@@ -1,6 +1,5 @@
-#include "itoken.hpp"
+#include "interrupted.hpp"
 #include <iostream>
-#include <chrono>
 #include <cassert>
 #include <cstring>
 
@@ -13,7 +12,7 @@ void testInterrupted()
   std::interrupted i3 = i1;
   i1 = i2;
   std::swap(i1,i2);
-  i1.swap(i2);
+  //i1.swap(i2);
 
   // what():
   auto s1 = i1.what();

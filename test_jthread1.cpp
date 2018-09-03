@@ -1,6 +1,5 @@
 #include "jthread.hpp"
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <chrono>
 #include <cassert>
