@@ -5,13 +5,16 @@
 #ifndef CONDITION_VARIABLE2_HPP
 #define CONDITION_VARIABLE2_HPP
 
+//*****************************************************************************
+// forward declarations are in separate header due to cyclic type dependencies:
+//*****************************************************************************
 #include "jthread_fwd.hpp"
 
 namespace std {
 
-//***************************************** 
+//*****************************************************************************
 //* implementation of class condition_variable2
-//***************************************** 
+//*****************************************************************************
 
 template<class Predicate>
 inline void condition_variable2::wait_or_throw(unique_lock<mutex>& lock, Predicate pred) {

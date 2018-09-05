@@ -1,14 +1,16 @@
 #ifndef INTERRUPT_TOKEN_HPP
 #define INTERRUPT_TOKEN_HPP
 
+//*****************************************************************************
+// forward declarations are in separate header due to cyclic type dependencies:
+//*****************************************************************************
 #include "jthread_fwd.hpp"
 
 
-//***************************************** 
+//*****************************************************************************
 //* implementation of new this_thread API for interrupts:
-//***************************************** 
+//*****************************************************************************
 #include "interrupted.hpp"
-#include "condition_variable2.hpp"
 #include <cassert>
 
 namespace std {
@@ -39,6 +41,7 @@ bool interrupt_token::registerCV(condition_variable2* cvPtr) noexcept {
   _ip->cvPtr = cvPtr;
   return _ip->interrupted.load();
 }
+
 bool interrupt_token::unregisterCV(condition_variable2* cvPtr) noexcept {
   if (!valid()) return false;
   std::scoped_lock lg{_ip->cvMutex};

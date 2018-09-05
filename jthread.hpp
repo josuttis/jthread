@@ -4,8 +4,7 @@
 #ifndef JTHREAD_HPP
 #define JTHREAD_HPP
 
-#include "condition_variable2.hpp"
-#include "this_thread.hpp"
+#include "interrupt_token.hpp"
 #include <thread>
 #include <future>
 #include <functional>  // for invoke()

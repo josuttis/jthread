@@ -1,7 +1,9 @@
+//*****************************************************************************
 // forward declarations of
 // - class interrupt_token
 // - class condition_variable2
 // due to cyclic dependencies
+//*****************************************************************************
 #ifndef ITOKEN_AND_CV_FWD_HPP
 #define ITOKEN_AND_CV_FWD_HPP
 
@@ -12,15 +14,15 @@
 
 namespace std {
 
+// forward declarations to avoid including header file:
+class condition_variable2;
+
 //***************************************** 
 //* new class for interrupt tokens
 //* - very cheap to create
 //* - cheap to copy
 //* - for both interrupter and interruptee
 //***************************************** 
-
-// forward declarations to avoid including header file:
-class condition_variable2;
 
 class interrupt_token {
  private:
