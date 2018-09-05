@@ -17,25 +17,25 @@ test_interrupted: interrupted.hpp test_interrupted.cpp Makefile
 	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@.exe
 	echo "- OK:  $@ and $@17  call  $@17raw.exe"
 
-test_itoken: interrupted.hpp interrupt_token.hpp condition_variable2.hpp jthread.hpp test_itoken.cpp Makefile
+test_itoken: jthread_fwd.hpp interrupted.hpp interrupt_token.hpp condition_variable2.hpp test_itoken.cpp Makefile
 	$(CXX17) $(CXXFLAGS17) $(INCLUDES) test_itoken.cpp $(LDFLAGS17) -o $@17raw.exe
 	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@17.exe
 	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@.exe
 	echo "- OK:  $@ and $@17  call  $@17raw.exe"
 
-test_jthread1: interrupted.hpp interrupt_token.hpp condition_variable2.hpp jthread.hpp test_jthread1.cpp Makefile
+test_jthread1: jthread_fwd.hpp interrupted.hpp interrupt_token.hpp condition_variable2.hpp jthread.hpp test_jthread1.cpp Makefile
 	$(CXX17) $(CXXFLAGS17) $(INCLUDES) test_jthread1.cpp $(LDFLAGS17) -o $@17raw.exe
 	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@17.exe
 	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@.exe
 	echo "- OK:  $@ and $@17  call  $@17raw.exe"
 
-test_jthread2: interrupted.hpp interrupt_token.hpp condition_variable2.hpp jthread.hpp test_jthread2.cpp Makefile
+test_jthread2: jthread_fwd.hpp interrupted.hpp interrupt_token.hpp condition_variable2.hpp jthread.hpp test_jthread2.cpp Makefile
 	$(CXX17) $(CXXFLAGS17) $(INCLUDES) test_jthread2.cpp $(LDFLAGS17) -o $@17raw.exe
 	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@17.exe
 	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@.exe
 	echo "- OK:  $@ and $@17  call  $@17raw.exe"
 
-test_cv: interrupted.hpp interrupt_token.hpp jthread.hpp condition_variable2.hpp test_cv.cpp Makefile
+test_cv: jthread_fwd.hpp interrupted.hpp interrupt_token.hpp jthread.hpp condition_variable2.hpp test_cv.cpp Makefile
 	$(CXX17) $(CXXFLAGS17) $(INCLUDES) test_cv.cpp $(LDFLAGS17) -o $@17raw.exe
 	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@17.exe
 	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@.exe

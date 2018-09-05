@@ -5,23 +5,13 @@
 #define JTHREAD_HPP
 
 #include "condition_variable2.hpp"
+#include "this_thread.hpp"
 #include <thread>
 #include <future>
 #include <functional>  // for invoke()
 #include <iostream>    // for debugging output
 
 namespace std {
-
-//***************************************** 
-//* new this_thread API for interrupts:
-//***************************************** 
-namespace this_thread {
-  static bool is_interrupted() noexcept;
-  static void throw_if_interrupted();
-  static interrupt_token get_interrupt_token() noexcept;
-  static void exchange_interrupt_token(const interrupt_token&) noexcept;
-
-}
 
 //***************************************** 
 //* class jthread
