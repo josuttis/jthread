@@ -4,7 +4,7 @@
 #ifndef JTHREAD_HPP
 #define JTHREAD_HPP
 
-#include "interrupt_token.hpp"
+#include "condition_variable2.hpp"
 #include <thread>
 #include <future>
 #include <functional>  // for invoke()
@@ -20,8 +20,8 @@ namespace this_thread {
   static void throw_if_interrupted();
   static interrupt_token get_interrupt_token() noexcept;
   static void exchange_interrupt_token(const interrupt_token&) noexcept;
-}
 
+}
 
 //***************************************** 
 //* class jthread

@@ -5,9 +5,9 @@
 #ifndef CONDITION_VARIABLE2_HPP
 #define CONDITION_VARIABLE2_HPP
 
+#include "this_thread.hpp"
 #include "interrupt_token.hpp"
 #include <condition_variable>
-#include "jthread.hpp"
 
 namespace std {
 
@@ -107,18 +107,38 @@ class condition_variable2
 
 template<class Predicate>
 inline void condition_variable2::wait_or_throw(unique_lock<mutex>& lock, Predicate pred) {
-    while(!pred()) {
-      cv.wait_for(lock, std::chrono::milliseconds{10},
-                      //[&pred] { return this_thread::is_interrupted() || pred(); })) {
-                  [&pred] {
-                    this_thread::throw_if_interrupted();
-                    return pred();
-                  });
-      //std::cout.put(this_thread::is_interrupted() ? 'i' : '.').flush();
+    std::this_thread::get_interrupt_token().registerCV(this);
+    try {
+      while(!pred()) {
+        this_thread::throw_if_interrupted();
+        cv.wait(lock, [&pred] {
+                        return pred() || this_thread::is_interrupted();
+                      });
+        //std::cout.put(this_thread::is_interrupted() ? 'i' : '.').flush();
+      }
     }
+    catch (...) {
+      std::this_thread::get_interrupt_token().unregisterCV(this);
+      throw;
+    }
+    std::this_thread::get_interrupt_token().unregisterCV(this);
 }
 
 inline void condition_variable2::wait_or_throw(unique_lock<mutex>& lock) {
+    std::this_thread::get_interrupt_token().registerCV(this);
+    try {
+      this_thread::throw_if_interrupted();
+      cv.wait(lock);
+      this_thread::throw_if_interrupted();
+      //std::cout.put(this_thread::is_interrupted() ? 'i' : '.').flush();
+    }
+    catch (...) {
+      std::this_thread::get_interrupt_token().unregisterCV(this);
+      throw;
+    }
+    std::this_thread::get_interrupt_token().unregisterCV(this);
+
+#ifdef OLD
     // Because we call a loop of wait_for() calls,
     // it might happen that notifications arrive between two of these calls
     // so they get los.
@@ -130,6 +150,7 @@ inline void condition_variable2::wait_or_throw(unique_lock<mutex>& lock) {
                   return false;
                 });
     //std::cout.put(this_thread::is_interrupted() ? 'i' : '.').flush();
+#endif
 }
 
 } // std
