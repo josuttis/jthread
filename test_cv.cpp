@@ -157,10 +157,10 @@ void testCVPred(bool doNotify)
 
 //------------------------------------------------------
 
-void testCVStdThreadPred(bool doNotify)
+void testCVStdThreadNoPred(bool doNotify)
 {
   // test the basic jthread API
-  std::cout << "*** start testCVStdThread(doNotify=" << doNotify << ")" << std::endl;
+  std::cout << "*** start testCVStdThreadNoPred(doNotify=" << doNotify << ")" << std::endl;
 
   bool ready = false;
   std::mutex readyMutex;
@@ -169,30 +169,84 @@ void testCVStdThreadPred(bool doNotify)
   std::interrupt_token it{false};
   {
     std::thread t1([&ready, &readyMutex, &readyCV, it, doNotify] {
-                      //std::cout.put('a').flush();
+                      {
+                        std::unique_lock lg{readyMutex};
+                        while (!ready && !it.is_interrupted()) {
+                          auto ret = readyCV.wait_until(lg,
+                                                        it);
+                          switch (ret) {
+                           case std::cv_status2::no_timeout:
+                            std::cout << "t1: ready" << std::endl;
+                            assert(!it.is_interrupted());
+                            break;
+                           case std::cv_status2::interrupted:
+                            std::cout << "t1: interrupted" << std::endl;
+                            assert(it.is_interrupted());
+                            break;
+                           case std::cv_status2::timeout:
+                            assert(false);
+                            break;
+                          }
+                        }
+                      }
+                      assert(doNotify != it.is_interrupted());
+                    });
+    
+    std::this_thread::sleep_for(0.5s);
+    assert(!it.is_interrupted());
+    std::this_thread::sleep_for(0.5s);
+    if (doNotify) {
+      {
+        std::lock_guard lg(readyMutex);
+        ready = true;
+      } // release lock
+      std::cout << "- call notify_one()" << std::endl;
+      readyCV.notify_one();
+    }
+    else {
+      std::cout << "- signal interrupt" << std::endl;
+      it.interrupt();
+    }
+    t1.join();
+  } // leave scope of t1 without join() or detach() (signals cancellation)
+  std::cout << "\n*** OK" << std::endl;
+}
+
+//------------------------------------------------------
+
+void testCVStdThreadPred(bool doNotify)
+{
+  // test the basic jthread API
+  std::cout << "*** start testCVStdThreadPred(doNotify=" << doNotify << ")" << std::endl;
+
+  bool ready = false;
+  std::mutex readyMutex;
+  std::condition_variable2 readyCV;
+  
+  std::interrupt_token it{false};
+  {
+    std::thread t1([&ready, &readyMutex, &readyCV, it, doNotify] {
                       bool ret;
                       {
                         std::unique_lock lg{readyMutex};
-                        //std::cout.put('b').flush();
                         ret = readyCV.wait_until(lg,
                                                  [&ready] { return ready; },
                                                  it);
+                        if (ret) {
+                          std::cout << "t1: ready" << std::endl;
+                          assert(!it.is_interrupted());
+                        }
+                        else {
+                          std::cout << "t1: interrupted" << std::endl;
+                          assert(it.is_interrupted());
+                        }
                       }
-                      //std::cout.put('c').flush();
-                      if (ret) {
-                        std::cout << "t1: ready" << std::endl;
-                        assert(!it.is_interrupted());
-                      }
-                      else {
-                        std::cout << "t1: interrupted" << std::endl;
-                        assert(it.is_interrupted());
-                      }
-                      //std::cout.put('d').flush();
+                      assert(doNotify != it.is_interrupted());
                     });
     
-    std::this_thread::sleep_for(1s);
+    std::this_thread::sleep_for(0.5s);
     assert(!it.is_interrupted());
-    std::this_thread::sleep_for(1s);
+    std::this_thread::sleep_for(0.5s);
     if (doNotify) {
       {
         std::lock_guard lg(readyMutex);
@@ -222,6 +276,11 @@ int main()
                      });
 
   std::cout << std::boolalpha;
+
+  std::cout << "\n\n**************************\n";
+  testCVStdThreadNoPred(false);  // signal cancellation
+  std::cout << "\n\n**************************\n";
+  testCVStdThreadNoPred(true);   // call notify()
 
   std::cout << "\n\n**************************\n";
   testStdCV(false);  // signal cancellation
