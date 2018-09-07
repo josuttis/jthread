@@ -9,6 +9,7 @@
 // forward declarations are in separate header due to cyclic type dependencies:
 //*****************************************************************************
 #include "jthread_fwd.hpp"
+#include <iostream>
 
 namespace std {
 
@@ -48,20 +49,55 @@ inline void condition_variable2::wait_or_throw(unique_lock<mutex>& lock) {
       throw;
     }
     std::this_thread::get_interrupt_token().unregisterCV(this);
+}
 
-#ifdef OLD
-    // Because we call a loop of wait_for() calls,
-    // it might happen that notifications arrive between two of these calls
-    // so they get los.
-    // As a consequence, we usually cause a spurious wakeup and let this
-    // handle in the outer loop that calls this function. 
-    cv.wait_for(lock, std::chrono::milliseconds{10},
-                [] {
-                  this_thread::throw_if_interrupted();
-                  return false;
-                });
-    //std::cout.put(this_thread::is_interrupted() ? 'i' : '.').flush();
-#endif
+// return std::cv_status::interrupted on interrupt:
+inline cv_status2 condition_variable2::wait_until(unique_lock<mutex>& lock,
+                                                  interrupt_token itoken) {
+    if (itoken.is_interrupted()) {
+      return cv_status2::interrupted;
+    }
+    itoken.registerCV(this);
+    try {
+      cv.wait(lock);
+      //std::cout.put(itoken.is_interrupted() ? 'i' : '.').flush();
+    }
+    catch (...) {
+      itoken.unregisterCV(this);
+      throw;
+    }
+    itoken.unregisterCV(this);
+    return itoken.is_interrupted() ? cv_status2::interrupted : cv_status2::no_timeout;
+}
+
+// only returns if pred or on signaled interrupt:
+// return value:
+//   true:  pred() yields true
+//   false: pred() yields false (other reason => interrupt signaled)
+template <class Predicate>
+inline bool condition_variable2::wait_until(unique_lock<mutex>& lock,
+                                            Predicate pred,
+                                            interrupt_token itoken)
+{
+    if (itoken.is_interrupted()) {
+      return pred();
+    }
+    itoken.registerCV(this);
+    try {
+      while(!pred() && !itoken.is_interrupted()) {
+        //std::cout.put(itoken.is_interrupted() ? 'i' : '.').flush();
+        cv.wait(lock, [&pred, &itoken] {
+                        return pred() || itoken.is_interrupted();
+                      });
+      }
+    }
+    catch (...) {
+      itoken.unregisterCV(this);
+      throw;
+    }
+    itoken.unregisterCV(this);
+    // return true if pred() true:
+    return pred();
 }
 
 } // std

@@ -165,8 +165,17 @@ class condition_variable2
     // x.6.2.1 dealing with interrupts:
     // throw std::interrupted on interrupt:
     void wait_or_throw(unique_lock<mutex>& lock);
+
     template<class Predicate>
-    void wait_or_throw(unique_lock<mutex>& lock, Predicate pred);
+     void wait_or_throw(unique_lock<mutex>& lock, Predicate pred);
+
+    // return std::cv_status::interrupted on interrupt:
+    cv_status2 wait_until(unique_lock<mutex>& lock,
+                          interrupt_token itoken);
+    template <class Predicate>
+      bool wait_until(unique_lock<mutex>& lock,
+                      Predicate pred,
+                      interrupt_token itoken);
 
   //***************************************** 
   //* implementation:

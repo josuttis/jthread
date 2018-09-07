@@ -13,7 +13,7 @@ using namespace::std::literals;
 void testStdCV(bool doNotify)
 {
   // test the basic jthread API
-  std::cout << "\n*** start testStdCV(doNotify=" << doNotify << ")" << std::endl;
+  std::cout << "*** start testStdCV(doNotify=" << doNotify << ")" << std::endl;
 
   bool ready = false;
   std::mutex readyMutex;
@@ -56,7 +56,7 @@ void testStdCV(bool doNotify)
 void testCVNoPred(bool doNotify)
 {
   // test the basic jthread API
-  std::cout << "\n*** start testCVNoPred(doNotify=" << doNotify << ")" << std::endl;
+  std::cout << "*** start testCVNoPred(doNotify=" << doNotify << ")" << std::endl;
 
   bool ready = false;
   std::mutex readyMutex;
@@ -110,7 +110,7 @@ void testCVNoPred(bool doNotify)
 void testCVPred(bool doNotify)
 {
   // test the basic jthread API
-  std::cout << "\n*** start testCVPred(doNotify=" << doNotify << ")" << std::endl;
+  std::cout << "*** start testCVPred(doNotify=" << doNotify << ")" << std::endl;
 
   bool ready = false;
   std::mutex readyMutex;
@@ -155,6 +155,61 @@ void testCVPred(bool doNotify)
   std::cout << "\n*** OK" << std::endl;
 }
 
+//------------------------------------------------------
+
+void testCVStdThreadPred(bool doNotify)
+{
+  // test the basic jthread API
+  std::cout << "*** start testCVStdThread(doNotify=" << doNotify << ")" << std::endl;
+
+  bool ready = false;
+  std::mutex readyMutex;
+  std::condition_variable2 readyCV;
+  
+  std::interrupt_token it{false};
+  {
+    std::thread t1([&ready, &readyMutex, &readyCV, it, doNotify] {
+                      //std::cout.put('a').flush();
+                      bool ret;
+                      {
+                        std::unique_lock lg{readyMutex};
+                        //std::cout.put('b').flush();
+                        ret = readyCV.wait_until(lg,
+                                                 [&ready] { return ready; },
+                                                 it);
+                      }
+                      //std::cout.put('c').flush();
+                      if (ret) {
+                        std::cout << "t1: ready" << std::endl;
+                        assert(!it.is_interrupted());
+                      }
+                      else {
+                        std::cout << "t1: interrupted" << std::endl;
+                        assert(it.is_interrupted());
+                      }
+                      //std::cout.put('d').flush();
+                    });
+    
+    std::this_thread::sleep_for(1s);
+    assert(!it.is_interrupted());
+    std::this_thread::sleep_for(1s);
+    if (doNotify) {
+      {
+        std::lock_guard lg(readyMutex);
+        ready = true;
+      } // release lock
+      std::cout << "- call notify_one()" << std::endl;
+      readyCV.notify_one();
+    }
+    else {
+      std::cout << "- signal interrupt" << std::endl;
+      it.interrupt();
+    }
+    t1.join();
+  } // leave scope of t1 without join() or detach() (signals cancellation)
+  std::cout << "\n*** OK" << std::endl;
+}
+
 
 //------------------------------------------------------
 
@@ -162,21 +217,30 @@ int main()
 {
   std::set_terminate([](){
                        std::cout << "ERROR: terminate() called" << std::endl;
+                       std::this_thread::sleep_for(10s);
                        assert(false);
                      });
 
   std::cout << std::boolalpha;
-  std::cout << "\n\n**************************\n\n";
+
+  std::cout << "\n\n**************************\n";
   testStdCV(false);  // signal cancellation
-  std::cout << "\n\n**************************\n\n";
+  std::cout << "\n\n**************************\n";
   testStdCV(true);   // call notify()
-  std::cout << "\n\n**************************\n\n";
+
+  std::cout << "\n\n**************************\n";
   testCVPred(false);  // signal cancellation
-  std::cout << "\n\n**************************\n\n";
+  std::cout << "\n\n**************************\n";
   testCVPred(true);   // call notify()
-  std::cout << "\n\n**************************\n\n";
+
+  std::cout << "\n\n**************************\n";
   testCVNoPred(false);  // signal cancellation
-  std::cout << "\n\n**************************\n\n";
+  std::cout << "\n\n**************************\n";
   testCVNoPred(true);   // call notify()
+
+  std::cout << "\n\n**************************\n";
+  testCVStdThreadPred(false);  // signal cancellation
+  std::cout << "\n\n**************************\n";
+  testCVStdThreadPred(true);   // call notify()
 }
 
