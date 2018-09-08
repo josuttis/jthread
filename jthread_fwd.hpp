@@ -11,6 +11,7 @@
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
+#include <list>
 
 namespace std {
 
@@ -28,7 +29,7 @@ class interrupt_token {
  private:
   struct SharedData {
     ::std::atomic<bool> interrupted;
-    condition_variable2* cvPtr;
+    ::std::list<condition_variable2*> cvPtrs;
     ::std::mutex cvMutex{};      // for any concurrent access to cv, which might be two operations
   };
   ::std::shared_ptr<SharedData> _ip{nullptr};
@@ -38,7 +39,7 @@ class interrupt_token {
   explicit interrupt_token() noexcept = default;
   // enable interrupt mechanisms by passing a bool (usually false):
   explicit interrupt_token(bool initial_state)
-   : _ip{new SharedData{initial_state,nullptr}} {
+   : _ip{new SharedData{initial_state,{}}} {
   }
 
   // special members (default OK):
