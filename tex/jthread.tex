@@ -1,0 +1,1298 @@
+%!TEX root = std.tex
+\rSec0[thread]{Thread support library}
+
+%******************************************************************
+\rSec1[jthread.general]{General}
+
+\pnum
+The following subclauses describe components to create and manage
+threads\iref{intro.multithread}, perform mutual exclusion, and communicate conditions
+and values
+between threads, as summarized in \tref{thread.lib.summary}.
+
+\begin{libsumtab}{Thread support library summary}{tab:thread.lib.summary}
+\ref{thread.req}      & Requirements          &                               \\ \rowsep
+\ref{thread.threads}  & Threads               & \tcode{<thread>}              \\ \rowsep
+\color{insertcolor}
+\ref{thread.interrupt_token} &
+        \color{insertcolor} Interrupt Tokens       &
+                \color{insertcolor} \tcode{<interrupt_token>}              \\ \rowsep
+\color{insertcolor}
+\ref{thread.jthreads} &
+        \color{insertcolor} Joining Threads       &
+                \color{insertcolor} \tcode{<jthread>}              \\ \rowsep
+\ref{thread.mutex}    & Mutual exclusion      & \tcode{<mutex>}               \\
+                      &                       & \tcode{<shared_mutex>}        \\ \rowsep
+\ref{thread.condition}& Condition variables   & \tcode{<condition_variable>}  \\ \rowsep
+\ref{futures}         & Futures               & \tcode{<future>}              \\
+\end{libsumtab}
+
+%******************************************************************
+\rSec1[thread.req]{Requirements}
+
+
+%******************************************************************
+\rSec1[thread.threads]{Threads}
+
+
+\clearpage
+
+{\color{insertcolor}
+
+%******************************************************************
+\rSec1[thread.interrupt_token]{Interrupt Tokens}
+
+\pnum
+\ref{thread.interrupt_token} describes components that can be used to
+asynchonously signal an interrupt.
+The interrupt can only be signaled once.
+
+%**************************
+\rSec2[thread.interrupt_token.syn]{Header \tcode{<interrupt_token>} synopsis}
+\indexhdr{interrupt_token}%
+
+\begin{codeblock}
+namespace std {
+  // \ref{interrupted} class \tcode{interrupted}
+  class interrupted;
+
+  // \ref{thread.interrupt_token.syn} class \tcode{interrupt_token}
+  class interrupt_token;
+}
+\end{codeblock}
+
+%**************************
+\indexlibrary{\idxcode{interrupted}}%
+\rSec2[interrupted]{Class \tcode{interrupted}}
+
+\indexlibrary{\idxcode{exception}}%
+\begin{codeblock}
+namespace std {
+  class interrupted {
+  public:
+    explicit interrupted() noexcept;
+    explicit interrupted(const interrupted&) noexcept;
+    interrupted& operator=(const interrupted&) noexcept;
+    const char* what() const noexcept;
+  };
+}
+\end{codeblock}
+
+\pnum
+The class
+\tcode{interrupted}
+defines the type of objects thrown as
+exceptions by \Cpp{} standard library components,
+and certain expressions, to report a signaled interrupt.
+\begin{note} This class is not derived from class \tcode{exception}. \end{note}
+
+\indexlibrary{\idxcode{interrupted}!constructor}%
+\begin{itemdecl}
+interrupted() noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+Constructs an object of class
+\tcode{interrupted}.
+\end{itemdescr}
+
+\indexlibrary{\idxcode{interrupted}!constructor}%
+\indexlibrarymember{operator=}{interrupted}%
+\begin{itemdecl}
+interrupted(const interrupted&) noexcept;
+interrupted& operator=(const interrupted&) noexcept;
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum \effects Copies an object of class \tcode{interrupted}.
+
+  \pnum \postconditions If \tcode{*this} and \tcode{rhs} both have dynamic type \tcode{interrupted}
+        then the value of the expression \tcode{strcmp(what(), rhs.what())} shall equal 0.
+\end{itemdescr}
+
+\indexlibrarymember{what}{interrupted}%
+\begin{itemdecl}
+const char* what() const noexcept;
+\end{itemdecl}
+% NOTE: NO override here
+
+\begin{itemdescr}
+\pnum
+\returns
+An \impldef{return value of \tcode{interrupted::what}} \ntbs{}.
+
+\pnum
+\remarks
+The message may be a null-terminated multibyte string\iref{multibyte.strings},
+suitable for conversion and display as a
+\tcode{wstring}~(\ref{string.classes}, \ref{locale.codecvt}).
+The return value remains valid until the exception object from which
+it is obtained is destroyed or a non-\tcode{const}
+member function of the exception object is called.
+\end{itemdescr}
+
+
+%**************************
+\indexlibrary{\idxcode{interrupt_token}}%
+\rSec3[interrupt_token]{Class \tcode{interrupt_token}}
+
+\pnum
+\indexlibrary{\idxcode{interrupt_token}}%
+The class \tcode{interrupt_token} implements semantics of shared ownership of a 
+token to signal interrupts.
+An interrupt can only be signaled once.
+All owners can signal an interrupt, provided the token is valid.
+All owners can check whether an interrupt was signaled.
+The last remaining owner of the token is responsible for destroying
+the object.
+
+\begin{codeblock}
+namespace std {
+  class interrupt_token {
+  public:
+    explicit interrupt_token() noexcept;
+    explicit interrupt_token(bool initial_state);
+
+    interrupt_token(const interrupt_token&) noexcept;
+    interrupt_token(interrupt_token&&) noexcept;
+    interrupt_token& operator=(const interrupt_token&) noexcept;
+    interrupt_token& operator=(interrupt_token&&) noexcept;
+    void swap(interrupt_token&) noexcept;
+
+    // \ref{interrupt_token.mem} interrupt handling:
+    bool valid() const noexcept;
+    bool is_interrupted() const noexcept;
+    bool interrupt() noexcept;
+    void throw_if_interrupted() const;
+  }
+}
+
+bool operator== (const interrupt_token& lhs, const interrupt_token& rhs);
+bool operator!= (const interrupt_token& lhs, const interrupt_token& rhs);
+\end{codeblock}
+
+Calls to \tcode{interrupt()}, \tcode{is_interrupted()}, and \tcode{throw_if_interrupted()}
+are atomic operations(6.8.2.1p3 \ref{intro.races}) on an atomic object contained in the interrupt_token.
+Hence concurrent calls to these functions do not introduce data races. 
+A call to \tcode{interrupt()} synchronizes with any call to \tcode{interrupt()},
+\tcode{is_interrupted()}, or \tcode{throw_if_interrupted()} that observes the interrupt
+(and hence returns \tcode{true} or throws).
+
+% Hans Boehm:
+%The fact that they are atomic operations implies that they appear to be be executed in a single total per-interrupt-token order. We could instead require them to be sequentially consistent, and participate in the SC order. But I think this is another one of those cases in which only clearly silly code can tell the difference. And we've generally not insisted on seq_cst unless there is some real possibility of confusion. (You can implement Dekker's algorithm with interrupt_tokens. But if you do, your code deserves to break.)
+%
+%I'm using "synchronizes with" instead of "strongly happens before" since I'm calling these atomic operations. Since there are no sequentially consistent operations on the atomic, I believe the difference is not observable, even after the memory model fixes.
+%
+% Hans Boehm:
+%We then also need some statement for the waiting functions that if they return with an interrupted status, their synchronization behavior is as though they called is_interrupted().
+
+
+\rSec3[interrupt_token.constr]{\tcode{interrupt_token} constructors}
+
+\indexlibrary{\idxcode{interrupt_token}!constructor}%
+\begin{itemdecl}
+interrupt_token() noexcept;
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\effects Constructs a new \tcode{interrupt_token} object that can't be used to signal interrupts.
+
+  \pnum\postconditions \tcode{valid() == false}.
+\end{itemdescr}
+
+\indexlibrary{\idxcode{interrupt_token}!constructor}%
+\begin{itemdecl}
+interrupt_token(bool initial_state) noexcept;
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\effects Constructs a new \tcode{interrupt_token} object that can signal interrupts.
+
+  \pnum\postconditions \tcode{valid() == true} and \tcode{is_interrupted() == initial_state}.
+\end{itemdescr}
+
+\indexlibrary{\idxcode{interrupt_token}!constructor}%
+\begin{itemdecl}
+interrupt_token(const interrupt_token& it) noexcept;
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\effects If \tcode{it} is not valid, constructs an \tcode{interrupt_token} object
+                that is not valid;
+                otherwise, constructs an \tcode{interrupt_token}
+                that shares the ownership of the interrupt signal with \tcode{it}.
+
+  \pnum\postconditions \tcode{valid() == true}.
+\end{itemdescr}
+
+\indexlibrary{\idxcode{interrupt_token}!constructor}%
+\begin{itemdecl}
+interrupt_token(interrupt_token&& it) noexcept;
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\effects Move constructs an object of type \tcode{interrupt_token} from \tcode{it}.
+
+  \pnum\postconditions \tcode{*this} shall contain the old value of \tcode{it}.
+                        \tcode{it.valid() == false}.
+\end{itemdescr}
+
+%*****
+\rSec3[interrupt_token.assign]{\tcode{interrupt_token} assign}
+
+\indexlibrarymember{operator=}{interrupt_token}%
+\begin{itemdecl}
+interrupt_token& operator=(const interrupt_token& it) noexcept;
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\effects Equivalent to: \tcode{interrupt_token(it).swap(*this);}
+
+  \pnum\returns \tcode{*this}.
+\end{itemdescr}
+
+\indexlibrarymember{operator=}{interrupt_token}%
+\begin{itemdecl}
+interrupt_token& operator=(interrupt_token&& it) noexcept;
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\effects Equivalent to: \tcode{interrupt_token(std::move(it)).swap(*this);}
+
+  \pnum\returns \tcode{*this}.
+\end{itemdescr}
+
+%*****
+\rSec3[interrupt_token.swap]{\tcode{interrupt_token} swap}
+
+\indexlibrarymember{swap}{interrupt_token}%
+\begin{itemdecl}
+void swap(interrupt_token& it) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Swaps the state of \tcode{*this} and \tcode{it}.
+\end{itemdescr}
+
+
+%*****
+\rSec3[interrupt_token.mem]{\tcode{interrupt_token} members}
+
+\indexlibrarymember{valid}{interrupt_token}%
+\begin{itemdecl}
+bool valid() const noexcept;
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\returns \tcode{true} if the interrupt token can be used to signal interrupts.
+\end{itemdescr}
+
+\indexlibrarymember{is_interrupted}{interrupt_token}%
+\begin{itemdecl}
+bool is_interrupted() const noexcept;
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\returns \tcode{true} if initialized with \tcode{true}
+                or initialized with \tcode{false} and \tcode{interrupt()} was called
+                by one of the owners.
+\end{itemdescr}
+
+\indexlibrarymember{interrupt}{interrupt_token}%
+\begin{itemdecl}
+bool interrupt() noexcept;
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\requires \tcode{valid() == true}
+
+  \pnum\effects \tcode{is_interrupted() == true}.
+
+  \pnum\returns The value of \tcode{is_interrupted()} prior to the call.
+\end{itemdescr}
+
+\indexlibrarymember{throw_if_interrupted}{interrupt_token}%
+\begin{itemdecl}
+void throw_if_interrupted() const;
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\effects Equivalent to:
+\begin{codeblock}
+if (is_interrupted())
+  throw interrupted();
+\end{codeblock}
+\end{itemdescr}
+
+
+%*****
+\rSec3[interrupt_token.cmp]{\tcode{interrupt_token} comparisons}
+
+\indexlibrarymember{operator==}{interrupt_token}%
+\begin{itemdecl}
+bool operator== (const interrupt_token& lhs, const interrupt_token& rhs);
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\returns \tcode{!lhs.valid() \&\& !rhs.valid()} or
+                whether \tcode{lhs} and \tcode{rhs} refer to the
+                same interrupt token
+                (copied or moved from the same initial object).
+\end{itemdescr}
+
+\indexlibrarymember{operator!=}{interrupt_token}%
+\begin{itemdecl}
+bool operator!= (const interrupt_token& lhs, const interrupt_token& rhs);
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\returns \tcode{!(lhs==rhs)}.
+\end{itemdescr}
+
+
+\clearpage
+
+%******************************************************************
+\rSec1[thread.jthreads]{Joining Threads}
+
+}%\color{insertcolor}
+[{\itshape{}Editorial note:} 
+{\color{insertnote}This color signals differences to class \tcode{std::thread}.} ]
+{\color{insertcolor}
+
+\pnum
+\ref{thread.jthreads} describes components that can be used to create and manage threads
+with the ability to signal interrupts to cooperatively cancel the running thread.
+
+%**************************
+\rSec2[thread.jthread.syn]{Header \tcode{<jthread>} synopsis}
+\indexhdr{jthread}%
+
+\begin{codeblock}
+#include <interrupt_token>
+
+namespace std {
+  // \ref{thread.jthread.class} class \tcode{jthread}
+  class jthread;
+
+  void swap(jthread& x, jthread& y) noexcept;
+
+  // \ref{thread.jthread.this} class \tcode{jthread}
+  namespace this_thread {
+    static bool is_interrupted() noexcept;
+    static void throw_if_interrupted();
+    static interrupt_token get_interrupt_token() noexcept;
+    static interrupt_token exchange_interrupt_token(const interrupt_token&) noexcept;
+  }
+}
+\end{codeblock}
+
+%**************************
+\rSec2[thread.jthread.class]{Class \tcode{jthread}}
+
+\pnum
+The class \tcode{jthread} provides a mechanism on top of class \tcode{thread} (\ref{thread.thread}),
+which the additional ability to signal interrupts and
+let the destructor \tcode{join()} if still \tcode{joinable()}.
+The functionality is identical to class \tcode{thread}
+except where otherwise specified.
+
+\indexlibrary{\idxcode{jthread}}%
+\begin{codeblock}
+namespace std {
+  class jthread {
+  public:
+    // types
+    using id = thread::id;
+    using native_handle_type = thread::native_handle_type;
+
+    // construct/copy/destroy
+    jthread() noexcept;
+    template<class F, class... Args> explicit jthread(F&& f, Args&&... args);
+    ~jthread();
+    jthread(const jthread&) = delete;
+    jthread(jthread&&) noexcept;
+    jthread& operator=(const jthread&) = delete;
+    jthread& operator=(jthread&&) noexcept;
+
+    // members
+    void swap(jthread&) noexcept;
+    bool joinable() const noexcept;
+    void join();
+    void detach();
+    id get_id() const noexcept;
+    native_handle_type native_handle();     // see~\ref{thread.req.native}
+\end{codeblock}
+{\color{insertnote}
+\begin{codeblock}
+    // interrupt token handling
+    interrupt_token get_original_interrupt_token() const noexcept;
+    bool interrupt() noexcept;
+\end{codeblock}
+}%\color{insertnote}
+\begin{codeblock}
+    // static members
+    static unsigned int hardware_concurrency() noexcept;
+  
+\end{codeblock}
+{\color{insertnote}
+\begin{codeblock}
+  private:
+    interrupt_token itoken;                 // \expos
+  };
+\end{codeblock}
+}%\color{insertnote}
+\begin{codeblock}
+}
+\end{codeblock}
+
+
+\rSec3[thread.jthread.constr]{\tcode{jthread} constructors}
+
+\indexlibrary{\idxcode{jthread}!constructor}%
+\begin{itemdecl}
+jthread() noexcept;
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\effects Constructs a \tcode{jthread} object that does not represent a thread of execution.
+
+  \pnum\postconditions \tcode{get_id() == id()}
+        {\color{insertnote} and \tcode{itoken.valid() == false}}.
+\end{itemdescr}
+
+\indexlibrary{\idxcode{jthread}!constructor}%
+\begin{itemdecl}
+template<class F, class... Args> explicit jthread(F&& f, Args&&... args);
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum
+\requires\ \tcode{F} and each $\tcode{T}_i$ in \tcode{Args} shall satisfy the
+\oldconcept{MoveConstructible} requirements.
+\tcode{%
+\placeholdernc{INVOKE}(\brk{}%
+\placeholdernc{DECAY_COPY}(\brk{}%
+std::forward<F>(f)),
+\placeholdernc{DECAY_COPY}(\brk{}%
+std::forward<Args>(\brk{}args))...)}\iref{func.require} shall be
+a valid expression.
+
+\pnum\remarks
+This constructor shall not participate in overload resolution if \tcode{remove_cvref_t<F>}
+is the same type as \tcode{std::jthread}.
+
+\pnum\effects\ Constructs an object of type \tcode{jthread}. The new thread of execution executes
+\tcode{%
+\placeholdernc{INVOKE}(\brk{}%
+\placeholdernc{DECAY_COPY}(\brk{}%
+std::forward<F>(f)),
+\placeholdernc{DECAY_COPY}(\brk{}%
+std::forward<Args>(\brk{}args))...)} with the calls to
+\tcode{\placeholder{DECAY_COPY}} being evaluated in the constructing thread. Any return value from this invocation
+is ignored. \begin{note} This implies that any exceptions not thrown from the invocation of the copy
+of \tcode{f} will be thrown in the constructing thread, not the new thread. \end{note} If the
+invocation of
+\tcode{%
+\placeholdernc{INVOKE}(\brk{}%
+\placeholdernc{DECAY_COPY}(\brk{}%
+std::forward<F>(f)),
+\placeholdernc{DECAY_COPY}(\brk{}%
+std::forward<Args>(args))...)}
+termi\-nates with an uncaught exception, \tcode{terminate} shall be called.
+
+{\color{insertnote}
+An uncaught \tcode{interrupted} exception in the started thread of execution
+will silently be ignored.
+\begin{note} Thus, an uncaught exception thrown by \tcode{throw_if_interrupted()}
+             will cause the started thread to end silently.
+             \end{note}
+}%\color{insertnote}
+
+\pnum\sync The completion of the invocation of the constructor
+synchronizes with the beginning of the invocation of the copy of \tcode{f}.
+
+{\color{insertnote}
+\pnum\postconditions \tcode{get_id() != id()}.
+                     \tcode{itoken.valid() == true}.
+                     \tcode{*this} represents the newly started thread.
+                     In the started thread of execution \tcode{this_thread::thread_itoken}
+                     is an \tcode{interrupt_token} equal to \tcode{itoken}. 
+\begin{note} Note that the calling thread can signal an interrupt only once,
+                because it can't replace this interrupt token.  \end{note}
+}%\color{insertnote}
+
+\pnum\throws \tcode{system_error} if unable to start the new thread.
+
+\pnum\errors
+\begin{itemize}
+\item \tcode{resource_unavailable_try_again} --- the system lacked the necessary
+resources to create another thread, or the system-imposed limit on the number of
+threads in a process would be exceeded.
+\end{itemize}
+\end{itemdescr}
+
+\indexlibrary{\idxcode{jthread}!constructor}%
+\begin{itemdecl}
+jthread(jthread&& x) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Constructs an object of type \tcode{jthread} from \tcode{x}, and sets
+\tcode{x} to a default constructed state.
+
+\pnum
+\postconditions \tcode{x.get_id() == id()} and \tcode{get_id()} returns the
+value of \tcode{x.get_id()} prior to the start of construction.
+{\color{insertnote}
+\tcode{itoken} yields the value of \tcode{x.itoken} prior to the start of construction
+and \tcode{x.itoken.valid() == false}.
+}%\color{insertnote}
+
+\end{itemdescr}
+
+\rSec3[thread.jthread.destr]{\tcode{jthread} destructor}
+
+\indexlibrary{\idxcode{jthread}!destructor}%
+\begin{itemdecl}
+~jthread();
+\end{itemdecl}
+
+{\color{insertnote}
+\begin{itemdescr}
+\pnum
+If \tcode{joinable()}, calls \tcode{interrupt()} and \tcode{join()}.
+Otherwise, has no effects.
+\begin{note} Operations on \tcode{*this} are not synchronized. \end{note}
+\end{itemdescr}
+}%\color{insertnote}
+
+\rSec3[thread.jthread.assign]{\tcode{jthread} assignment}
+
+\indexlibrarymember{operator=}{jthread}%
+\begin{itemdecl}
+jthread& operator=(jthread&& x) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects If \tcode{joinable()}, calls \tcode{interrupt()} and \tcode{join()}.
+Assigns the
+state of \tcode{x} to \tcode{*this} and sets \tcode{x} to a default constructed state.
+
+{\color{insertnote}
+\pnum
+\postconditions \tcode{x.get_id() == id()} and \tcode{get_id()} returns the value of
+\tcode{x.get_id()} prior to the assignment.
+\tcode{itoken} yields the value of \tcode{x.itoken} prior to the assignment
+and \tcode{x.itoken.valid() == false}.
+}%\color{insertnote}
+
+\pnum
+\returns \tcode{*this}.
+\end{itemdescr}
+
+
+\rSec3[thread.jthread.interrupt]{\tcode{jthread} interrupt members}
+
+{\color{insertnote}
+\indexlibrarymember{get_original_interrupt_token}{jthread}%
+\begin{itemdecl}
+interrupt_token get_original_interrupt_token() const noexcept
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\effects Equivalent to: \tcode{return itoken;}
+\end{itemdescr}
+
+\indexlibrarymember{interrupt}{jthread}%
+\begin{itemdecl}
+bool interrupt() noexcept;
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\effects Equivalent to: \tcode{return itoken.interrupt();}
+\end{itemdescr}
+}%\color{insertnote}
+
+%\rSec3[thread.jthread.static]{\tcode{jthread} static members}
+%
+%\indexlibrarymember{hardware_concurrency}{thread}%
+%\begin{itemdecl}
+%unsigned hardware_concurrency() noexcept;
+%\end{itemdecl}
+%\begin{itemdescr}
+%  \pnum\effects Equivalent to: \tcode{return thread::hardware_concurrency()}.
+%\end{itemdescr}
+%
+%\rSec3[thread.jthread.algorithm]{\tcode{jthread} specialized algorithms}
+%
+%\indexlibrarymember{swap}{jthread}%
+%\begin{itemdecl}
+%void swap(jthread& x, jthread& y) noexcept;
+%\end{itemdecl}
+%\begin{itemdescr}
+%  \pnum\effects As if by \tcode{x.swap(y)}.
+%\end{itemdescr}
+
+%**************************
+\rSec2[thread.jthread.this]{Namespace \tcode{this_thread} Interrupt Handling}
+
+To be able to deal with signaled interrupt
+\tcode{this_thread} provides the following access to an \tcode{interrupt_token} (\ref{interrupt_token}):
+
+\begin{codeblock}
+namespace std::this_thread {
+  interrupt_token thread_itoken;                 // \expos
+  static interrupt_token get_interrupt_token() noexcept;
+  static bool is_interrupted() noexcept;
+  static void throw_if_interrupted();
+  static interrupt_token exchange_interrupt_token(const interrupt_token&) noexcept;
+}
+\end{codeblock}
+
+For any thread of execution, \tcode{thread_itoken} is default initialized unless
+the thread was started with a constructor of class \tcode{jthread} (\ref{thread.jthread}).
+
+
+\indexlibrarymember{get_interrupt_token}{this_thread}%
+\begin{itemdecl}
+interrupt_token get_interrupt_token() noexcept;
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\returns \tcode{this_thread::thread_itoken}.
+\end{itemdescr}
+
+\indexlibrarymember{is_interrupted}{this_thread}%
+\begin{itemdecl}
+bool is_interrupted() noexcept;
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\returns \tcode{this_thread::get_interrupt_token().is_interrupted()}.
+\end{itemdescr}
+
+\indexlibrarymember{throw_if_interrupted}{this_thread}%
+\begin{itemdecl}
+void throw_if_interrupted();
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\effects Equivalent to: \tcode{this_thread::get_interrupt_token().throw_if_interrupted();}
+\end{itemdescr}
+
+\indexlibrarymember{exchange_interrupt_token}{this_thread}%
+\begin{itemdecl}
+interrupt_token exchange_interrupt_token(const interrupt_token& it) noexcept;
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\effects Equivalent to: \tcode{this_thread::itoken = it;}
+
+  \pnum\returns \tcode{this_thread::thread_itoken} prior to the exchange.
+
+  \begin{note} With this exchange \tcode{this_thread::get_interrupt_token()}
+               will no longer signal interrupts from the calling threads
+               until the returned token is restored.
+               \end{note}
+\end{itemdescr}
+
+}%\color{insertcolor}
+
+\clearpage
+
+%******************************************************************
+\rSec1[thread.condition]{Condition variables}
+
+\rSec2[condition_variable.syn]{Header \tcode{<condition_variable>} synopsis}
+\indexhdr{condition_variable}%
+
+%{NEW: add interrupted:}
+
+\begin{codeblock}
+namespace std {
+  enum class cv_status { no_timeout, timeout,
+\end{codeblock}
+{\color{insertcolor}
+\begin{codeblock}
+                         interrupted
+\end{codeblock}
+}
+\begin{codeblock}
+                       };
+}
+\end{codeblock}
+
+
+\rSec2[thread.condition.condvar]{Class \tcode{condition_variable}}
+
+\indexlibrary{\idxcode{condition_variable}}%
+\begin{codeblock}
+namespace std {
+  class condition_variable {
+  public:
+    condition_variable();
+    ~condition_variable();
+
+    condition_variable(const condition_variable&) = delete;
+    condition_variable& operator=(const condition_variable&) = delete;
+
+    void notify_one() noexcept;
+    void notify_all() noexcept;
+
+    void wait(unique_lock<mutex>& lock);
+    template<class Predicate>
+      void wait(unique_lock<mutex>& lock, Predicate pred);
+
+    template<class Clock, class Duration>
+      cv_status wait_until(unique_lock<mutex>& lock,
+                           const chrono::time_point<Clock, Duration>& abs_time);
+    template<class Clock, class Duration, class Predicate>
+      bool wait_until(unique_lock<mutex>& lock,
+                      const chrono::time_point<Clock, Duration>& abs_time,
+                      Predicate pred);
+
+    template<class Rep, class Period>
+      cv_status wait_for(unique_lock<mutex>& lock,
+                         const chrono::duration<Rep, Period>& rel_time);
+    template<class Rep, class Period, class Predicate>
+      bool wait_for(unique_lock<mutex>& lock,
+                    const chrono::duration<Rep, Period>& rel_time,
+                    Predicate pred);
+\end{codeblock}
+{\color{insertcolor}
+\begin{codeblock}
+    // \ref{thread.condition.interrupted} dealing with interrupts:
+
+    // throw std::interrupted on interrupt:
+    void wait_or_throw(unique_lock<mutex>& lock);
+    template <class Predicate>
+      void wait_or_throw(unique_lock<mutex>& lock, Predicate pred);
+
+    // return std::cv_status::interrupted on interrupt:
+    cv_status wait_until(unique_lock<mutex>& lock,
+                         interrupt_token itoken);
+    template <class Predicate>
+      bool wait_until(unique_lock<mutex>& lock,
+                      Predicate pred,
+                      interrupt_token itoken);
+    template <class Clock, class Duration>
+      cv_status wait_until(unique_lock<mutex>& lock,
+                           const chrono::time_point<Clock, Duration>& abs_time
+                           interrupt_token itoken);
+    template <class Clock, class Duration, class Predicate>
+      bool wait_until(unique_lock<mutex>& lock,
+                      const chrono::time_point<Clock, Duration>& abs_time
+                      Predicate pred,
+                      interrupt_token itoken);
+
+    // return std::cv_status::interrupted on interrupt:
+    template <class Rep, class Period>
+    cv_status wait_for(unique_lock<mutex>& lock,
+                       const chrono::duration<Rep, Period>& rel_time,
+                       interrupt_token itoken);
+    template <class Rep, class Period, class Predicate>
+    bool wait_for(unique_lock<mutex>& lock,
+                  const chrono::duration<Rep, Period>& rel_time,
+                  Predicate pred,
+                  interrupt_token itoken);
+\end{codeblock}
+}
+\begin{codeblock}
+    using native_handle_type = @\impdefnc@;          // see~\ref{thread.req.native}
+    native_handle_type native_handle();                         // see~\ref{thread.req.native}
+  };
+}
+\end{codeblock}
+
+\pnum
+The class \tcode{condition_variable} shall be a standard-layout class\iref{class.prop}.
+
+\indexlibrary{\idxcode{condition_variable}!constructor}%
+\begin{itemdecl}
+condition_variable();
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Constructs an object of type \tcode{condition_variable}.
+
+\pnum
+\throws \tcode{system_error} when an exception is required\iref{thread.req.exception}.
+
+\pnum
+\errors
+\begin{itemize}
+\item \tcode{resource_unavailable_try_again} --- if some non-memory resource
+limitation prevents initialization.
+\end{itemize}
+\end{itemdescr}
+
+\indexlibrary{\idxcode{condition_variable}!destructor}%
+\begin{itemdecl}
+~condition_variable();
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\requires There shall be no thread blocked on \tcode{*this}. \begin{note} That is, all
+threads shall have been notified; they may subsequently block on the lock specified in the
+wait.
+This relaxes the usual rules, which would have required all wait calls to happen before
+destruction. Only the notification to unblock the wait needs to happen before destruction.
+The user should take care to ensure that no threads wait on \tcode{*this} once the destructor has
+been started, especially when the waiting threads are calling the wait functions in a loop or
+using the overloads of \tcode{wait}, \tcode{wait_for}, or \tcode{wait_until} that take a predicate.
+\end{note}
+
+\pnum\effects Destroys the object.
+\end{itemdescr}
+
+\indexlibrarymember{notify_one}{condition_variable}%
+\begin{itemdecl}
+void notify_one() noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum\effects If any threads are blocked waiting for \tcode{*this}, unblocks one of those threads.
+\end{itemdescr}
+
+\indexlibrarymember{notify_all}{condition_variable}%
+\begin{itemdecl}
+void notify_all() noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum\effects Unblocks all threads that are blocked waiting for \tcode{*this}.
+\end{itemdescr}
+
+%**** wait
+
+\indexlibrarymember{wait}{condition_variable}%
+\begin{itemdecl}
+void wait(unique_lock<mutex>& lock);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+is locked by the calling thread, and either
+\begin{itemize}
+\item no other thread is waiting on this \tcode{condition_variable} object or
+\item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
+arguments supplied by all concurrently waiting (via \tcode{wait},
+\tcode{wait_for}, or \tcode{wait_until}) threads.
+\end{itemize}
+
+\pnum\effects
+\begin{itemize}
+\item Atomically calls \tcode{lock.unlock()} and blocks on \tcode{*this}.
+\item When unblocked, calls \tcode{lock.lock()} (possibly blocking on the lock), then returns.
+\item The function will unblock when signaled by a call to \tcode{notify_one()}
+or a call to \tcode{notify_all()}, or spuriously.
+\end{itemize}
+
+\pnum
+\remarks
+If the function fails to meet the postcondition, \tcode{terminate()}
+shall be called\iref{except.terminate}.
+\begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+
+\pnum
+\postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+is locked by the calling thread.
+
+\pnum\throws Nothing.
+
+\end{itemdescr}
+
+\indexlibrarymember{wait}{condition_variable}%
+\begin{itemdecl}
+template<class Predicate>
+  void wait(unique_lock<mutex>& lock, Predicate pred);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()} is
+locked by the calling thread, and either
+
+\begin{itemize}
+\item no other thread is waiting on this \tcode{condition_variable} object or
+\item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
+arguments supplied by all concurrently waiting (via \tcode{wait},
+\tcode{wait_for}, or \tcode{wait_until}) threads.
+\end{itemize}
+
+\pnum
+\effects Equivalent to:
+\begin{codeblock}
+while (!pred())
+  wait(lock);
+\end{codeblock}
+
+\pnum
+\remarks
+If the function fails to meet the postcondition, \tcode{terminate()}
+shall be called\iref{except.terminate}.
+\begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+
+\pnum
+\postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+is locked by the calling thread.
+
+\pnum
+\throws Any exception thrown by \tcode{pred}.
+
+\end{itemdescr}
+
+%**** wait_until
+
+\indexlibrarymember{wait_until}{condition_variable}%
+\begin{itemdecl}
+template<class Clock, class Duration>
+  cv_status wait_until(unique_lock<mutex>& lock,
+                       const chrono::time_point<Clock, Duration>& abs_time);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+is locked by the calling thread, and either
+\begin{itemize}
+\item no other thread is waiting on this \tcode{condition_variable} object or
+\item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
+arguments supplied by all concurrently waiting (via \tcode{wait},
+\tcode{wait_for}, or \tcode{wait_until}) threads.
+\end{itemize}
+
+\pnum
+\effects
+\begin{itemize}
+\item
+Atomically calls \tcode{lock.unlock()} and blocks on \tcode{*this}.
+
+\item
+When unblocked, calls \tcode{lock.lock()} (possibly blocking on the lock), then returns.
+
+\item
+The function will unblock when signaled by a call to \tcode{notify_one()}, a call to \tcode{notify_all()},
+expiration of the absolute timeout\iref{thread.req.timing} specified by \tcode{abs_time},
+or spuriously.
+
+\item
+If the function exits via an exception, \tcode{lock.lock()} shall be called prior to exiting the function.
+\end{itemize}
+
+\pnum
+\remarks
+If the function fails to meet the postcondition, \tcode{terminate()}
+shall be called\iref{except.terminate}.
+\begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+
+\pnum
+\postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+is locked by the calling thread.
+
+\pnum
+\returns \tcode{cv_status::timeout} if
+the absolute timeout\iref{thread.req.timing} specified by \tcode{abs_time} expired,
+otherwise \tcode{cv_status::no_timeout}.
+
+\pnum\throws Timeout-related
+exceptions\iref{thread.req.timing}.
+
+\end{itemdescr}
+
+\indexlibrarymember{wait_until}{condition_variable}%
+\begin{itemdecl}
+template<class Clock, class Duration, class Predicate>
+  bool wait_until(unique_lock<mutex>& lock,
+                  const chrono::time_point<Clock, Duration>& abs_time,
+                  Predicate pred);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()} is
+locked by the calling thread, and either
+
+\begin{itemize}
+\item no other thread is waiting on this \tcode{condition_variable} object or
+\item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
+arguments supplied by all concurrently waiting (via \tcode{wait},
+\tcode{wait_for}, or \tcode{wait_until}) threads.
+\end{itemize}
+
+\pnum
+\effects Equivalent to:
+\begin{codeblock}
+while (!pred())
+  if (wait_until(lock, abs_time) == cv_status::timeout)
+    return pred();
+return true;
+\end{codeblock}
+
+\pnum
+\remarks
+If the function fails to meet the postcondition, \tcode{terminate()}
+shall be called\iref{except.terminate}.
+\begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+
+\pnum
+\postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+is locked by the calling thread.
+
+\pnum
+\begin{note} The returned value indicates whether the predicate evaluated to
+\tcode{true} regardless of whether the timeout was triggered. \end{note}
+
+\pnum
+\throws Timeout-related
+exceptions\iref{thread.req.timing} or any exception thrown by \tcode{pred}.
+
+\end{itemdescr}
+
+%**** wait_for
+
+\indexlibrarymember{wait_for}{condition_variable}%
+\begin{itemdecl}
+template<class Rep, class Period>
+  cv_status wait_for(unique_lock<mutex>& lock,
+                     const chrono::duration<Rep, Period>& rel_time);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+is locked by the calling thread, and either
+\begin{itemize}
+\item no other thread is waiting on this \tcode{condition_variable} object or
+\item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock} arguments
+supplied by all concurrently waiting (via \tcode{wait}, \tcode{wait_for}, or
+\tcode{wait_until}) threads.
+\end{itemize}
+
+\pnum
+\effects Equivalent to:
+\begin{codeblock}
+return wait_until(lock, chrono::steady_clock::now() + rel_time);
+\end{codeblock}
+
+\pnum
+\returns \tcode{cv_status::timeout} if
+the relative timeout\iref{thread.req.timing} specified by \tcode{rel_time} expired,
+otherwise \tcode{cv_status::no_timeout}.
+
+\pnum
+\remarks
+If the function fails to meet the postcondition, \tcode{terminate()}
+shall be called\iref{except.terminate}.
+\begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+
+\pnum
+\postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+is locked by the calling thread.
+
+\pnum
+\throws Timeout-related
+exceptions\iref{thread.req.timing}.
+
+\end{itemdescr}
+
+\indexlibrarymember{wait_for}{condition_variable}%
+\begin{itemdecl}
+template<class Rep, class Period, class Predicate>
+  bool wait_for(unique_lock<mutex>& lock,
+                const chrono::duration<Rep, Period>& rel_time,
+                Predicate pred);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+is locked by the calling thread, and either
+\begin{itemize}
+\item
+no other thread is waiting on this \tcode{condition_variable} object or
+
+\item
+\tcode{lock.mutex()} returns the same value for each of the \tcode{lock} arguments
+supplied by all concurrently waiting (via \tcode{wait}, \tcode{wait_for}, or
+\tcode{wait_until}) threads.
+\end{itemize}
+
+\pnum
+\effects Equivalent to:
+\begin{codeblock}
+return wait_until(lock, chrono::steady_clock::now() + rel_time, std::move(pred));
+\end{codeblock}
+
+\pnum
+\begin{note} There is no blocking if \tcode{pred()} is initially \tcode{true}, even if the
+timeout has already expired. \end{note}
+
+\pnum
+\remarks
+If the function fails to meet the postcondition, \tcode{terminate()}
+shall be called\iref{except.terminate}.
+\begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+
+\pnum
+\postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+is locked by the calling thread.
+
+\pnum
+\begin{note} The returned value indicates whether the predicate evaluates to \tcode{true}
+regardless of whether the timeout was triggered. \end{note}
+
+\pnum
+\throws Timeout-related
+exceptions\iref{thread.req.timing} or any exception thrown by \tcode{pred}.
+
+\end{itemdescr}
+
+
+%**********************************************************
+\begin{codeblock}
+%******************
+%* NEW:
+%******************
+\end{codeblock}
+{\color{insertcolor}
+
+%// \ref{thread.condition.interupted} dealing with interrupts:
+\rSec3[thread.condition.interrupted]{\tcode{interrupt_token} handling}
+
+The following functions respect the state of the \tcode{interrupt_token}
+passed as argument or returned by \tcode{this_thread::get_interrupt_token()}.
+If these functions return with \tcode{cv_status::interrupted}
+their synchronization behavior is as though they called \tcode{is_interrupted()}.
+
+% Hans Boehm:
+%We then also need some statement for the waiting functions that if they return with an interrupted status, their synchronization behavior is as though they called is_interrupted().
+
+%**** wait_or_throw
+
+\indexlibrarymember{wait_or_throw}{condition_variable}%
+\begin{itemdecl}
+void wait_or_throw(unique_lock<mutex>& lock);
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\effects Like \tcode{wait(lock)} with the following modifications:
+  \begin{itemize}
+    \item ...
+    \item The function will unblock when signaled by a call to \tcode{notify_one()}
+          or a call to \tcode{notify_all()},
+          when \tcode{this_thread::is_interrupted() == true},
+          or spuriously.
+  \end{itemize}
+
+  \pnum\throws \tcode{interrupted} if \tcode{this_thread::is_interrupted() == true}.
+
+  \pnum\sync In that case their synchronization behavior is as though they called \tcode{is_interrupted()}.
+\end{itemdescr}
+
+
+\indexlibrarymember{wait_or_throw}{condition_variable}%
+\begin{itemdecl}
+template<class Predicate>
+  void wait_or_throw(unique_lock<mutex>& lock, Predicate pred);
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\effects Like \tcode{wait(lock, pred)} with the following modifications:
+  
+  \pnum\throws Any exception thrown by \tcode{pred}
+              or \tcode{interrupted} if \tcode{this_thread::is_interrupted() == true}.
+
+  \pnum\sync In that case their synchronization behavior is as though they called \tcode{is_interrupted()}.
+\end{itemdescr}
+
+%**** wait_until NEW
+%NEW:
+
+\indexlibrarymember{wait_until}{condition_variable}%
+\begin{itemdecl}
+cv_status wait_until(unique_lock<mutex>& lock,
+                     interrupt_token itoken);
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\effects Like \tcode{wait(lock)} with the following modifications:
+  \begin{itemize}
+    \item ...
+    \item The function will unblock when signaled by a call to \tcode{notify_one()}
+      or a call to \tcode{notify_all()},
+      when \tcode{this_thread::is_interrupted() == true},
+      or spuriously.
+  \end{itemize}
+
+  \pnum\returns \tcode{cv_status::interrupted} if \tcode{this_thread::is_interrupted() == true},
+                otherwise \tcode{cv_status::no_timeout}.
+
+  \pnum\sync In that case their synchronization behavior is as though they called \tcode{is_interrupted()}.
+\end{itemdescr}
+
+
+\begin{itemdecl}
+template <class Predicate>
+  bool wait_until(unique_lock<mutex>& lock,
+                  Predicate pred,
+                  interrupt_token itoken);
+\end{itemdecl}
+\begin{itemdescr}
+ \pnum\effects Equivalent to:
+\begin{codeblock}
+while (!pred() && !itoken.is_interrupted())
+  try {
+    wait_or_throw(lock);
+  }
+  catch(interrupted&) {
+  }
+return pred();
+\end{codeblock}
+
+  \pnum\returns \tcode{cv_status::interrupted} if \tcode{this_thread::is_interrupted() == true},
+                otherwise \tcode{cv_status::no_timeout}.
+
+  \pnum\begin{note} The returned value indicates whether the predicate evaluates to \tcode{true}
+        regardless of whether the timeout was triggered. \end{note}
+
+  \throws Any exception thrown by \tcode{pred}.
+
+  \pnum\sync In that case their synchronization behavior is as though they called \tcode{is_interrupted()}.
+\end{itemdescr}
+
+\begin{itemdecl}
+template <class Clock, class Duration>
+  cv_status wait_until(unique_lock<mutex>& lock,
+                       const chrono::time_point<Clock, Duration>& abs_time
+                       interrupt_token itoken);
+\end{itemdecl}
+\begin{itemdescr}
+ \pnum\effects TODO
+\end{itemdescr}
+
+\begin{itemdecl}
+template <class Clock, class Duration, class Predicate>
+  bool wait_until(unique_lock<mutex>& lock,
+                  const chrono::time_point<Clock, Duration>& abs_time
+                  Predicate pred,
+                  interrupt_token itoken);
+\end{itemdecl}
+\begin{itemdescr}
+ \pnum\effects TODO
+\end{itemdescr}
+
+
+%**** wait_for NEW
+%NEW:
+%// return std::cv_status::interrupted on interrupt:
+
+\indexlibrarymember{wait_for}{condition_variable}%
+\begin{itemdecl}
+template <class Rep, class Period>
+  cv_status wait_for(unique_lock<mutex>& lock,
+                     const chrono::duration<Rep, Period>& rel_time,
+                     interrupt_token itoken);
+\end{itemdecl}
+\begin{itemdescr}
+ \pnum\effects TODO
+\end{itemdescr}
+
+\begin{itemdecl}
+template <class Rep, class Period, class Predicate>
+  bool wait_for(unique_lock<mutex>& lock,
+                const chrono::duration<Rep, Period>& rel_time,
+                Predicate pred,
+                interrupt_token itoken);
+\end{itemdecl}
+\begin{itemdescr}
+ \pnum\effects TODO
+\end{itemdescr}
+
+}%\color{insertcolor}
+

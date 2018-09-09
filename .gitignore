@@ -4,3 +4,11 @@
 *.exe
 *stackdump
 Makefile.h
+
+*.log
+*.aux
+*.glo
+*.idx
+*.ext
+*.xtr
+*.out
