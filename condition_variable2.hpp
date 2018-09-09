@@ -54,6 +54,37 @@ inline void condition_variable2::iwait(unique_lock<mutex>& lock,
     }
 }
 
+template<class Clock, class Duration, class Predicate>
+inline bool condition_variable2::iwait_until(unique_lock<mutex>& lock,
+                                             const chrono::time_point<Clock, Duration>& abs_time,
+                                             Predicate pred)
+{
+    this_thread::throw_if_interrupted();  // don't forget this otherwise we might never check
+    auto itoken = std::this_thread::get_interrupt_token();
+    register_guard rg{itoken, this};
+    while(!pred() && Clock::now() < abs_time) {
+      this_thread::throw_if_interrupted();
+      cv.wait_until(lock, abs_time,
+                    [&pred] {
+                      return pred() || this_thread::is_interrupted();
+                    });
+      //std::cout.put(this_thread::is_interrupted() ? 'i' : '.').flush();
+    }
+    return pred();
+}
+
+template<class Rep, class Period, class Predicate>
+inline bool condition_variable2::iwait_for(unique_lock<mutex>& lock,
+                                           const chrono::duration<Rep, Period>& rel_time,
+                                           Predicate pred)
+{
+    this_thread::throw_if_interrupted();  // don't forget this otherwise we might never check
+    auto abs_time = std::chrono::steady_clock::now() + rel_time;
+    return iwait_until(lock,
+                       abs_time,
+                       std::move(pred));
+}
+
 // wait_until(): wait with interrupt handling 
 // - returns on interrupt
 // return value:
@@ -117,6 +148,7 @@ inline bool condition_variable2::wait_for(unique_lock<mutex>& lock,
                     std::move(pred),
                     std::move(itoken));
 }
+
 
 } // std
 

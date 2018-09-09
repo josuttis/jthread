@@ -172,6 +172,16 @@ class condition_variable2
     template<class Predicate>
      void iwait(unique_lock<mutex>& lock, Predicate pred);
 
+    template<class Clock, class Duration, class Predicate>
+     bool iwait_until(unique_lock<mutex>& lock,
+                      const chrono::time_point<Clock, Duration>& abs_time,
+                      Predicate pred);
+
+    template<class Rep, class Period, class Predicate>
+     bool iwait_for(unique_lock<mutex>& lock,
+                    const chrono::duration<Rep, Period>& rel_time,
+                    Predicate pred);
+
     // return:
     // - true if pred yields true
     // - false otherwise (i.e. on interrupt)

@@ -329,6 +329,119 @@ void testTimedCV(bool callNotify, bool callInterrupt, Dur dur)
 }
 
 
+//------------------------------------------------------
+
+template<typename Dur>
+void testTimedIWait(bool callNotify, bool callInterrupt, Dur dur)
+{
+  // test the basic jthread API
+  std::cout << "*** start testTimedIWait(callNotify=" << callNotify << ", "
+            << "callInterrupt=" << callInterrupt << ", "
+            << std::chrono::duration<double, std::ratio<1>>(dur).count() << "s)" << std::endl;
+  using namespace std::literals;
+
+  bool ready = false;
+  std::mutex readyMutex;
+  std::condition_variable2 readyCV;
+  
+  enum class State { loop, ready, interrupted };
+  State t1Feedback{State::loop};
+  {
+    std::jthread t1([&ready, &readyMutex, &readyCV, callNotify, dur, &t1Feedback] {
+                      std::cout << "\n- start t1" << std::endl;
+                      auto t0 = std::chrono::steady_clock::now();
+                      int timesDone{0};
+                      while (timesDone < 3) {
+                        try {
+                          std::unique_lock lg{readyMutex};
+                          //auto end = std::chrono::system_clock::now() + dur;
+                          //auto ret = readyCV.wait_until(lg, end,
+                          auto ret = readyCV.iwait_for(lg, dur,
+                                                       [&ready] { return ready; });
+                          if (dur > 5s) {
+                            assert(std::chrono::steady_clock::now() < t0 + dur);
+                          }
+                          if (ret) {
+                            //std::cout << "t1: ready" << std::endl;
+                            std::cout.put('r').flush();
+                            t1Feedback = State::ready;
+                            assert(ready);
+                            assert(!std::this_thread::is_interrupted());
+                            assert(callNotify);
+                            ++timesDone;
+                          }
+                          else {
+                            // note: might also be interrupted already!
+                            //std::cout << "t1: timeout" << std::endl;
+                            std::cout.put(std::this_thread::is_interrupted() ? 'T' : 't').flush();
+                          }
+                        }
+                        catch (const std::interrupted& e) {
+                          //std::cout << "t1: interrupted" << std::endl;
+                          std::cout.put('i').flush();
+                          t1Feedback = State::interrupted;
+                          assert(!ready);
+                          assert(!callNotify);
+                          ++timesDone;
+                          if (timesDone >= 3) {
+                            std::cout << "\n- t1 done" << std::endl;
+                            throw;
+                          }
+                        }
+                        catch (const std::exception& e) {
+                          std::string msg = std::string("\nEXCEPTION: ") + e.what();
+                          std::cerr << msg << std::endl;
+                          assert(false);
+                        }
+                        catch (...) {
+                          std::cerr << "\nEXCEPTION" << std::endl;
+                          assert(false);
+                        }
+                      }
+                      std::cout << "\n- t1 done" << std::endl;
+                    });
+    
+    std::this_thread::sleep_for(0.5s);
+    assert(!t1.get_original_interrupt_token().is_interrupted());
+    std::this_thread::sleep_for(0.5s);
+    if (callNotify) {
+      std::cout << "\n- set ready" << std::endl;
+      {
+        std::lock_guard lg(readyMutex);
+        ready = true;
+      } // release lock
+      std::this_thread::sleep_for(1.5s);
+      std::cout << "\n- call notify_one()" << std::endl;
+      auto t0 = std::chrono::steady_clock::now();
+      readyCV.notify_one();
+      while (t1Feedback != State::ready) {
+        std::this_thread::sleep_for(200ms);
+        assert(std::chrono::steady_clock::now() < t0 + 5s);
+      }
+    }
+    else if (callInterrupt) {
+      std::cout << "\n- signal interrupt" << std::endl;
+      auto t0 = std::chrono::steady_clock::now();
+      t1.interrupt();
+      while (t1Feedback != State::interrupted) {
+        std::this_thread::sleep_for(200ms);
+        assert(std::chrono::steady_clock::now() < t0 + 5s);
+      }
+    }
+    else {
+      std::cout << "- let destructor signal interrupt" << std::endl;
+    }
+    std::this_thread::sleep_for(1.5s);
+    std::cout << "- leave scope (should at latest signal interrupt)" << std::endl;
+  } // leave scope of t1 without join() or detach() (signals cancellation)
+  auto t0 = std::chrono::steady_clock::now();
+  while (t1Feedback == State::loop) {
+        std::this_thread::sleep_for(100ms);
+  }
+  assert(std::chrono::steady_clock::now() < t0 + 5s);
+  std::cout << "\n*** OK" << std::endl;
+}
+
 
 //------------------------------------------------------
 
@@ -461,6 +574,19 @@ int main()
   testTimedCV(false, true, 60s);   // don't call notify, call interrupt()
   std::cout << "\n\n**************************\n";
   testTimedCV(false, false, 60s);   // don't call notify, don't call interrupt()
+
+  std::cout << "\n\n**************************\n";
+  testTimedIWait(true, false, 200ms);  // call notify(), don't call interrupt()
+  std::cout << "\n\n**************************\n";
+  testTimedIWait(false, true, 200ms);   // don't call notify, call interrupt()
+  std::cout << "\n\n**************************\n";
+  testTimedIWait(false, false, 200ms);   // don't call notify, don't call interrupt()
+  std::cout << "\n\n**************************\n";
+  testTimedIWait(true, false, 60s);  // call notify(), don't call interrupt()
+  std::cout << "\n\n**************************\n";
+  testTimedIWait(false, true, 60s);   // don't call notify, call interrupt()
+  std::cout << "\n\n**************************\n";
+  testTimedIWait(false, false, 60s);   // don't call notify, don't call interrupt()
 
   std::cout << "\n\n**************************\n";
   testManyCV<9>(true, false);  // call notify(), don't call interrupt()
