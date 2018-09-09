@@ -37,8 +37,12 @@ class register_guard
 //* implementation of class condition_variable2
 //*****************************************************************************
 
+// iwait(): wait with interrupt handling 
+// - throws std::interrupted on interrupt
 template<class Predicate>
-inline void condition_variable2::iwait(unique_lock<mutex>& lock, Predicate pred) {
+inline void condition_variable2::iwait(unique_lock<mutex>& lock,
+                                       Predicate pred)
+{
     auto itoken = std::this_thread::get_interrupt_token();
     register_guard rg{itoken, this};
     while(!pred()) {
@@ -50,28 +54,8 @@ inline void condition_variable2::iwait(unique_lock<mutex>& lock, Predicate pred)
     }
 }
 
-inline void condition_variable2::iwait(unique_lock<mutex>& lock) {
-    auto itoken = std::this_thread::get_interrupt_token();
-    register_guard rg{itoken, this};
-    this_thread::throw_if_interrupted();
-    cv.wait(lock);
-    this_thread::throw_if_interrupted();
-    std::cout.put(this_thread::is_interrupted() ? 'i' : '.').flush();
-}
-
-// return std::cv_status::interrupted on interrupt:
-inline cv_status2 condition_variable2::wait_until(unique_lock<mutex>& lock,
-                                                  interrupt_token itoken) {
-    if (itoken.is_interrupted()) {
-      return cv_status2::interrupted;
-    }
-    register_guard rg{itoken, this};
-    cv.wait(lock);
-    //std::cout.put(itoken.is_interrupted() ? 'i' : '.').flush();
-    return itoken.is_interrupted() ? cv_status2::interrupted : cv_status2::no_timeout;
-}
-
-// only returns if pred or on signaled interrupt:
+// wait_until(): wait with interrupt handling 
+// - returns on interrupt
 // return value:
 //   true:  pred() yields true
 //   false: pred() yields false (other reason => interrupt signaled)
@@ -93,6 +77,8 @@ inline bool condition_variable2::wait_until(unique_lock<mutex>& lock,
     return pred();
 }
 
+// wait_until(): timed wait with interrupt handling 
+// - returns on interrupt
 // return:
 // - true if pred yields true
 // - false otherwise (i.e. on timeout or interrupt)
@@ -114,6 +100,8 @@ inline bool condition_variable2::wait_until(unique_lock<mutex>& lock,
     return pred();
 }
 
+// wait_for(): timed wait with interrupt handling 
+// - returns on interrupt
 // return:
 // - true if pred yields true
 // - false otherwise (i.e. on timeout or interrupt)
