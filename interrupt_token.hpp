@@ -12,6 +12,7 @@
 //*****************************************************************************
 #include "interrupted.hpp"
 #include <cassert>
+#include <iostream> // in case we enable the debug output
 
 namespace std {
 
@@ -22,13 +23,13 @@ void interrupt_token::throw_if_interrupted() const
   }
 }
 
-bool interrupt_token::interrupt() noexcept
+bool interrupt_token::interrupt()
 {
   //std::cout.put('I').flush();
   if (!valid()) return false;
   auto wasInterrupted = _ip->interrupted.exchange(true);
   if (!wasInterrupted) {
-    ::std::scoped_lock lg{_ip->cvMutex};
+    ::std::scoped_lock lg{_ip->cvMutex};  // might throw
     for (const auto& cvPtr : _ip->cvPtrs) {
       cvPtr->notify_all();
     }
@@ -37,19 +38,18 @@ bool interrupt_token::interrupt() noexcept
   return wasInterrupted;
 }
 
-#include <iostream>
-bool interrupt_token::registerCV(condition_variable2* cvPtr) noexcept {
+bool interrupt_token::registerCV(condition_variable2* cvPtr) {
   //std::cout.put('R').flush();
   if (!valid()) return false;
   {
     std::scoped_lock lg{_ip->cvMutex};
-    _ip->cvPtrs.push_front(cvPtr);
+    _ip->cvPtrs.push_front(cvPtr);  // might throw
   }
   //std::cout.put('r').flush();
   return _ip->interrupted.load();
 }
 
-bool interrupt_token::unregisterCV(condition_variable2* cvPtr) noexcept {
+bool interrupt_token::unregisterCV(condition_variable2* cvPtr) {
   //std::cout.put('U').flush();
   if (!valid()) return false;
   {

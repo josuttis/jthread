@@ -62,7 +62,7 @@ class interrupt_token {
   }
   void throw_if_interrupted() const;
 
-  bool interrupt() noexcept;
+  bool interrupt();
   
   friend bool operator== (const interrupt_token& lhs, const interrupt_token& rhs);
  
@@ -70,8 +70,8 @@ class interrupt_token {
   // stuff to registered condition variables for notofication: 
   friend class ::std::condition_variable2;
   friend class ::std::register_guard;
-  bool registerCV(condition_variable2* cvPtr) noexcept;
-  bool unregisterCV(condition_variable2* cvPtr) noexcept;
+  bool registerCV(condition_variable2* cvPtr);
+  bool unregisterCV(condition_variable2* cvPtr);
 };
 
 bool operator== (const interrupt_token& lhs, const interrupt_token& rhs) {
@@ -169,11 +169,11 @@ class condition_variable2
     // x.6.2.1 dealing with interrupts:
 
     // throw std::interrupted on interrupt:
-    void wait_or_throw(unique_lock<mutex>& lock);
+    void iwait(unique_lock<mutex>& lock);
 
     // throw std::interrupted on interrupt:
     template<class Predicate>
-     void wait_or_throw(unique_lock<mutex>& lock, Predicate pred);
+     void iwait(unique_lock<mutex>& lock, Predicate pred);
 
     // return:
     // - std::cv_status::interrupted on interrupt

@@ -38,7 +38,7 @@ class register_guard
 //*****************************************************************************
 
 template<class Predicate>
-inline void condition_variable2::wait_or_throw(unique_lock<mutex>& lock, Predicate pred) {
+inline void condition_variable2::iwait(unique_lock<mutex>& lock, Predicate pred) {
     auto itoken = std::this_thread::get_interrupt_token();
     register_guard rg{itoken, this};
     while(!pred()) {
@@ -50,8 +50,7 @@ inline void condition_variable2::wait_or_throw(unique_lock<mutex>& lock, Predica
     }
 }
 
-inline void condition_variable2::wait_or_throw(unique_lock<mutex>& lock) {
-    std::cout.put('x').flush();
+inline void condition_variable2::iwait(unique_lock<mutex>& lock) {
     auto itoken = std::this_thread::get_interrupt_token();
     register_guard rg{itoken, this};
     this_thread::throw_if_interrupted();

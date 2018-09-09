@@ -8,10 +8,10 @@
 #include <cassert>
 using namespace::std::literals;
 
-// helper to call wait_or_throw and check some assertions
-void cvWaitOrThrow (int id, bool& ready, std::mutex& readyMutex, std::condition_variable2& readyCV, bool notifyCalled) {
+// helper to call iwait() and check some assertions
+void cvIWait (int id, bool& ready, std::mutex& readyMutex, std::condition_variable2& readyCV, bool notifyCalled) {
   std::ostringstream strm;
-  strm <<"\ncvWaitOrThrow(" << std::to_string(id) << ") called in thread "
+  strm <<"\ncvIWait(" << std::to_string(id) << ") called in thread "
        << std::this_thread::get_id();
   std::cout << strm.str() << std::endl;
 
@@ -20,33 +20,33 @@ void cvWaitOrThrow (int id, bool& ready, std::mutex& readyMutex, std::condition_
       std::unique_lock lg{readyMutex};
       while(!ready) {
         //std::cout.put(static_cast<char>('0'+id)).flush();
-        readyCV.wait_or_throw(lg);
+        readyCV.iwait(lg);
       }
     }
     if (std::this_thread::is_interrupted()) {
-      std::string msg = "\ncvWaitOrThrow(" + std::to_string(id) + "): interrupted";
+      std::string msg = "\ncvIWait(" + std::to_string(id) + "): interrupted";
       std::cout << msg << std::endl;
       assert(false);
     }
     else {
-      std::string msg = "\ncvWaitOrThrow(" + std::to_string(id) + "): ready";
+      std::string msg = "\ncvIWait(" + std::to_string(id) + "): ready";
       std::cout << msg << std::endl;
     }
     assert(notifyCalled);
   }
   catch (const std::interrupted& e) {
-    std::string msg = "\nINTERRUPT in cvWaitOrThrow(" + std::to_string(id) + "): " + e.what();
+    std::string msg = "\nINTERRUPT in cvIWait(" + std::to_string(id) + "): " + e.what();
     std::cerr << msg << std::endl;
     assert(!notifyCalled);
     throw;
   }
   catch (const std::exception& e) {
-    std::string msg = "\nEXCEPTION in cvWaitOrThrow(" + std::to_string(id) + "): " + e.what();
+    std::string msg = "\nEXCEPTION in cvIWait(" + std::to_string(id) + "): " + e.what();
     std::cerr << msg << std::endl;
     assert(false);
   }
   catch (...) {
-    std::string msg = "\nEXCEPTION in cvWaitOrThrow(" + std::to_string(id) + ")";
+    std::string msg = "\nEXCEPTION in cvIWait(" + std::to_string(id) + ")";
     std::cerr << msg << std::endl;
     assert(false);
   }
@@ -112,7 +112,7 @@ void testCVNoPred(bool callNotify)
                         {
                           std::unique_lock lg{readyMutex};
                           while(!ready) {
-                            readyCV.wait_or_throw(lg);
+                            readyCV.iwait(lg);
                           }
                         }
                         assert(callNotify);
@@ -164,7 +164,7 @@ void testCVPred(bool callNotify)
     std::jthread t1([&ready, &readyMutex, &readyCV, callNotify] {
                       try {
                         std::unique_lock lg{readyMutex};
-                        readyCV.wait_or_throw(lg, [&ready] { return ready; });
+                        readyCV.iwait(lg, [&ready] { return ready; });
                         assert(callNotify);
                       }
                       catch (const std::exception&) {  // should be no std::exception
@@ -408,7 +408,7 @@ void testManyCV(bool callNotify, bool callInterrupt)
     bool ready = false;
     std::mutex readyMutex;
     std::condition_variable2 readyCV;
-    std::jthread t0(cvWaitOrThrow, 0, std::ref(ready), std::ref(readyMutex), std::ref(readyCV), callNotify);
+    std::jthread t0(cvIWait, 0, std::ref(ready), std::ref(readyMutex), std::ref(readyCV), callNotify);
     {  
       t0itoken = t0.get_original_interrupt_token();
       std::this_thread::sleep_for(0.5s);
@@ -427,7 +427,7 @@ void testManyCV(bool callNotify, bool callInterrupt)
                          // NOTE: disables signaling interrupts directly to the thread
                          std::this_thread::exchange_interrupt_token(t0itoken);
 
-                         cvWaitOrThrow(idx+1, arrReady[idx], arrReadyMutex[idx], arrReadyCV[idx], callNotify);
+                         cvIWait(idx+1, arrReady[idx], arrReadyMutex[idx], arrReadyCV[idx], callNotify);
                        });
         vThreads.push_back(std::move(t));
       }
