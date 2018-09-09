@@ -13,42 +13,51 @@
 
 namespace std {
 
+// RAII helper to ensure interrupt_token::unregister(cv) is called 
+class register_guard
+{
+  private:
+    interrupt_token*  itoken;
+    condition_variable2*  cvPtr;
+  public:
+    explicit register_guard(interrupt_token& i, condition_variable2* cp)
+     : itoken{&i}, cvPtr{cp} {
+        itoken->registerCV(cvPtr);
+    }
+
+    ~register_guard() {
+        itoken->unregisterCV(cvPtr);
+    }
+
+    register_guard(register_guard&) = delete;
+    register_guard& operator=(register_guard&) = delete;
+};
+
 //*****************************************************************************
 //* implementation of class condition_variable2
 //*****************************************************************************
 
 template<class Predicate>
 inline void condition_variable2::wait_or_throw(unique_lock<mutex>& lock, Predicate pred) {
-    std::this_thread::get_interrupt_token().registerCV(this);
-    try {
-      while(!pred()) {
-        this_thread::throw_if_interrupted();
-        cv.wait(lock, [&pred] {
-                        return pred() || this_thread::is_interrupted();
-                      });
-        //std::cout.put(this_thread::is_interrupted() ? 'i' : '.').flush();
-      }
+    auto itoken = std::this_thread::get_interrupt_token();
+    register_guard rg{itoken, this};
+    while(!pred()) {
+      this_thread::throw_if_interrupted();
+      cv.wait(lock, [&pred] {
+                      return pred() || this_thread::is_interrupted();
+                    });
+      //std::cout.put(this_thread::is_interrupted() ? 'i' : '.').flush();
     }
-    catch (...) {
-      std::this_thread::get_interrupt_token().unregisterCV(this);
-      throw;
-    }
-    std::this_thread::get_interrupt_token().unregisterCV(this);
 }
 
 inline void condition_variable2::wait_or_throw(unique_lock<mutex>& lock) {
-    std::this_thread::get_interrupt_token().registerCV(this);
-    try {
-      this_thread::throw_if_interrupted();
-      cv.wait(lock);
-      this_thread::throw_if_interrupted();
-      //std::cout.put(this_thread::is_interrupted() ? 'i' : '.').flush();
-    }
-    catch (...) {
-      std::this_thread::get_interrupt_token().unregisterCV(this);
-      throw;
-    }
-    std::this_thread::get_interrupt_token().unregisterCV(this);
+    std::cout.put('x').flush();
+    auto itoken = std::this_thread::get_interrupt_token();
+    register_guard rg{itoken, this};
+    this_thread::throw_if_interrupted();
+    cv.wait(lock);
+    this_thread::throw_if_interrupted();
+    std::cout.put(this_thread::is_interrupted() ? 'i' : '.').flush();
 }
 
 // return std::cv_status::interrupted on interrupt:
@@ -57,16 +66,9 @@ inline cv_status2 condition_variable2::wait_until(unique_lock<mutex>& lock,
     if (itoken.is_interrupted()) {
       return cv_status2::interrupted;
     }
-    itoken.registerCV(this);
-    try {
-      cv.wait(lock);
-      //std::cout.put(itoken.is_interrupted() ? 'i' : '.').flush();
-    }
-    catch (...) {
-      itoken.unregisterCV(this);
-      throw;
-    }
-    itoken.unregisterCV(this);
+    register_guard rg{itoken, this};
+    cv.wait(lock);
+    //std::cout.put(itoken.is_interrupted() ? 'i' : '.').flush();
     return itoken.is_interrupted() ? cv_status2::interrupted : cv_status2::no_timeout;
 }
 
@@ -82,22 +84,51 @@ inline bool condition_variable2::wait_until(unique_lock<mutex>& lock,
     if (itoken.is_interrupted()) {
       return pred();
     }
-    itoken.registerCV(this);
-    try {
-      while(!pred() && !itoken.is_interrupted()) {
-        //std::cout.put(itoken.is_interrupted() ? 'i' : '.').flush();
-        cv.wait(lock, [&pred, &itoken] {
-                        return pred() || itoken.is_interrupted();
-                      });
-      }
+    register_guard rg{itoken, this};
+    while(!pred() && !itoken.is_interrupted()) {
+      //std::cout.put(itoken.is_interrupted() ? 'i' : '.').flush();
+      cv.wait(lock, [&pred, &itoken] {
+                      return pred() || itoken.is_interrupted();
+                    });
     }
-    catch (...) {
-      itoken.unregisterCV(this);
-      throw;
-    }
-    itoken.unregisterCV(this);
-    // return true if pred() true:
     return pred();
+}
+
+// return:
+// - true if pred yields true
+// - false otherwise (i.e. on timeout or interrupt)
+template <class Clock, class Duration, class Predicate>
+inline bool condition_variable2::wait_until(unique_lock<mutex>& lock,
+                                            const chrono::time_point<Clock, Duration>& abs_time,
+                                            Predicate pred,
+                                            interrupt_token itoken)
+{
+    register_guard rg{itoken, this};
+    while(!pred() && !itoken.is_interrupted()) {
+      //std::cout.put(itoken.is_interrupted() ? 'i' : '.').flush();
+      cv.wait_until(lock,
+                    abs_time,
+                    [&pred, &itoken] {
+                      return pred() || itoken.is_interrupted();
+                    });
+    }
+    return pred();
+}
+
+// return:
+// - true if pred yields true
+// - false otherwise (i.e. on timeout or interrupt)
+template <class Rep, class Period, class Predicate>
+inline bool condition_variable2::wait_for(unique_lock<mutex>& lock,
+                                          const chrono::duration<Rep, Period>& rel_time,
+                                          Predicate pred,
+                                          interrupt_token itoken)
+{
+  auto abs_time = std::chrono::steady_clock::now() + rel_time;
+  return wait_until(lock,
+                    abs_time,
+                    std::move(pred),
+                    std::move(itoken));
 }
 
 } // std

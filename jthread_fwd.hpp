@@ -11,12 +11,14 @@
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
+#include <chrono>
 #include <list>
 
 namespace std {
 
 // forward declarations to avoid including header file:
 class condition_variable2;
+class register_guard;
 
 //***************************************** 
 //* new class for interrupt tokens
@@ -67,6 +69,7 @@ class interrupt_token {
  private:
   // stuff to registered condition variables for notofication: 
   friend class ::std::condition_variable2;
+  friend class ::std::register_guard;
   bool registerCV(condition_variable2* cvPtr) noexcept;
   bool unregisterCV(condition_variable2* cvPtr) noexcept;
 };
@@ -164,19 +167,43 @@ class condition_variable2
     //***************************************** 
 
     // x.6.2.1 dealing with interrupts:
+
     // throw std::interrupted on interrupt:
     void wait_or_throw(unique_lock<mutex>& lock);
 
+    // throw std::interrupted on interrupt:
     template<class Predicate>
      void wait_or_throw(unique_lock<mutex>& lock, Predicate pred);
 
-    // return std::cv_status::interrupted on interrupt:
+    // return:
+    // - std::cv_status::interrupted on interrupt
+    // - std::cv_status::no_timeout otherwise
     cv_status2 wait_until(unique_lock<mutex>& lock,
                           interrupt_token itoken);
+    // return:
+    // - true if pred yields true
+    // - false otherwise (i.e. on interrupt)
     template <class Predicate>
       bool wait_until(unique_lock<mutex>& lock,
                       Predicate pred,
                       interrupt_token itoken);
+
+    // return:
+    // - true if pred yields true
+    // - false otherwise (i.e. on timeout or interrupt)
+    template <class Clock, class Duration, class Predicate>
+      bool wait_until(unique_lock<mutex>& lock,
+                      const chrono::time_point<Clock, Duration>& abs_time,
+                      Predicate pred,
+                      interrupt_token itoken);
+    // return:
+    // - true if pred yields true
+    // - false otherwise (i.e. on timeout or interrupt)
+    template <class Rep, class Period, class Predicate>
+      bool wait_for(unique_lock<mutex>& lock,
+                    const chrono::duration<Rep, Period>& rel_time,
+                    Predicate pred,
+                    interrupt_token itoken);
 
   //***************************************** 
   //* implementation:
