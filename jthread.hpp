@@ -79,7 +79,7 @@ class jthread
     //*** API for the started thread (TLS stuff):
     inline static thread_local interrupt_token _this_thread_it{}; // int.token for this thread
     friend interrupt_token this_thread::get_interrupt_token() noexcept;
-    friend void this_thread::exchange_interrupt_token(const interrupt_token&) noexcept;
+    friend interrupt_token this_thread::exchange_interrupt_token(const interrupt_token&) noexcept;
 };
 
 
@@ -182,8 +182,10 @@ namespace this_thread {
   static interrupt_token get_interrupt_token() noexcept {
     return ::std::jthread::_this_thread_it;
   }
-  static void exchange_interrupt_token(const interrupt_token& it) noexcept {
+  static interrupt_token exchange_interrupt_token(const interrupt_token& it) noexcept {
+    auto old = ::std::jthread::_this_thread_it;
     ::std::jthread::_this_thread_it = it;
+    return old;
   }
   static bool is_interrupted() noexcept {
     return get_interrupt_token().is_interrupted();

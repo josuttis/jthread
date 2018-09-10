@@ -90,7 +90,7 @@ namespace this_thread {
   static bool is_interrupted() noexcept;
   static void throw_if_interrupted();
   static interrupt_token get_interrupt_token() noexcept;
-  static void exchange_interrupt_token(const interrupt_token&) noexcept;
+  static interrupt_token exchange_interrupt_token(const interrupt_token&) noexcept;
 }
 
 

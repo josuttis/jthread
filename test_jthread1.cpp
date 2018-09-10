@@ -147,7 +147,7 @@ void testDetach()
   {
     std::jthread t0;
     std::jthread::id t1ID{std::this_thread::get_id()};
-    bool t1IsInterrupted{true};
+    bool t1IsInterrupted;
     std::interrupt_token t1InterruptToken;
     std::atomic<bool> t1AllSet{false};
     std::jthread t1([&t1ID, &t1IsInterrupted, &t1InterruptToken, &t1AllSet, &t1FinallyInterrupted] {
@@ -270,6 +270,77 @@ void testStdThread()
 
 //------------------------------------------------------
 
+void testTemporarilyDisableToken()
+{
+  // test exchanging the token to disable it temporarily
+  std::cout << "\n*** start testTemporarilyDisableToken()" << std::endl;
+
+  enum class State { init, loop, disabled, restored, interrupted };
+  std::atomic<State> state{State::init};
+  std::interrupt_token t1it;
+  {
+    std::jthread t1([&state] {
+                   std::cout << "- start t1" << std::endl;
+                   // just loop (no interrupt should occur):
+                   state.store(State::loop); 
+                   try {
+                     for (int i=0; i < 10; ++i) {
+                        std::this_thread::throw_if_interrupted();
+                        std::this_thread::sleep_for(100ms);
+                        std::cout.put('.').flush();
+                     }
+                   }
+                   catch (...) {
+                     assert(false);
+                   }
+                   // temporarily disable interrupts:
+                   std::interrupt_token interruptDisabled;
+                   auto origToken = std::this_thread::exchange_interrupt_token(interruptDisabled);
+                   state.store(State::disabled); 
+                   // loop again until interupt signaled to original interrupt token:
+                   try {
+                     while (!origToken.is_interrupted()) {
+                        std::this_thread::throw_if_interrupted();
+                        std::this_thread::sleep_for(100ms);
+                        std::cout.put('d').flush();
+                     }
+                     for (int i=0; i < 10; ++i) {
+                        std::this_thread::sleep_for(100ms);
+                        std::cout.put('D').flush();
+                     }
+                   }
+                   catch (...) {
+                     assert(false);
+                   }
+                   state.store(State::restored); 
+                   // loop again (should immediately throw):
+                   auto newToken = std::this_thread::exchange_interrupt_token(origToken);
+                   assert(newToken == interruptDisabled);
+                   assert(!interruptDisabled.is_interrupted());
+                   try {
+                     std::this_thread::throw_if_interrupted();
+                   }
+                   catch (std::interrupted) {
+                     std::cout.put('i').flush();
+                     state.store(State::interrupted); 
+                   }
+                   std::cout << "\n- end t1" << std::endl;
+                 });
+    while (state.load() != State::disabled) {
+      std::this_thread::sleep_for(100ms);
+      std::cout.put('m').flush();
+    }
+    std::this_thread::sleep_for(500ms);
+    std::cout << "\n- leave scope (should inuterrupt started thread)" << std::endl;
+    t1it = t1.get_original_interrupt_token();
+  } // leave scope of t1 without join() or detach() (signals cancellation)
+  assert(t1it.is_interrupted());
+  assert(state.load() == State::interrupted);
+  std::cout << "\n*** OK" << std::endl;
+}
+
+//------------------------------------------------------
+
 
 int main()
 {
@@ -278,13 +349,15 @@ int main()
 		       assert(false);
 		     });
 
-  std::cout << "\n\n**************************\n\n";
+  std::cout << "\n\n**************************\n";
   testJThread();
-  std::cout << "\n\n**************************\n\n";
+  std::cout << "\n\n**************************\n";
   testJoin();
-  std::cout << "\n\n**************************\n\n";
+  std::cout << "\n\n**************************\n";
   testDetach();
-  std::cout << "\n\n**************************\n\n";
+  std::cout << "\n\n**************************\n";
   testStdThread();
+  std::cout << "\n\n**************************\n";
+  testTemporarilyDisableToken();
 }
 

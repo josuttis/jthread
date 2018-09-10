@@ -234,6 +234,18 @@ interrupt_token(interrupt_token&& it) noexcept;
                         \tcode{it.valid() == false}.
 \end{itemdescr}
 
+\rSec3[thread.thread.destr]{\tcode{thread} destructor}
+
+\indexlibrary{\idxcode{interrupt_token}!destructor}%
+\begin{itemdecl}
+~interrupt_token();
+\end{itemdecl}
+
+\begin{itemdescr}
+ \pnum\effects If \tcode{valid()} and this is the last owner of the interrupt signal,
+                destructs the underlying interrupt signal.
+\end{itemdescr}
+
 %*****
 \rSec3[interrupt_token.assign]{\tcode{interrupt_token} assign}
 
@@ -749,7 +761,8 @@ namespace std {
     // \ref{thread.condition.interrupted} dealing with interrupts:
 
     // throw \tcode{std::interrupted} if \tcode{this_thread::is_interrupted()}:
-    void iwait(unique_lock<mutex>& lock);
+    template<class Predicate>
+      void iwait(unique_lock<mutex>& lock, Predicate pred);
 
     template<class Clock, class Duration, class Predicate>
       bool iwait_until(unique_lock<mutex>& lock,
@@ -1148,7 +1161,7 @@ template<class Predicate>
 
 {\color{diffcolor}
   \pnum\effects Registers \tcode{*this} to get notified if an interrupt is signaled on \tcode{this_thread::get_interrupt_token()}
-                and then equivalent to:
+                during this call and then equivalent to:
 \begin{codeblock}
 while(!pred()) {
   this_thread::throw_if_interrupted();
@@ -1200,7 +1213,7 @@ template<class Clock, class Duration, class Predicate>
 
 {\color{diffcolor}
   \pnum\effects Registers \tcode{*this} to get notified if an interrupt is signaled on \tcode{this_thread::get_interrupt_token()}
-                and then equivalent to:
+                during this call and then equivalent to:
 \begin{codeblock}
 while(!pred() && Clock::now() < abs_time) {
   this_thread::throw_if_interrupted();
@@ -1315,7 +1328,7 @@ template <class Predicate>
 
 {\color{diffcolor}
  \pnum\effects Registers \tcode{*this} to get notified if an interrupt is signaled on \tcode{itoken}
-                and then equivalent to:
+                during this call and then equivalent to:
 \begin{codeblock}
 while(!pred() && !itoken.is_interrupted()) {
   cv.wait(lock, [&pred, &itoken] {
@@ -1374,7 +1387,7 @@ template <class Clock, class Duration, class Predicate>
 
 {\color{diffcolor}
  \pnum\effects Registers \tcode{*this} to get notified if an interrupt is signaled on \tcode{itoken}
-                and then equivalent to:
+                during this call and then equivalent to:
 \begin{codeblock}
 while(!pred() && !itoken.is_interrupted() && Clock::now() < abs_time) {
   cv.wait_until(lock,
