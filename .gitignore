@@ -12,3 +12,4 @@ Makefile.h
 *.ext
 *.xtr
 *.out
+.pdf

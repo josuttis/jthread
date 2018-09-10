@@ -248,6 +248,39 @@ void testCVStdThreadPred(bool callNotify)
 
 //------------------------------------------------------
 
+void testMinimalWaitFor() 
+{
+  // test the basic timed CV wait API
+  std::cout << "*** start testMinimalWaitFor()" << std::endl;
+  auto dur = std::chrono::seconds{5};
+
+  bool ready = false;
+  std::mutex readyMutex;
+  std::condition_variable2 readyCV;
+  {
+    std::jthread t1([&ready, &readyMutex, &readyCV, dur] {
+                      std::cout << "\n- start t1" << std::endl;
+                      auto t0 = std::chrono::steady_clock::now();
+                      {
+                        std::unique_lock lg{readyMutex};
+                        readyCV.iwait_for(lg,
+                                          dur,
+                                          [&ready] {
+                                             return ready;
+                                          });
+                      }
+                      assert(std::chrono::steady_clock::now() <  t0 + dur);
+                      std::cout << "\n- t1 done" << std::endl;
+                    });
+    
+    std::this_thread::sleep_for(1.5s);
+    std::cout << "- leave scope (should signal interrupt and unblock CV wait)" << std::endl;
+  } // leave scope of t1 without join() or detach() (signals cancellation)
+  std::cout << "\n*** OK" << std::endl;
+}
+
+//------------------------------------------------------
+
 template<typename Dur>
 void testTimedCV(bool callNotify, bool callInterrupt, Dur dur)
 {
@@ -541,6 +574,9 @@ int main()
                      });
 
   std::cout << std::boolalpha;
+
+  std::cout << "\n\n**************************\n";
+  testMinimalWaitFor();
 
   std::cout << "\n\n**************************\n";
   testCVStdThreadNoPred(false);  // signal cancellation
