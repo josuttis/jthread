@@ -79,9 +79,8 @@ inline bool condition_variable2::iwait_for(unique_lock<mutex>& lock,
                                            Predicate pred)
 {
     this_thread::throw_if_interrupted();  // don't forget this otherwise we might never check
-    auto abs_time = std::chrono::steady_clock::now() + rel_time;
     return iwait_until(lock,
-                       abs_time,
+                       std::chrono::steady_clock::now() + rel_time,
                        std::move(pred));
 }
 

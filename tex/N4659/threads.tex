@@ -1,0 +1,1250 @@
+%!TEX root = std.tex
+\rSec0[thread]{Thread support library}
+
+\rSec1[thread.general]{General}
+
+\pnum
+The following subclauses describe components to create and manage
+threads\iref{intro.multithread}, perform mutual exclusion, and communicate conditions
+and values
+between threads, as summarized in \tref{thread.lib.summary}.
+
+\begin{libsumtab}{Thread support library summary}{tab:thread.lib.summary}
+\ref{thread.req}      & Requirements          &                               \\ \rowsep
+\ref{thread.threads}  & Threads               & \tcode{<thread>}              \\ \rowsep
+\ref{thread.mutex}    & Mutual exclusion      & \tcode{<mutex>}               \\
+                      &                       & \tcode{<shared_mutex>}        \\ \rowsep
+\ref{thread.condition}& Condition variables   & \tcode{<condition_variable>}  \\ \rowsep
+\ref{futures}         & Futures               & \tcode{<future>}              \\
+\end{libsumtab}
+
+\rSec1[thread.req]{Requirements}
+
+\rSec2[thread.req.paramname]{Template parameter names}
+
+\pnum
+Throughout this Clause, the names of template parameters are used to express type
+requirements.
+If a template parameter is named \tcode{Predicate}, \tcode{operator()} applied to
+the template argument shall return a value that is convertible to \tcode{bool}.
+If a template parameter is named \tcode{Clock},
+the corresponding template argument shall be a type \tcode{C}
+for which \tcode{is_clock_v<C>} is \tcode{true};
+otherwise the program is ill-formed.
+
+\rSec2[thread.req.exception]{Exceptions}
+
+\pnum
+Some functions described in this Clause are specified to throw exceptions of type
+\tcode{system_error}\iref{syserr.syserr}. Such exceptions shall be thrown if
+any of the function's error conditions is detected or
+a call to
+an operating system or other underlying API results in an error that prevents the
+library function from
+meeting its specifications. Failure to allocate storage shall be reported as described
+in~\ref{res.on.exception.handling}.
+
+\begin{example}
+Consider a function in this clause that is specified to throw exceptions of type
+\tcode{system_error} and specifies error conditions that include
+\tcode{operation_not_permitted} for a thread that does not have the privilege to
+perform the operation. Assume that, during the execution of this function, an \tcode{errno}
+of \tcode{EPERM} is reported by a POSIX API call used by the implementation. Since POSIX
+specifies an \tcode{errno} of \tcode{EPERM} when ``the caller does not have the privilege
+to perform the operation'', the implementation maps \tcode{EPERM} to an
+\tcode{error_condition} of \tcode{operation_not_permitted}\iref{syserr} and an exception
+of type \tcode{system_error} is thrown.
+\end{example}
+
+\pnum
+The \tcode{error_code} reported by such an exception's \tcode{code()} member function
+shall compare equal to one of the conditions specified in the function's error condition
+element.
+
+\rSec2[thread.req.native]{Native handles}
+
+\pnum
+Several classes described in this Clause have members \tcode{native_handle_type} and
+\tcode{native_handle}. The presence of these members and their semantics is
+\impldef{presence and meaning of \tcode{native_handle_type} and \tcode{native_handle}}.
+\begin{note} These members allow implementations to provide access
+to implementation details. Their names are specified to facilitate portable compile-time
+detection. Actual use of these members is inherently non-portable. \end{note}
+
+\rSec2[thread.req.timing]{Timing specifications}
+
+\pnum
+Several functions described in this Clause take an argument to specify a timeout. These
+timeouts are specified as either a \tcode{duration} or a \tcode{time_point} type as
+specified in~\ref{time}.
+
+\pnum
+Implementations necessarily have some delay in returning from a timeout. Any overhead in
+interrupt response, function return, and scheduling induces a ``quality of implementation''
+delay, expressed as duration $D_i$. Ideally, this delay would be zero. Further, any contention for
+processor and memory resources induces a ``quality of management'' delay, expressed as duration
+$D_m$. The delay durations may vary from timeout to timeout, but in all cases shorter is better.
+
+\pnum
+The functions whose names end in \tcode{_for} take an argument that
+specifies a duration. These functions produce relative timeouts. Implementations
+should use a steady clock to measure time for these functions.\footnote{All
+implementations for which standard time units are meaningful must necessarily
+have a steady clock within their hardware implementation.} Given a duration
+argument $D_t$, the real-time duration of the timeout is $D_t + D_i + D_m$.
+
+\pnum
+The functions whose names end in \tcode{_until} take an argument that specifies a time
+point. These functions produce absolute timeouts. Implementations should use the clock
+specified in the time point to measure time for these functions. Given a clock time point
+argument $C_t$, the clock time point of the return from timeout should be $C_t + D_i + D_m$
+when the clock is not adjusted during the timeout. If the clock is adjusted to the time $C_a$
+during the timeout, the behavior should be as follows:
+
+\begin{itemize}
+\item
+if $C_a > C_t$, the waiting function should wake as soon as possible, i.e., $C_a + D_i + D_m$,
+since the timeout is already satisfied. \begin{note} This specification may result in the total
+duration of the wait decreasing when measured against a steady clock. \end{note}
+
+\item
+if $C_a \leq C_t$, the waiting function should not time out until \tcode{Clock::now()} returns a
+time $C_n \geq C_t$, i.e., waking at $C_t + D_i + D_m$. \begin{note} When the clock is adjusted
+backwards, this specification may result in the total duration of the wait increasing when
+measured against a steady clock. When the clock is adjusted forwards, this specification may
+result in the total duration of the wait decreasing when measured against a steady clock.
+\end{note}
+\end{itemize}
+
+An implementation shall return from such a timeout at any point from the time specified above to
+the time it would return from a steady-clock relative timeout on the difference between $C_t$
+and the time point of the call to the \tcode{_until} function. \begin{note} Implementations
+should decrease the duration of the wait when the clock is adjusted forwards.
+\end{note}
+
+\pnum
+\begin{note} If the clock is not synchronized with a steady clock, e.g., a CPU time clock, these
+timeouts might not provide useful functionality. \end{note}
+
+\pnum
+The resolution of timing provided by an implementation depends on both operating system
+and hardware. The finest resolution provided by an implementation is called the
+\term{native resolution}.
+
+\pnum
+Implementation-provided clocks that are used for these functions shall satisfy the
+\oldconcept{TrivialClock} requirements\iref{time.clock.req}.
+
+\pnum
+A function that takes an argument which specifies a timeout will throw if,
+during its execution, a clock, time point, or time duration throws an exception.
+Such exceptions are referred to as \term{timeout-related exceptions}.
+\begin{note} Instantiations of clock, time point and duration types supplied by
+the implementation as specified in~\ref{time.clock} do not throw exceptions.
+\end{note}
+
+\rSec2[thread.req.lockable]{Requirements for \oldconcept{Lockable} types}
+
+\rSec3[thread.req.lockable.general]{In general}
+
+\pnum
+An \defn{execution agent} is an entity such as a thread that may perform work in parallel with
+other execution agents. \begin{note} Implementations or users may introduce other kinds of
+agents such as processes or thread-pool tasks. \end{note} The calling agent is determined by
+context, e.g., the calling thread that contains the call, and so on.
+
+\pnum
+\begin{note} Some lockable objects are ``agent oblivious'' in that they work for any
+execution agent model because they do not determine or store the agent's ID (e.g., an
+ordinary spin lock). \end{note}
+
+\pnum
+The standard library templates \tcode{unique_lock}\iref{thread.lock.unique},
+\tcode{shared_lock}\iref{thread.lock.shared},
+\tcode{scoped_lock}\iref{thread.lock.scoped},
+\tcode{lock_guard}\iref{thread.lock.guard}, \tcode{lock},
+\tcode{try_lock}\iref{thread.lock.algorithm}, and
+\tcode{condition_variable_any}\iref{thread.condition.condvarany} all operate on user-supplied
+lockable objects. The \oldconcept{BasicLockable} requirements, the \oldconcept{Lockable} requirements,
+and the \oldconcept{TimedLockable} requirements list the requirements imposed by these library types
+in order to acquire or release ownership of a \tcode{lock} by a given execution agent.
+\begin{note} The nature of any lock ownership and any synchronization it may entail are not part
+of these requirements. \end{note}
+
+\rSec3[thread.req.lockable.basic]{\oldconcept{BasicLockable} requirements}
+
+\pnum
+A type \tcode{L} meets the \oldconcept{BasicLockable} requirements if the following expressions are
+well-formed and have the specified semantics (\tcode{m} denotes a value of type \tcode{L}).
+
+\begin{itemdecl}
+m.lock()
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Blocks until a lock can be acquired for the current execution agent. If an exception
+is thrown then a lock shall not have been acquired for the current execution agent.
+\end{itemdescr}
+
+\begin{itemdecl}
+m.unlock()
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\requires The current execution agent shall hold a lock on \tcode{m}.
+
+\pnum
+\effects Releases a lock on \tcode{m} held by the current execution agent.
+
+\pnum
+\throws Nothing.
+\end{itemdescr}
+
+\rSec3[thread.req.lockable.req]{\oldconcept{Lockable} requirements}
+
+\pnum
+A type \tcode{L} meets the \oldconcept{Lockable} requirements if it meets the \oldconcept{BasicLockable}
+requirements and the following expressions are well-formed and have the specified semantics
+(\tcode{m} denotes a value of type \tcode{L}).
+
+\begin{itemdecl}
+m.try_lock()
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Attempts to acquire a lock for the current execution agent without blocking. If an
+exception is thrown then a lock shall not have been acquired for the current execution agent.
+
+\pnum
+\returntype \tcode{bool}.
+
+\pnum
+\returns \tcode{true} if the lock was acquired, \tcode{false} otherwise.
+\end{itemdescr}
+
+\rSec3[thread.req.lockable.timed]{\oldconcept{TimedLockable} requirements}
+
+\pnum
+A type \tcode{L} meets the \oldconcept{TimedLockable} requirements if it meets the \oldconcept{Lockable}
+requirements and the following expressions are well-formed and have the specified semantics
+(\tcode{m} denotes a value of type \tcode{L}, \tcode{rel_time} denotes a value of an
+instantiation of \tcode{duration}\iref{time.duration}, and \tcode{abs_time} denotes a value
+of an instantiation of \tcode{time_point}\iref{time.point}).
+
+\begin{itemdecl}
+m.try_lock_for(rel_time)
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Attempts to acquire a lock for the current execution agent within the relative
+timeout\iref{thread.req.timing} specified by \tcode{rel_time}. The function shall not return
+within the timeout specified by \tcode{rel_time} unless it has obtained a lock on \tcode{m}
+for the current execution agent. If an exception is thrown then a lock shall not have been
+acquired for the current execution agent.
+
+\pnum
+\returntype \tcode{bool}.
+
+\pnum
+\returns \tcode{true} if the lock was acquired, \tcode{false} otherwise.
+\end{itemdescr}
+
+\begin{itemdecl}
+m.try_lock_until(abs_time)
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Attempts to acquire a lock for the current execution agent before the absolute
+timeout\iref{thread.req.timing} specified by \tcode{abs_time}. The function shall not return
+before the timeout specified by \tcode{abs_time} unless it has obtained a lock on \tcode{m} for
+the current execution agent. If an exception is thrown then a lock shall not have been acquired
+for the current execution agent.
+
+\pnum
+\returntype \tcode{bool}.
+
+\pnum
+\returns \tcode{true} if the lock was acquired, \tcode{false} otherwise.
+\end{itemdescr}
+
+\rSec2[thread.decaycopy]{\tcode{decay_copy}}
+
+\pnum
+In several places in this Clause the operation
+\indextext{DECAY_COPY@\tcode{\placeholder{DECAY_COPY}}}%
+\indexlibrary{DECAY_COPY@\tcode{\placeholder{DECAY_COPY}}}%
+{\tcode{\placeholdernc{DECAY_COPY}(x)}} is used. All
+such uses mean call the function \tcode{decay_copy(x)} and use the
+result, where \tcode{decay_copy} is defined as follows:
+
+\begin{codeblock}
+template<class T> decay_t<T> decay_copy(T&& v)
+  { return std::forward<T>(v); }
+\end{codeblock}
+
+\rSec1[thread.threads]{Threads}
+
+\pnum
+\ref{thread.threads} describes components that can be used to create and manage threads.
+\begin{note} These threads are intended to map one-to-one with operating system threads.
+\end{note}
+
+\rSec2[thread.syn]{Header \tcode{<thread>} synopsis}
+\indexhdr{thread}%
+
+\begin{codeblock}
+namespace std {
+  class thread;
+
+  void swap(thread& x, thread& y) noexcept;
+
+  namespace this_thread {
+    thread::id get_id() noexcept;
+
+    void yield() noexcept;
+    template<class Clock, class Duration>
+      void sleep_until(const chrono::time_point<Clock, Duration>& abs_time);
+    template<class Rep, class Period>
+      void sleep_for(const chrono::duration<Rep, Period>& rel_time);
+  }
+}
+\end{codeblock}
+
+\rSec2[thread.thread.class]{Class \tcode{thread}}
+
+\pnum
+The class \tcode{thread} provides a mechanism to create a new thread of execution, to join with
+a thread (i.e., wait for a thread to complete), and to perform other operations that manage and
+query the state of a thread. A \tcode{thread} object uniquely represents a particular thread of
+execution. That representation may be transferred to other \tcode{thread} objects in such a way
+that no two \tcode{thread} objects simultaneously represent the same thread of execution. A
+thread of execution is \term{detached} when no \tcode{thread} object represents that thread.
+Objects of class \tcode{thread} can be in a state that does not represent a thread of
+execution. \begin{note} A \tcode{thread} object does not represent a thread of execution after
+default construction, after being moved from, or after a successful call to \tcode{detach} or
+\tcode{join}. \end{note}
+
+\indexlibrary{\idxcode{thread}}%
+\begin{codeblock}
+namespace std {
+  class thread {
+  public:
+    // types
+    class id;
+    using native_handle_type = @\impdefnc@;         // see~\ref{thread.req.native}
+
+    // construct/copy/destroy
+    thread() noexcept;
+    template<class F, class... Args> explicit thread(F&& f, Args&&... args);
+    ~thread();
+    thread(const thread&) = delete;
+    thread(thread&&) noexcept;
+    thread& operator=(const thread&) = delete;
+    thread& operator=(thread&&) noexcept;
+
+    // members
+    void swap(thread&) noexcept;
+    bool joinable() const noexcept;
+    void join();
+    void detach();
+    id get_id() const noexcept;
+    native_handle_type native_handle();                         // see~\ref{thread.req.native}
+
+    // static members
+    static unsigned int hardware_concurrency() noexcept;
+  };
+}
+\end{codeblock}
+
+\rSec3[thread.thread.id]{Class \tcode{thread::id}}
+
+\indexlibrary{\idxcode{thread::id}}%
+\indexlibrary{\idxcode{thread}!\idxcode{id}}%
+\begin{codeblock}
+namespace std {
+  class thread::id {
+  public:
+    id() noexcept;
+  };
+
+  bool operator==(thread::id x, thread::id y) noexcept;
+  bool operator!=(thread::id x, thread::id y) noexcept;
+  bool operator<(thread::id x, thread::id y) noexcept;
+  bool operator>(thread::id x, thread::id y) noexcept;
+  bool operator<=(thread::id x, thread::id y) noexcept;
+  bool operator>=(thread::id x, thread::id y) noexcept;
+
+  template<class charT, class traits>
+    basic_ostream<charT, traits>&
+      operator<<(basic_ostream<charT, traits>& out, thread::id id);
+
+  // hash support
+  template<class T> struct hash;
+  template<> struct hash<thread::id>;
+}
+\end{codeblock}
+
+\pnum An object of type \tcode{thread::id} provides a unique identifier for
+each thread of execution and a single distinct value for all \tcode{thread}
+objects that do not represent a thread of
+execution\iref{thread.thread.class}. Each thread of execution has an
+associated \tcode{thread::id} object that is not equal to the
+\tcode{thread::id} object of any other thread of execution and that is not
+equal to the \tcode{thread::id} object of any \tcode{thread} object that
+does not represent threads of execution.
+
+\pnum
+\tcode{thread::id} is a trivially copyable class\iref{class.prop}.
+The library may reuse the value of a \tcode{thread::id} of a terminated thread that can no longer be joined.
+
+\pnum
+\begin{note} Relational operators allow \tcode{thread::id} objects to be used as
+keys in associative containers. \end{note}
+
+\indexlibrary{\idxcode{thread::id}!constructor}%
+\begin{itemdecl}
+id() noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum\effects Constructs an object of type \tcode{id}.
+
+\pnum\postconditions The constructed object does not represent a thread of execution.
+\end{itemdescr}
+
+\indexlibrarymember{operator==}{thread::id}%
+\begin{itemdecl}
+bool operator==(thread::id x, thread::id y) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum\returns \tcode{true} only if \tcode{x} and \tcode{y} represent the same
+thread of execution or neither \tcode{x} nor \tcode{y} represents a thread of
+execution.
+\end{itemdescr}
+
+\indexlibrarymember{operator"!=}{thread::id}%
+\begin{itemdecl}
+bool operator!=(thread::id x, thread::id y) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum\returns \tcode{!(x == y)}
+\end{itemdescr}
+
+\indexlibrarymember{operator<}{thread::id}%
+\begin{itemdecl}
+bool operator<(thread::id x, thread::id y) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\returns A value such that \tcode{operator<} is a total ordering as described in~\ref{alg.sorting}.
+\end{itemdescr}
+
+\indexlibrarymember{operator>}{thread::id}%
+\begin{itemdecl}
+bool operator>(thread::id x, thread::id y) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum\returns \tcode{y < x}.
+\end{itemdescr}
+
+\indexlibrarymember{operator<=}{thread::id}%
+\begin{itemdecl}
+bool operator<=(thread::id x, thread::id y) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\returns \tcode{!(y < x)}.
+\end{itemdescr}
+
+\indexlibrarymember{operator>=}{thread::id}%
+\begin{itemdecl}
+bool operator>=(thread::id x, thread::id y) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum\returns \tcode{!(x < y)}.
+\end{itemdescr}
+
+\indexlibrarymember{operator<<}{thread::id}%
+\begin{itemdecl}
+template<class charT, class traits>
+  basic_ostream<charT, traits>&
+    operator<< (basic_ostream<charT, traits>& out, thread::id id);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum\effects Inserts an unspecified text representation of \tcode{id} into
+\tcode{out}. For two objects of type \tcode{thread::id} \tcode{x} and \tcode{y},
+if \tcode{x == y} the \tcode{thread::id} objects have the same text
+representation and if \tcode{x != y} the \tcode{thread::id} objects have
+distinct text representations.
+
+\pnum\returns \tcode{out}.
+\end{itemdescr}
+
+\indexlibrary{\idxcode{hash}!\idxcode{thread::id}}%
+\begin{itemdecl}
+template<> struct hash<thread::id>;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum The specialization is enabled\iref{unord.hash}.
+\end{itemdescr}
+
+\rSec3[thread.thread.constr]{\tcode{thread} constructors}
+
+\indexlibrary{\idxcode{thread}!constructor}%
+\begin{itemdecl}
+thread() noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum\effects Constructs a \tcode{thread} object that does not represent a thread of execution.
+
+\pnum\postconditions \tcode{get_id() == id()}.
+\end{itemdescr}
+
+\indexlibrary{\idxcode{thread}!constructor}%
+\begin{itemdecl}
+template<class F, class... Args> explicit thread(F&& f, Args&&... args);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\requires\ \tcode{F} and each $\tcode{T}_i$ in \tcode{Args} shall satisfy the
+\oldconcept{MoveConstructible} requirements.
+\tcode{%
+\placeholdernc{INVOKE}(\brk{}%
+\placeholdernc{DECAY_COPY}(\brk{}%
+std::forward<F>(f)),
+\placeholdernc{DECAY_COPY}(\brk{}%
+std::forward<Args>(\brk{}args))...)}\iref{func.require} shall be
+a va\-lid expression.
+
+\pnum
+\remarks
+This constructor shall not participate in overload resolution if \tcode{remove_cvref_t<F>}
+is the same type as \tcode{std::thread}.
+
+\pnum
+\effects\ Constructs an object of type \tcode{thread}. The new thread of execution executes
+\tcode{%
+\placeholdernc{INVOKE}(\brk{}%
+\placeholdernc{DECAY_COPY}(\brk{}%
+std::forward<F>(f)),
+\placeholdernc{DECAY_COPY}(\brk{}%
+std::forward<Args>(\brk{}args))...)} with the calls to
+\tcode{\placeholder{DECAY_COPY}} being evaluated in the constructing thread. Any return value from this invocation
+is ignored. \begin{note} This implies that any exceptions not thrown from the invocation of the copy
+of \tcode{f} will be thrown in the constructing thread, not the new thread. \end{note} If the
+invocation of
+\tcode{%
+\placeholdernc{INVOKE}(\brk{}%
+\placeholdernc{DECAY_COPY}(\brk{}%
+std::forward<F>(f)),
+\placeholdernc{DECAY_COPY}(\brk{}%
+std::forward<Args>(args))...)}
+termi\-nates with an uncaught exception, \tcode{terminate} shall be called.
+
+
+\pnum\sync The completion of the invocation of the constructor
+synchronizes with the beginning of the invocation of the copy of \tcode{f}.
+
+\pnum\postconditions \tcode{get_id() != id()}. \tcode{*this} represents the newly started thread.
+
+\pnum\throws \tcode{system_error} if unable to start the new thread.
+
+\pnum\errors
+\begin{itemize}
+\item \tcode{resource_unavailable_try_again} --- the system lacked the necessary
+resources to create another thread, or the system-imposed limit on the number of
+threads in a process would be exceeded.
+\end{itemize}
+\end{itemdescr}
+
+\indexlibrary{\idxcode{thread}!constructor}%
+\begin{itemdecl}
+thread(thread&& x) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Constructs an object of type \tcode{thread} from \tcode{x}, and sets
+\tcode{x} to a default constructed state.
+
+\pnum
+\postconditions \tcode{x.get_id() == id()} and \tcode{get_id()} returns the
+value of \tcode{x.get_id()} prior to the start of construction.
+
+\end{itemdescr}
+
+\rSec3[thread.thread.destr]{\tcode{thread} destructor}
+
+\indexlibrary{\idxcode{thread}!destructor}%
+\begin{itemdecl}
+~thread();
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+If \tcode{joinable()}, calls \tcode{terminate()}. Otherwise, has no effects.
+\begin{note} Either implicitly detaching or joining a \tcode{joinable()} thread in its
+destructor could result in difficult to debug correctness (for detach) or performance
+(for join) bugs encountered only when an exception is thrown. Thus the programmer must
+ensure that the destructor is never executed while the thread is still joinable.
+\end{note}
+\end{itemdescr}
+
+\rSec3[thread.thread.assign]{\tcode{thread} assignment}
+
+\indexlibrarymember{operator=}{thread}%
+\begin{itemdecl}
+thread& operator=(thread&& x) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects If \tcode{joinable()}, calls \tcode{terminate()}. Otherwise, assigns the
+state of \tcode{x} to \tcode{*this} and sets \tcode{x} to a default constructed state.
+
+\pnum
+\postconditions \tcode{x.get_id() == id()} and \tcode{get_id()} returns the value of
+\tcode{x.get_id()} prior to the assignment.
+
+\pnum
+\returns \tcode{*this}.
+\end{itemdescr}
+
+\rSec3[thread.thread.member]{\tcode{thread} members}
+
+\indexlibrarymember{swap}{thread}%
+\begin{itemdecl}
+void swap(thread& x) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Swaps the state of \tcode{*this} and \tcode{x}.
+\end{itemdescr}
+
+\indexlibrarymember{joinable}{thread}%
+\begin{itemdecl}
+bool joinable() const noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\returns \tcode{get_id() != id()}.
+\end{itemdescr}
+
+\indexlibrarymember{join}{thread}%
+\begin{itemdecl}
+void join();
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects\ Blocks until the thread represented by \tcode{*this} has completed.
+
+\pnum
+\sync The completion of the thread represented by \tcode{*this} synchronizes with\iref{intro.multithread}
+the corresponding successful
+\tcode{join()} return. \begin{note} Operations on
+\tcode{*this} are not synchronized. \end{note}
+
+\pnum
+\postconditions The thread represented by \tcode{*this} has completed. \tcode{get_id() == id()}.
+
+\pnum
+\throws \tcode{system_error} when
+an exception is required\iref{thread.req.exception}.
+
+\pnum
+\errors
+\begin{itemize}
+\item \tcode{resource_deadlock_would_occur} --- if deadlock is detected or
+\tcode{get_id() == this_thread::\brk{}get_id()}.
+
+\item \tcode{no_such_process} --- if the thread is not valid.
+
+\item \tcode{invalid_argument} --- if the thread is not joinable.
+\end{itemize}
+\end{itemdescr}
+
+\indexlibrarymember{detach}{thread}%
+\begin{itemdecl}
+void detach();
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects The thread represented by \tcode{*this} continues execution without the calling thread
+blocking. When \tcode{detach()} returns, \tcode{*this} no longer represents the possibly continuing
+thread of execution. When the thread previously represented by \tcode{*this} ends execution, the
+implementation shall release any owned resources.
+
+\pnum\postconditions \tcode{get_id() == id()}.
+
+\pnum\throws \tcode{system_error} when
+an exception is required\iref{thread.req.exception}.
+
+\pnum \errors
+\begin{itemize}
+\item \tcode{no_such_process} --- if the thread is not valid.
+\item \tcode{invalid_argument} --- if the thread is not joinable.
+\end{itemize}
+\end{itemdescr}
+
+\indexlibrarymember{get_id}{thread}%
+\begin{itemdecl}
+id get_id() const noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\returns A default constructed \tcode{id} object if \tcode{*this} does not represent a thread,
+otherwise \tcode{this_thread::get_id()} for the thread of execution represented by
+\tcode{*this}.
+\end{itemdescr}
+
+\rSec3[thread.thread.static]{\tcode{thread} static members}
+
+\indexlibrarymember{hardware_concurrency}{thread}%
+\begin{itemdecl}
+unsigned hardware_concurrency() noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\returns The number of hardware thread contexts. \begin{note} This value should
+only be considered to be a hint. \end{note} If this value is not computable or
+well-defined, an implementation should return 0.
+\end{itemdescr}
+
+\rSec3[thread.thread.algorithm]{\tcode{thread} specialized algorithms}
+
+\indexlibrarymember{swap}{thread}%
+\begin{itemdecl}
+void swap(thread& x, thread& y) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum\effects As if by \tcode{x.swap(y)}.
+\end{itemdescr}
+
+\rSec2[thread.thread.this]{Namespace \tcode{this_thread}}
+
+\begin{codeblock}
+namespace std::this_thread {
+  thread::id get_id() noexcept;
+
+  void yield() noexcept;
+  template<class Clock, class Duration>
+    void sleep_until(const chrono::time_point<Clock, Duration>& abs_time);
+  template<class Rep, class Period>
+    void sleep_for(const chrono::duration<Rep, Period>& rel_time);
+}
+\end{codeblock}
+
+\indexlibrarymember{get_id}{this_thread}%
+\begin{itemdecl}
+thread::id this_thread::get_id() noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\returns An object of type \tcode{thread::id} that uniquely identifies the current thread of
+execution. No other thread of execution shall have this id and this thread of execution shall
+always have this id. The object returned shall not compare equal to a default constructed
+\tcode{thread::id}.
+\end{itemdescr}
+
+\indexlibrarymember{yield}{this_thread}%
+\begin{itemdecl}
+void this_thread::yield() noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Offers the implementation the opportunity to reschedule.
+
+\pnum
+\sync None.
+\end{itemdescr}
+
+\indexlibrarymember{sleep_until}{this_thread}%
+\begin{itemdecl}
+template<class Clock, class Duration>
+  void sleep_until(const chrono::time_point<Clock, Duration>& abs_time);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Blocks the calling thread for the absolute timeout\iref{thread.req.timing} specified
+by \tcode{abs_time}.
+
+\pnum
+\sync None.
+
+\pnum
+\throws Timeout-related exceptions\iref{thread.req.timing}.
+\end{itemdescr}
+
+\indexlibrarymember{sleep_for}{this_thread}%
+\begin{itemdecl}
+template<class Rep, class Period>
+  void sleep_for(const chrono::duration<Rep, Period>& rel_time);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Blocks the calling thread for the relative timeout\iref{thread.req.timing} specified
+by \tcode{rel_time}.
+
+\pnum
+\sync None.
+
+\pnum
+\throws Timeout-related exceptions\iref{thread.req.timing}.
+\end{itemdescr}
+
+\rSec1[thread.condition]{Condition variables}
+
+\pnum
+Condition variables provide synchronization primitives used to block a thread until
+notified by some other thread that some condition is met or until a system time is
+reached. Class \tcode{condition_variable} provides a condition variable that can only
+wait on an object of type \tcode{unique_lock<mutex>}, allowing maximum efficiency on some
+platforms. Class \tcode{condition_variable_any} provides a general condition variable
+that can wait on objects of user-supplied lock types.
+
+\pnum
+Condition variables permit concurrent invocation of the \tcode{wait}, \tcode{wait_for},
+\tcode{wait_until}, \tcode{notify_one} and \tcode{notify_all} member functions.
+
+\pnum
+The execution of \tcode{notify_one} and \tcode{notify_all} shall be atomic. The
+execution of \tcode{wait}, \tcode{wait_for}, and \tcode{wait_until} shall be performed
+in three atomic parts:
+
+\begin{enumerate}
+\item the release of the mutex and entry into the waiting state;
+\item the unblocking of the wait; and
+\item the reacquisition of the lock.
+\end{enumerate}
+
+\pnum
+The implementation shall behave as if all executions of \tcode{notify_one}, \tcode{notify_all}, and each
+part of the \tcode{wait}, \tcode{wait_for}, and \tcode{wait_until} executions are
+executed in a single unspecified total order consistent with the "happens before" order.
+
+\pnum
+Condition variable construction and destruction need not be synchronized.
+
+\rSec2[condition_variable.syn]{Header \tcode{<condition_variable>} synopsis}
+\indexhdr{condition_variable}%
+
+\indexlibrary{\idxcode{cv_status}}%
+\begin{codeblock}
+namespace std {
+  class condition_variable;
+  class condition_variable_any;
+
+  void notify_all_at_thread_exit(condition_variable& cond, unique_lock<mutex> lk);
+
+  enum class cv_status { no_timeout, timeout };
+}
+\end{codeblock}
+
+\rSec2[thread.condition.nonmember]{Non-member functions}
+\indexlibrary{\idxcode{notify_all_at_thread_exit}}%
+\begin{itemdecl}
+void notify_all_at_thread_exit(condition_variable& cond, unique_lock<mutex> lk);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\requires \tcode{lk} is locked by the calling thread and either
+
+\begin{itemize}
+\item no other thread is waiting on \tcode{cond}, or
+\item \tcode{lk.mutex()} returns the same value for each of the lock arguments
+supplied by all concurrently waiting (via \tcode{wait}, \tcode{wait_for},
+or \tcode{wait_until}) threads.
+\end{itemize}
+
+\pnum
+\effects Transfers ownership of the lock associated with \tcode{lk} into
+internal storage and schedules \tcode{cond} to be notified when the current
+thread exits, after all objects of thread storage duration associated with
+the current thread have been destroyed. This notification shall be as if:
+\begin{codeblock}
+lk.unlock();
+cond.notify_all();
+\end{codeblock}
+
+\pnum
+\sync The implied \tcode{lk.unlock()} call is sequenced after the destruction of
+all objects with thread storage duration associated with the current thread.
+
+\pnum
+\begin{note}
+The supplied lock will be held until the thread exits, and care
+should be taken to ensure that this does not cause deadlock due to lock
+ordering issues. After calling \tcode{notify_all_at_thread_exit} it is
+recommended that the thread should be exited as soon as possible, and
+that no blocking or time-consuming tasks are run on that thread.
+\end{note}
+
+\pnum
+\begin{note}
+It is the user's responsibility to ensure that waiting threads
+do not erroneously assume that the thread has finished if they experience
+spurious wakeups. This typically requires that the condition being waited
+for is satisfied while holding the lock on \tcode{lk}, and that this lock
+is not released and reacquired prior to calling \tcode{notify_all_at_thread_exit}.
+\end{note}
+\end{itemdescr}
+
+\rSec2[thread.condition.condvar]{Class \tcode{condition_variable}}
+
+\indexlibrary{\idxcode{condition_variable}}%
+\begin{codeblock}
+namespace std {
+  class condition_variable {
+  public:
+    condition_variable();
+    ~condition_variable();
+
+    condition_variable(const condition_variable&) = delete;
+    condition_variable& operator=(const condition_variable&) = delete;
+
+    void notify_one() noexcept;
+    void notify_all() noexcept;
+    void wait(unique_lock<mutex>& lock);
+    template<class Predicate>
+      void wait(unique_lock<mutex>& lock, Predicate pred);
+    template<class Clock, class Duration>
+      cv_status wait_until(unique_lock<mutex>& lock,
+                           const chrono::time_point<Clock, Duration>& abs_time);
+    template<class Clock, class Duration, class Predicate>
+      bool wait_until(unique_lock<mutex>& lock,
+                      const chrono::time_point<Clock, Duration>& abs_time,
+                      Predicate pred);
+    template<class Rep, class Period>
+      cv_status wait_for(unique_lock<mutex>& lock,
+                         const chrono::duration<Rep, Period>& rel_time);
+    template<class Rep, class Period, class Predicate>
+      bool wait_for(unique_lock<mutex>& lock,
+                    const chrono::duration<Rep, Period>& rel_time,
+                    Predicate pred);
+
+    using native_handle_type = @\impdefnc@;          // see~\ref{thread.req.native}
+    native_handle_type native_handle();                         // see~\ref{thread.req.native}
+  };
+}
+\end{codeblock}
+
+\pnum
+The class \tcode{condition_variable} shall be a standard-layout class\iref{class.prop}.
+
+\indexlibrary{\idxcode{condition_variable}!constructor}%
+\begin{itemdecl}
+condition_variable();
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Constructs an object of type \tcode{condition_variable}.
+
+\pnum
+\throws \tcode{system_error} when an exception is required\iref{thread.req.exception}.
+
+\pnum
+\errors
+\begin{itemize}
+\item \tcode{resource_unavailable_try_again} --- if some non-memory resource
+limitation prevents initialization.
+\end{itemize}
+\end{itemdescr}
+
+\indexlibrary{\idxcode{condition_variable}!destructor}%
+\begin{itemdecl}
+~condition_variable();
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\requires There shall be no thread blocked on \tcode{*this}. \begin{note} That is, all
+threads shall have been notified; they may subsequently block on the lock specified in the
+wait.
+This relaxes the usual rules, which would have required all wait calls to happen before
+destruction. Only the notification to unblock the wait needs to happen before destruction.
+The user should take care to ensure that no threads wait on \tcode{*this} once the destructor has
+been started, especially when the waiting threads are calling the wait functions in a loop or
+using the overloads of \tcode{wait}, \tcode{wait_for}, or \tcode{wait_until} that take a predicate.
+\end{note}
+
+\pnum\effects Destroys the object.
+\end{itemdescr}
+
+\indexlibrarymember{notify_one}{condition_variable}%
+\begin{itemdecl}
+void notify_one() noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum\effects If any threads are blocked waiting for \tcode{*this}, unblocks one of those threads.
+\end{itemdescr}
+
+\indexlibrarymember{notify_all}{condition_variable}%
+\begin{itemdecl}
+void notify_all() noexcept;
+\end{itemdecl}
+
+%*** wait functions:
+
+\begin{itemdescr}
+\pnum\effects Unblocks all threads that are blocked waiting for \tcode{*this}.
+\end{itemdescr}
+
+\indexlibrarymember{wait}{condition_variable}%
+\begin{itemdecl}
+void wait(unique_lock<mutex>& lock);
+\end{itemdecl}
+\begin{itemdescr}
+ \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread, and either
+ \begin{itemize}
+        \item no other thread is waiting on this \tcode{condition_variable} object or
+        \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
+                arguments supplied by all concurrently waiting (via \tcode{wait},
+                \tcode{wait_for}, or \tcode{wait_until}) threads.
+ \end{itemize}
+
+ \pnum\effects
+ \begin{itemize}
+        \item Atomically calls \tcode{lock.unlock()} and blocks on \tcode{*this}.
+        \item When unblocked, calls \tcode{lock.lock()} (possibly blocking on the lock), then returns.
+        \item The function will unblock when signaled by a call to \tcode{notify_one()}
+              or a call to \tcode{notify_all()}, or spuriously.
+ \end{itemize}
+
+ \pnum \remarks
+        If the function fails to meet the postcondition, \tcode{terminate()}
+        shall be called\iref{except.terminate}.
+        \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+ 
+ \pnum \postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread.
+
+ \pnum\throws Nothing.
+\end{itemdescr}
+
+
+\indexlibrarymember{wait}{condition_variable}%
+\begin{itemdecl}
+template<class Predicate>
+  void wait(unique_lock<mutex>& lock, Predicate pred);
+\end{itemdecl}
+\begin{itemdescr}
+ \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()} is
+        locked by the calling thread, and either
+
+        \begin{itemize}
+         \item no other thread is waiting on this \tcode{condition_variable} object or
+         \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
+                arguments supplied by all concurrently waiting (via \tcode{wait},
+                \tcode{wait_for}, or \tcode{wait_until}) threads.
+        \end{itemize}
+
+ \pnum \effects Equivalent to:
+\begin{codeblock}
+while (!pred())
+  wait(lock);
+\end{codeblock}
+
+ \pnum \remarks
+        If the function fails to meet the postcondition, \tcode{terminate()}
+        shall be called\iref{except.terminate}.
+        \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+
+ \pnum \postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread.
+
+ \pnum \throws Any exception thrown by \tcode{pred}.
+\end{itemdescr}
+
+
+\indexlibrarymember{wait_until}{condition_variable}%
+\begin{itemdecl}
+template<class Clock, class Duration>
+  cv_status wait_until(unique_lock<mutex>& lock,
+                       const chrono::time_point<Clock, Duration>& abs_time);
+\end{itemdecl}
+\begin{itemdescr}
+ \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread, and either
+        \begin{itemize}
+         \item no other thread is waiting on this \tcode{condition_variable} object or
+         \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
+                arguments supplied by all concurrently waiting (via \tcode{wait},
+                \tcode{wait_for}, or \tcode{wait_until}) threads.
+        \end{itemize}
+
+ \pnum \effects
+        \begin{itemize}
+         \item Atomically calls \tcode{lock.unlock()} and blocks on \tcode{*this}.
+
+         \item When unblocked, calls \tcode{lock.lock()} (possibly blocking on the lock), then returns.
+
+         \item The function will unblock when signaled by a call to \tcode{notify_one()}, a call to \tcode{notify_all()},
+                expiration of the absolute timeout\iref{thread.req.timing} specified by \tcode{abs_time},
+                or spuriously.
+
+         \item If the function exits via an exception, \tcode{lock.lock()} shall be called prior to exiting the function.
+        \end{itemize}
+
+ \pnum \remarks
+        If the function fails to meet the postcondition, \tcode{terminate()}
+        shall be called\iref{except.terminate}.
+        \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+
+ \pnum \postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread.
+
+ \pnum \returns \tcode{cv_status::timeout} if
+        the absolute timeout\iref{thread.req.timing} specified by \tcode{abs_time} expired,
+        otherwise \tcode{cv_status::no_timeout}.
+
+ \pnum\throws Timeout-related exceptions\iref{thread.req.timing}.
+\end{itemdescr}
+
+\indexlibrarymember{wait_for}{condition_variable}%
+\begin{itemdecl}
+template<class Rep, class Period>
+  cv_status wait_for(unique_lock<mutex>& lock,
+                     const chrono::duration<Rep, Period>& rel_time);
+\end{itemdecl}
+\begin{itemdescr}
+ \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread, and either
+        \begin{itemize}
+         \item no other thread is waiting on this \tcode{condition_variable} object or
+         \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock} arguments
+                supplied by all concurrently waiting (via \tcode{wait}, \tcode{wait_for}, or
+                \tcode{wait_until}) threads.
+        \end{itemize}
+
+ \pnum \effects Equivalent to:
+\begin{codeblock}
+return wait_until(lock, chrono::steady_clock::now() + rel_time);
+\end{codeblock}
+
+ \pnum \returns \tcode{cv_status::timeout} if
+                the relative timeout\iref{thread.req.timing} specified by \tcode{rel_time} expired,
+                otherwise \tcode{cv_status::no_timeout}.
+
+ \pnum \remarks
+                If the function fails to meet the postcondition, \tcode{terminate()}
+                shall be called\iref{except.terminate}.
+                \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+
+ \pnum \postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread.
+
+ \pnum \throws Timeout-related exceptions\iref{thread.req.timing}.
+\end{itemdescr}
+
+
+\indexlibrarymember{wait_until}{condition_variable}%
+\begin{itemdecl}
+template<class Clock, class Duration, class Predicate>
+  bool wait_until(unique_lock<mutex>& lock,
+                  const chrono::time_point<Clock, Duration>& abs_time,
+                  Predicate pred);
+\end{itemdecl}
+\begin{itemdescr}
+ \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()} is
+                locked by the calling thread, and either
+
+        \begin{itemize}
+        \item no other thread is waiting on this \tcode{condition_variable} object or
+        \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
+                arguments supplied by all concurrently waiting (via \tcode{wait},
+                \tcode{wait_for}, or \tcode{wait_until}) threads.
+        \end{itemize}
+
+ \pnum \effects Equivalent to:
+\begin{codeblock}
+while (!pred())
+  if (wait_until(lock, abs_time) == cv_status::timeout)
+    return pred();
+return true;
+\end{codeblock}
+
+ \pnum \remarks
+        If the function fails to meet the postcondition, \tcode{terminate()}
+        shall be called\iref{except.terminate}.
+        \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+
+ \pnum \postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread.
+
+ \pnum \begin{note} The returned value indicates whether the predicate evaluated to
+        \tcode{true} regardless of whether the timeout was triggered. \end{note}
+
+ \pnum \throws Timeout-related exceptions\iref{thread.req.timing} or any exception thrown by \tcode{pred}.
+\end{itemdescr}
+
+
+\indexlibrarymember{wait_for}{condition_variable}%
+\begin{itemdecl}
+template<class Rep, class Period, class Predicate>
+  bool wait_for(unique_lock<mutex>& lock,
+                const chrono::duration<Rep, Period>& rel_time,
+                Predicate pred);
+\end{itemdecl}
+\begin{itemdescr}
+ \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread, and either
+        \begin{itemize}
+        \item no other thread is waiting on this \tcode{condition_variable} object or
+        \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock} arguments
+                supplied by all concurrently waiting (via \tcode{wait}, \tcode{wait_for}, or
+                \tcode{wait_until}) threads.
+        \end{itemize}
+ 
+ \pnum \effects Equivalent to:
+\begin{codeblock}
+return wait_until(lock, chrono::steady_clock::now() + rel_time, std::move(pred));
+\end{codeblock}
+ 
+ \pnum \begin{note} There is no blocking if \tcode{pred()} is initially \tcode{true}, even if the
+        timeout has already expired. \end{note}
+ 
+ \pnum \remarks
+        If the function fails to meet the postcondition, \tcode{terminate()}
+        shall be called\iref{except.terminate}.
+        \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+ 
+ \pnum \postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread.
+ 
+ \pnum \begin{note} The returned value indicates whether the predicate evaluates to \tcode{true}
+        regardless of whether the timeout was triggered. \end{note}
+ 
+ \pnum \throws Timeout-related exceptions\iref{thread.req.timing} or any exception thrown by \tcode{pred}.
+\end{itemdescr}
+
+

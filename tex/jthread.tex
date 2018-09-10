@@ -163,7 +163,7 @@ namespace std {
     // \ref{interrupt_token.mem} interrupt handling:
     bool valid() const noexcept;
     bool is_interrupted() const noexcept;
-    bool interrupt() noexcept;
+    bool interrupt();
     void throw_if_interrupted() const;
   }
 }
@@ -294,7 +294,7 @@ bool is_interrupted() const noexcept;
 
 \indexlibrarymember{interrupt}{interrupt_token}%
 \begin{itemdecl}
-bool interrupt() noexcept;
+bool interrupt();
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\requires \tcode{valid() == true}
@@ -345,10 +345,10 @@ bool operator!= (const interrupt_token& lhs, const interrupt_token& rhs);
 %******************************************************************
 \rSec1[thread.jthreads]{Joining Threads}
 
-}%\color{insertcolor}
-[{\itshape{}Editorial note:} 
-{\color{insertnote}This color signals differences to class \tcode{std::thread}.} ]
-{\color{insertcolor}
+{\color{blue}
+[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to class \tcode{std::thread}.} ]
+}
+
 
 \pnum
 \ref{thread.jthreads} describes components that can be used to create and manage threads
@@ -413,25 +413,25 @@ namespace std {
     id get_id() const noexcept;
     native_handle_type native_handle();     // see~\ref{thread.req.native}
 \end{codeblock}
-{\color{insertnote}
+{\color{diffcolor}
 \begin{codeblock}
     // interrupt token handling
     interrupt_token get_original_interrupt_token() const noexcept;
     bool interrupt() noexcept;
 \end{codeblock}
-}%\color{insertnote}
+}%\color{diffcolor}
 \begin{codeblock}
     // static members
     static unsigned int hardware_concurrency() noexcept;
   
 \end{codeblock}
-{\color{insertnote}
+{\color{diffcolor}
 \begin{codeblock}
   private:
     interrupt_token itoken;                 // \expos
   };
 \end{codeblock}
-}%\color{insertnote}
+}%\color{diffcolor}
 \begin{codeblock}
 }
 \end{codeblock}
@@ -447,7 +447,7 @@ jthread() noexcept;
   \pnum\effects Constructs a \tcode{jthread} object that does not represent a thread of execution.
 
   \pnum\postconditions \tcode{get_id() == id()}
-        {\color{insertnote} and \tcode{itoken.valid() == false}}.
+        {\color{diffcolor} and \tcode{itoken.valid() == false}}.
 \end{itemdescr}
 
 \indexlibrary{\idxcode{jthread}!constructor}%
@@ -489,18 +489,18 @@ std::forward<F>(f)),
 std::forward<Args>(args))...)}
 termi\-nates with an uncaught exception, \tcode{terminate} shall be called.
 
-{\color{insertnote}
+{\color{diffcolor}
 An uncaught \tcode{interrupted} exception in the started thread of execution
 will silently be ignored.
 \begin{note} Thus, an uncaught exception thrown by \tcode{throw_if_interrupted()}
              will cause the started thread to end silently.
              \end{note}
-}%\color{insertnote}
+}%\color{diffcolor}
 
 \pnum\sync The completion of the invocation of the constructor
 synchronizes with the beginning of the invocation of the copy of \tcode{f}.
 
-{\color{insertnote}
+{\color{diffcolor}
 \pnum\postconditions \tcode{get_id() != id()}.
                      \tcode{itoken.valid() == true}.
                      \tcode{*this} represents the newly started thread.
@@ -508,7 +508,7 @@ synchronizes with the beginning of the invocation of the copy of \tcode{f}.
                      is an \tcode{interrupt_token} equal to \tcode{itoken}. 
 \begin{note} Note that the calling thread can signal an interrupt only once,
                 because it can't replace this interrupt token.  \end{note}
-}%\color{insertnote}
+}%\color{diffcolor}
 
 \pnum\throws \tcode{system_error} if unable to start the new thread.
 
@@ -533,10 +533,10 @@ jthread(jthread&& x) noexcept;
 \pnum
 \postconditions \tcode{x.get_id() == id()} and \tcode{get_id()} returns the
 value of \tcode{x.get_id()} prior to the start of construction.
-{\color{insertnote}
+{\color{diffcolor}
 \tcode{itoken} yields the value of \tcode{x.itoken} prior to the start of construction
 and \tcode{x.itoken.valid() == false}.
-}%\color{insertnote}
+}%\color{diffcolor}
 
 \end{itemdescr}
 
@@ -547,14 +547,14 @@ and \tcode{x.itoken.valid() == false}.
 ~jthread();
 \end{itemdecl}
 
-{\color{insertnote}
+{\color{diffcolor}
 \begin{itemdescr}
 \pnum
 If \tcode{joinable()}, calls \tcode{interrupt()} and \tcode{join()}.
 Otherwise, has no effects.
 \begin{note} Operations on \tcode{*this} are not synchronized. \end{note}
 \end{itemdescr}
-}%\color{insertnote}
+}%\color{diffcolor}
 
 \rSec3[thread.jthread.assign]{\tcode{jthread} assignment}
 
@@ -569,13 +569,13 @@ jthread& operator=(jthread&& x) noexcept;
 Assigns the
 state of \tcode{x} to \tcode{*this} and sets \tcode{x} to a default constructed state.
 
-{\color{insertnote}
+{\color{diffcolor}
 \pnum
 \postconditions \tcode{x.get_id() == id()} and \tcode{get_id()} returns the value of
 \tcode{x.get_id()} prior to the assignment.
 \tcode{itoken} yields the value of \tcode{x.itoken} prior to the assignment
 and \tcode{x.itoken.valid() == false}.
-}%\color{insertnote}
+}%\color{diffcolor}
 
 \pnum
 \returns \tcode{*this}.
@@ -584,7 +584,7 @@ and \tcode{x.itoken.valid() == false}.
 
 \rSec3[thread.jthread.interrupt]{\tcode{jthread} interrupt members}
 
-{\color{insertnote}
+{\color{diffcolor}
 \indexlibrarymember{get_original_interrupt_token}{jthread}%
 \begin{itemdecl}
 interrupt_token get_original_interrupt_token() const noexcept
@@ -600,7 +600,7 @@ bool interrupt() noexcept;
 \begin{itemdescr}
   \pnum\effects Equivalent to: \tcode{return itoken.interrupt();}
 \end{itemdescr}
-}%\color{insertnote}
+}%\color{diffcolor}
 
 %\rSec3[thread.jthread.static]{\tcode{jthread} static members}
 %
@@ -688,24 +688,24 @@ interrupt_token exchange_interrupt_token(const interrupt_token& it) noexcept;
 %******************************************************************
 \rSec1[thread.condition]{Condition variables}
 
-\rSec2[condition_variable.syn]{Header \tcode{<condition_variable>} synopsis}
-\indexhdr{condition_variable}%
-
-%{NEW: add interrupted:}
-
-\begin{codeblock}
-namespace std {
-  enum class cv_status { no_timeout, timeout,
-\end{codeblock}
-{\color{insertcolor}
-\begin{codeblock}
-                         interrupted
-\end{codeblock}
-}
-\begin{codeblock}
-                       };
-}
-\end{codeblock}
+%\rSec2[condition_variable.syn]{Header \tcode{<condition_variable>} synopsis}
+%\indexhdr{condition_variable}%
+%
+%%{NEW: add interrupted:}
+%
+%\begin{codeblock}
+%namespace std {
+%  enum class cv_status { no_timeout, timeout,
+%\end{codeblock}
+%{\color{insertcolor}
+%\begin{codeblock}
+%                         interrupted
+%\end{codeblock}
+%}
+%\begin{codeblock}
+%                       };
+%}
+%\end{codeblock}
 
 
 \rSec2[thread.condition.condvar]{Class \tcode{condition_variable}}
@@ -748,38 +748,33 @@ namespace std {
 \begin{codeblock}
     // \ref{thread.condition.interrupted} dealing with interrupts:
 
-    // throw std::interrupted on interrupt:
-    void wait_or_throw(unique_lock<mutex>& lock);
-    template <class Predicate>
-      void wait_or_throw(unique_lock<mutex>& lock, Predicate pred);
+    // throw \tcode{std::interrupted} if \tcode{this_thread::is_interrupted()}:
+    void iwait(unique_lock<mutex>& lock);
 
-    // return std::cv_status::interrupted on interrupt:
-    cv_status wait_until(unique_lock<mutex>& lock,
-                         interrupt_token itoken);
+    template<class Clock, class Duration, class Predicate>
+      bool iwait_until(unique_lock<mutex>& lock,
+                       const chrono::time_point<Clock, Duration>& abs_time,
+                       Predicate pred);
+    template<class Rep, class Period, class Predicate>
+      bool iwait_for(unique_lock<mutex>& lock,
+                     const chrono::duration<Rep, Period>& rel_time,
+                     Predicate pred);
+
+    // return \tcode{false} if \tcode{itoken.is_interrupted()}:
     template <class Predicate>
       bool wait_until(unique_lock<mutex>& lock,
                       Predicate pred,
                       interrupt_token itoken);
-    template <class Clock, class Duration>
-      cv_status wait_until(unique_lock<mutex>& lock,
-                           const chrono::time_point<Clock, Duration>& abs_time
-                           interrupt_token itoken);
     template <class Clock, class Duration, class Predicate>
       bool wait_until(unique_lock<mutex>& lock,
                       const chrono::time_point<Clock, Duration>& abs_time
                       Predicate pred,
                       interrupt_token itoken);
-
-    // return std::cv_status::interrupted on interrupt:
-    template <class Rep, class Period>
-    cv_status wait_for(unique_lock<mutex>& lock,
-                       const chrono::duration<Rep, Period>& rel_time,
-                       interrupt_token itoken);
     template <class Rep, class Period, class Predicate>
-    bool wait_for(unique_lock<mutex>& lock,
-                  const chrono::duration<Rep, Period>& rel_time,
-                  Predicate pred,
-                  interrupt_token itoken);
+      bool wait_for(unique_lock<mutex>& lock,
+                    const chrono::duration<Rep, Period>& rel_time,
+                    Predicate pred,
+                    interrupt_token itoken);
 \end{codeblock}
 }
 \begin{codeblock}
@@ -788,6 +783,7 @@ namespace std {
   };
 }
 \end{codeblock}
+
 
 \pnum
 The class \tcode{condition_variable} shall be a standard-layout class\iref{class.prop}.
@@ -846,91 +842,83 @@ void notify_one() noexcept;
 void notify_all() noexcept;
 \end{itemdecl}
 
+
+%*** wait functions:
+
 \begin{itemdescr}
 \pnum\effects Unblocks all threads that are blocked waiting for \tcode{*this}.
 \end{itemdescr}
-
-%**** wait
 
 \indexlibrarymember{wait}{condition_variable}%
 \begin{itemdecl}
 void wait(unique_lock<mutex>& lock);
 \end{itemdecl}
-
 \begin{itemdescr}
-\pnum
-\requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
-is locked by the calling thread, and either
-\begin{itemize}
-\item no other thread is waiting on this \tcode{condition_variable} object or
-\item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
-arguments supplied by all concurrently waiting (via \tcode{wait},
-\tcode{wait_for}, or \tcode{wait_until}) threads.
-\end{itemize}
+ \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread, and either
+        \begin{itemize}
+         \item no other thread is waiting on this \tcode{condition_variable} object or
+         \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
+                arguments supplied by all concurrently waiting (via \tcode{wait},
+                \tcode{wait_for}, \tcode{wait_until}
+                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+        \end{itemize}
 
-\pnum\effects
-\begin{itemize}
-\item Atomically calls \tcode{lock.unlock()} and blocks on \tcode{*this}.
-\item When unblocked, calls \tcode{lock.lock()} (possibly blocking on the lock), then returns.
-\item The function will unblock when signaled by a call to \tcode{notify_one()}
-or a call to \tcode{notify_all()}, or spuriously.
-\end{itemize}
+ \pnum\effects
+ \begin{itemize}
+        \item Atomically calls \tcode{lock.unlock()} and blocks on \tcode{*this}.
+        \item When unblocked, calls \tcode{lock.lock()} (possibly blocking on the lock), then returns.
+        \item The function will unblock when signaled by a call to \tcode{notify_one()}
+              or a call to \tcode{notify_all()}, or spuriously.
+ \end{itemize}
 
-\pnum
-\remarks
-If the function fails to meet the postcondition, \tcode{terminate()}
-shall be called\iref{except.terminate}.
-\begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+ \pnum \remarks
+        If the function fails to meet the postcondition, \tcode{terminate()}
+        shall be called\iref{except.terminate}.
+        \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+ 
+ \pnum \postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread.
 
-\pnum
-\postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
-is locked by the calling thread.
-
-\pnum\throws Nothing.
-
+ \pnum\throws Nothing.
 \end{itemdescr}
+
 
 \indexlibrarymember{wait}{condition_variable}%
 \begin{itemdecl}
 template<class Predicate>
   void wait(unique_lock<mutex>& lock, Predicate pred);
 \end{itemdecl}
-
 \begin{itemdescr}
-\pnum
-\requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()} is
-locked by the calling thread, and either
+ \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()} is
+        locked by the calling thread, and either
 
-\begin{itemize}
-\item no other thread is waiting on this \tcode{condition_variable} object or
-\item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
-arguments supplied by all concurrently waiting (via \tcode{wait},
-\tcode{wait_for}, or \tcode{wait_until}) threads.
-\end{itemize}
+        \begin{itemize}
+         \item no other thread is waiting on this \tcode{condition_variable} object or
+         \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
+                arguments supplied by all concurrently waiting (via \tcode{wait},
+                \tcode{wait_for}, \tcode{wait_until}
+                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+        \end{itemize}
 
-\pnum
-\effects Equivalent to:
+ \pnum \effects Equivalent to:
 \begin{codeblock}
 while (!pred())
   wait(lock);
 \end{codeblock}
 
-\pnum
-\remarks
-If the function fails to meet the postcondition, \tcode{terminate()}
-shall be called\iref{except.terminate}.
-\begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+ \pnum \remarks
+        If the function fails to meet the postcondition, \tcode{terminate()}
+        shall be called\iref{except.terminate}.
+        \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
 
-\pnum
-\postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
-is locked by the calling thread.
+ \pnum \postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread.
 
-\pnum
-\throws Any exception thrown by \tcode{pred}.
-
+ \pnum \throws Any exception thrown by \tcode{pred}.
 \end{itemdescr}
 
-%**** wait_until
+%**** wait_until (no pred)
 
 \indexlibrarymember{wait_until}{condition_variable}%
 \begin{itemdecl}
@@ -938,55 +926,85 @@ template<class Clock, class Duration>
   cv_status wait_until(unique_lock<mutex>& lock,
                        const chrono::time_point<Clock, Duration>& abs_time);
 \end{itemdecl}
-
 \begin{itemdescr}
-\pnum
-\requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
-is locked by the calling thread, and either
-\begin{itemize}
-\item no other thread is waiting on this \tcode{condition_variable} object or
-\item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
-arguments supplied by all concurrently waiting (via \tcode{wait},
-\tcode{wait_for}, or \tcode{wait_until}) threads.
-\end{itemize}
+ \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread, and either
+        \begin{itemize}
+         \item no other thread is waiting on this \tcode{condition_variable} object or
+         \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
+                arguments supplied by all concurrently waiting (via \tcode{wait},
+                \tcode{wait_for}, \tcode{wait_until}
+                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+        \end{itemize}
 
-\pnum
-\effects
-\begin{itemize}
-\item
-Atomically calls \tcode{lock.unlock()} and blocks on \tcode{*this}.
+ \pnum \effects
+        \begin{itemize}
+         \item Atomically calls \tcode{lock.unlock()} and blocks on \tcode{*this}.
 
-\item
-When unblocked, calls \tcode{lock.lock()} (possibly blocking on the lock), then returns.
+         \item When unblocked, calls \tcode{lock.lock()} (possibly blocking on the lock), then returns.
 
-\item
-The function will unblock when signaled by a call to \tcode{notify_one()}, a call to \tcode{notify_all()},
-expiration of the absolute timeout\iref{thread.req.timing} specified by \tcode{abs_time},
-or spuriously.
+         \item The function will unblock when signaled by a call to \tcode{notify_one()}, a call to \tcode{notify_all()},
+                expiration of the absolute timeout\iref{thread.req.timing} specified by \tcode{abs_time},
+                or spuriously.
 
-\item
-If the function exits via an exception, \tcode{lock.lock()} shall be called prior to exiting the function.
-\end{itemize}
+         \item If the function exits via an exception, \tcode{lock.lock()} shall be called prior to exiting the function.
+        \end{itemize}
 
-\pnum
-\remarks
-If the function fails to meet the postcondition, \tcode{terminate()}
-shall be called\iref{except.terminate}.
-\begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+ \pnum \remarks
+        If the function fails to meet the postcondition, \tcode{terminate()}
+        shall be called\iref{except.terminate}.
+        \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
 
-\pnum
-\postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
-is locked by the calling thread.
+ \pnum \postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread.
 
-\pnum
-\returns \tcode{cv_status::timeout} if
-the absolute timeout\iref{thread.req.timing} specified by \tcode{abs_time} expired,
-otherwise \tcode{cv_status::no_timeout}.
+ \pnum \returns \tcode{cv_status::timeout} if
+        the absolute timeout\iref{thread.req.timing} specified by \tcode{abs_time} expired,
+        otherwise \tcode{cv_status::no_timeout}.
 
-\pnum\throws Timeout-related
-exceptions\iref{thread.req.timing}.
-
+ \pnum\throws Timeout-related exceptions\iref{thread.req.timing}.
 \end{itemdescr}
+
+%**** wait_for (no pred)
+
+\indexlibrarymember{wait_for}{condition_variable}%
+\begin{itemdecl}
+template<class Rep, class Period>
+  cv_status wait_for(unique_lock<mutex>& lock,
+                     const chrono::duration<Rep, Period>& rel_time);
+\end{itemdecl}
+\begin{itemdescr}
+ \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread, and either
+        \begin{itemize}
+         \item no other thread is waiting on this \tcode{condition_variable} object or
+         \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock} arguments
+                supplied by all concurrently waiting (via \tcode{wait},
+                \tcode{wait_for}, \tcode{wait_until}
+                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+        \end{itemize}
+
+ \pnum \effects Equivalent to:
+\begin{codeblock}
+return wait_until(lock, chrono::steady_clock::now() + rel_time);
+\end{codeblock}
+
+ \pnum \returns \tcode{cv_status::timeout} if
+                the relative timeout\iref{thread.req.timing} specified by \tcode{rel_time} expired,
+                otherwise \tcode{cv_status::no_timeout}.
+
+ \pnum \remarks
+                If the function fails to meet the postcondition, \tcode{terminate()}
+                shall be called\iref{except.terminate}.
+                \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+
+ \pnum \postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread.
+
+ \pnum \throws Timeout-related exceptions\iref{thread.req.timing}.
+\end{itemdescr}
+
+%**** wait_until (with pred)
 
 \indexlibrarymember{wait_until}{condition_variable}%
 \begin{itemdecl}
@@ -995,21 +1013,19 @@ template<class Clock, class Duration, class Predicate>
                   const chrono::time_point<Clock, Duration>& abs_time,
                   Predicate pred);
 \end{itemdecl}
-
 \begin{itemdescr}
-\pnum
-\requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()} is
-locked by the calling thread, and either
+ \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()} is
+                locked by the calling thread, and either
 
-\begin{itemize}
-\item no other thread is waiting on this \tcode{condition_variable} object or
-\item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
-arguments supplied by all concurrently waiting (via \tcode{wait},
-\tcode{wait_for}, or \tcode{wait_until}) threads.
-\end{itemize}
+        \begin{itemize}
+        \item no other thread is waiting on this \tcode{condition_variable} object or
+        \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
+                arguments supplied by all concurrently waiting (via \tcode{wait},
+                \tcode{wait_for}, \tcode{wait_until}
+                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+        \end{itemize}
 
-\pnum
-\effects Equivalent to:
+ \pnum \effects Equivalent to:
 \begin{codeblock}
 while (!pred())
   if (wait_until(lock, abs_time) == cv_status::timeout)
@@ -1017,72 +1033,22 @@ while (!pred())
 return true;
 \end{codeblock}
 
-\pnum
-\remarks
-If the function fails to meet the postcondition, \tcode{terminate()}
-shall be called\iref{except.terminate}.
-\begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+ \pnum \remarks
+        If the function fails to meet the postcondition, \tcode{terminate()}
+        shall be called\iref{except.terminate}.
+        \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
 
-\pnum
-\postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
-is locked by the calling thread.
+ \pnum \postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread.
 
-\pnum
-\begin{note} The returned value indicates whether the predicate evaluated to
-\tcode{true} regardless of whether the timeout was triggered. \end{note}
+ \pnum \begin{note} The returned value indicates whether the predicate evaluated to
+        \tcode{true} regardless of whether the timeout was triggered. \end{note}
 
-\pnum
-\throws Timeout-related
-exceptions\iref{thread.req.timing} or any exception thrown by \tcode{pred}.
-
+ \pnum \throws Timeout-related exceptions\iref{thread.req.timing} or any exception thrown by \tcode{pred}.
 \end{itemdescr}
 
-%**** wait_for
 
-\indexlibrarymember{wait_for}{condition_variable}%
-\begin{itemdecl}
-template<class Rep, class Period>
-  cv_status wait_for(unique_lock<mutex>& lock,
-                     const chrono::duration<Rep, Period>& rel_time);
-\end{itemdecl}
-
-\begin{itemdescr}
-\pnum
-\requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
-is locked by the calling thread, and either
-\begin{itemize}
-\item no other thread is waiting on this \tcode{condition_variable} object or
-\item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock} arguments
-supplied by all concurrently waiting (via \tcode{wait}, \tcode{wait_for}, or
-\tcode{wait_until}) threads.
-\end{itemize}
-
-\pnum
-\effects Equivalent to:
-\begin{codeblock}
-return wait_until(lock, chrono::steady_clock::now() + rel_time);
-\end{codeblock}
-
-\pnum
-\returns \tcode{cv_status::timeout} if
-the relative timeout\iref{thread.req.timing} specified by \tcode{rel_time} expired,
-otherwise \tcode{cv_status::no_timeout}.
-
-\pnum
-\remarks
-If the function fails to meet the postcondition, \tcode{terminate()}
-shall be called\iref{except.terminate}.
-\begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
-
-\pnum
-\postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
-is locked by the calling thread.
-
-\pnum
-\throws Timeout-related
-exceptions\iref{thread.req.timing}.
-
-\end{itemdescr}
+%**** wait_for (with pred)
 
 \indexlibrarymember{wait_for}{condition_variable}%
 \begin{itemdecl}
@@ -1091,58 +1057,56 @@ template<class Rep, class Period, class Predicate>
                 const chrono::duration<Rep, Period>& rel_time,
                 Predicate pred);
 \end{itemdecl}
-
 \begin{itemdescr}
-\pnum
-\requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
-is locked by the calling thread, and either
-\begin{itemize}
-\item
-no other thread is waiting on this \tcode{condition_variable} object or
-
-\item
-\tcode{lock.mutex()} returns the same value for each of the \tcode{lock} arguments
-supplied by all concurrently waiting (via \tcode{wait}, \tcode{wait_for}, or
-\tcode{wait_until}) threads.
-\end{itemize}
-
-\pnum
-\effects Equivalent to:
+ \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread, and either
+        \begin{itemize}
+        \item no other thread is waiting on this \tcode{condition_variable} object or
+        \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock} arguments
+                supplied by all concurrently waiting (via \tcode{wait},
+                \tcode{wait_for}, \tcode{wait_until}
+                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+        \end{itemize}
+ 
+ \pnum \effects Equivalent to:
 \begin{codeblock}
 return wait_until(lock, chrono::steady_clock::now() + rel_time, std::move(pred));
 \end{codeblock}
-
-\pnum
-\begin{note} There is no blocking if \tcode{pred()} is initially \tcode{true}, even if the
-timeout has already expired. \end{note}
-
-\pnum
-\remarks
-If the function fails to meet the postcondition, \tcode{terminate()}
-shall be called\iref{except.terminate}.
-\begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
-
-\pnum
-\postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
-is locked by the calling thread.
-
-\pnum
-\begin{note} The returned value indicates whether the predicate evaluates to \tcode{true}
-regardless of whether the timeout was triggered. \end{note}
-
-\pnum
-\throws Timeout-related
-exceptions\iref{thread.req.timing} or any exception thrown by \tcode{pred}.
-
+ 
+ \pnum \begin{note} There is no blocking if \tcode{pred()} is initially \tcode{true}, even if the
+        timeout has already expired. \end{note}
+ 
+ \pnum \remarks
+        If the function fails to meet the postcondition, \tcode{terminate()}
+        shall be called\iref{except.terminate}.
+        \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+ 
+ \pnum \postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread.
+ 
+ \pnum \begin{note} The returned value indicates whether the predicate evaluates to \tcode{true}
+        regardless of whether the timeout was triggered. \end{note}
+ 
+ \pnum \throws Timeout-related exceptions\iref{thread.req.timing} or any exception thrown by \tcode{pred}.
 \end{itemdescr}
 
 
+
+
+%**** wait
+
+
+
+
+
+
+
 %**********************************************************
-\begin{codeblock}
+%\begin{codeblock}
 %******************
 %* NEW:
 %******************
-\end{codeblock}
+%\end{codeblock}
 {\color{insertcolor}
 
 %// \ref{thread.condition.interupted} dealing with interrupts:
@@ -1150,72 +1114,187 @@ exceptions\iref{thread.req.timing} or any exception thrown by \tcode{pred}.
 
 The following functions respect the state of the \tcode{interrupt_token}
 passed as argument or returned by \tcode{this_thread::get_interrupt_token()}.
-If these functions return with \tcode{cv_status::interrupted}
-their synchronization behavior is as though they called \tcode{is_interrupted()}.
+The functions starting with \tcode{i}
+(\tcode{iwait()}, \tcode{iwait_until()}, \tcode{iwait_for()}
+throw \tcode{std::interrupted} on a signaled interrupt.
+The other functions listed here
+(\tcode{wait_until()}, \tcode{wait_for()}
+return \tcode{false} on a signaled interrupt
+(if the predicate evaluates to \tcode{false}). 
 
 % Hans Boehm:
 %We then also need some statement for the waiting functions that if they return with an interrupted status, their synchronization behavior is as though they called is_interrupted().
 
-%**** wait_or_throw
+{\color{blue}
+[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait...()} function.} ]
+}
 
-\indexlibrarymember{wait_or_throw}{condition_variable}%
-\begin{itemdecl}
-void wait_or_throw(unique_lock<mutex>& lock);
-\end{itemdecl}
-\begin{itemdescr}
-  \pnum\effects Like \tcode{wait(lock)} with the following modifications:
-  \begin{itemize}
-    \item ...
-    \item The function will unblock when signaled by a call to \tcode{notify_one()}
-          or a call to \tcode{notify_all()},
-          when \tcode{this_thread::is_interrupted() == true},
-          or spuriously.
-  \end{itemize}
-
-  \pnum\throws \tcode{interrupted} if \tcode{this_thread::is_interrupted() == true}.
-
-  \pnum\sync In that case their synchronization behavior is as though they called \tcode{is_interrupted()}.
-\end{itemdescr}
-
-
-\indexlibrarymember{wait_or_throw}{condition_variable}%
+\indexlibrarymember{iwait}{condition_variable}%
 \begin{itemdecl}
 template<class Predicate>
-  void wait_or_throw(unique_lock<mutex>& lock, Predicate pred);
+  void iwait(unique_lock<mutex>& lock, Predicate pred);
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Like \tcode{wait(lock, pred)} with the following modifications:
+ \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()} is
+        locked by the calling thread, and either
+
+        \begin{itemize}
+         \item no other thread is waiting on this \tcode{condition_variable} object or
+         \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
+                arguments supplied by all concurrently waiting (via \tcode{wait},
+                \tcode{wait_for}, \tcode{wait_until}
+                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+        \end{itemize}
+
+{\color{diffcolor}
+  \pnum\effects Registers \tcode{*this} to get notified if an interrupt is signaled on \tcode{this_thread::get_interrupt_token()}
+                and then equivalent to:
+\begin{codeblock}
+while(!pred()) {
+  this_thread::throw_if_interrupted();
+  cv.wait(lock, [&pred] {
+                  return pred() || this_thread::is_interrupted();
+                });
+}
+\end{codeblock}
+}%diffcolor
   
-  \pnum\throws Any exception thrown by \tcode{pred}
-              or \tcode{interrupted} if \tcode{this_thread::is_interrupted() == true}.
+ \pnum \remarks
+        If the function fails to meet the postcondition, \tcode{terminate()}
+        shall be called\iref{except.terminate}.
+        \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
 
-  \pnum\sync In that case their synchronization behavior is as though they called \tcode{is_interrupted()}.
+ \pnum \postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread.
+
+ \pnum \throws Any exception thrown by \tcode{pred}
+                {\color{diffcolor}or exception \tcode{interrupted} if
+                 \tcode{this_thread::is_interrupted()}}.
+
+{\color{diffcolor}
+ \pnum\sync If the function returns with an interrupted status, 
+                their synchronization behavior is as though it called \tcode{is_interrupted()}.
+}%diffcolor
 \end{itemdescr}
 
-%**** wait_until NEW
-%NEW:
 
-\indexlibrarymember{wait_until}{condition_variable}%
+
+\indexlibrarymember{iwait_until}{condition_variable}%
 \begin{itemdecl}
-cv_status wait_until(unique_lock<mutex>& lock,
-                     interrupt_token itoken);
+template<class Clock, class Duration, class Predicate>
+  bool iwait_until(unique_lock<mutex>& lock,
+                   const chrono::time_point<Clock, Duration>& abs_time,
+                   Predicate pred);
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Like \tcode{wait(lock)} with the following modifications:
-  \begin{itemize}
-    \item ...
-    \item The function will unblock when signaled by a call to \tcode{notify_one()}
-      or a call to \tcode{notify_all()},
-      when \tcode{this_thread::is_interrupted() == true},
-      or spuriously.
-  \end{itemize}
+ \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()} is
+                locked by the calling thread, and either
 
-  \pnum\returns \tcode{cv_status::interrupted} if \tcode{this_thread::is_interrupted() == true},
-                otherwise \tcode{cv_status::no_timeout}.
+        \begin{itemize}
+        \item no other thread is waiting on this \tcode{condition_variable} object or
+        \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
+                arguments supplied by all concurrently waiting (via \tcode{wait},
+                \tcode{wait_for}, \tcode{wait_until}
+                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+        \end{itemize}
 
-  \pnum\sync In that case their synchronization behavior is as though they called \tcode{is_interrupted()}.
+{\color{diffcolor}
+  \pnum\effects Registers \tcode{*this} to get notified if an interrupt is signaled on \tcode{this_thread::get_interrupt_token()}
+                and then equivalent to:
+\begin{codeblock}
+while(!pred() && Clock::now() < abs_time) {
+  this_thread::throw_if_interrupted();
+  cv.wait_until(lock, abs_time,
+                [&pred] {
+                  return pred() || this_thread::is_interrupted();
+                });
+}
+return pred();
+\end{codeblock}
+}%diffcolor
+
+ \pnum \remarks
+        If the function fails to meet the postcondition, \tcode{terminate()}
+        shall be called\iref{except.terminate}.
+        \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+
+ \pnum \postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread.
+
+ \pnum \begin{note} The returned value indicates whether the predicate evaluated to
+        \tcode{true} regardless of whether the timeout was triggered
+        {\color{diffcolor} or an interrupt was signaled}. \end{note}
+
+ \pnum \throws Timeout-related exceptions\iref{thread.req.timing} or any exception thrown by \tcode{pred}
+                {\color{diffcolor}or exception \tcode{interrupted} if
+                 \tcode{this_thread::is_interrupted()}}.
+
+{\color{diffcolor}
+ \pnum\sync If the function returns with an interrupted status, 
+                their synchronization behavior is as though it called \tcode{is_interrupted()}.
+}%diffcolor
 \end{itemdescr}
 
+
+
+\indexlibrarymember{iwait_for}{condition_variable}%
+\begin{itemdecl}
+template<class Rep, class Period, class Predicate>
+  bool iwait_for(unique_lock<mutex>& lock,
+                 const chrono::duration<Rep, Period>& rel_time,
+                 Predicate pred);
+\end{itemdecl}
+\begin{itemdescr}
+ \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()} is
+                locked by the calling thread, and either
+
+        \begin{itemize}
+        \item no other thread is waiting on this \tcode{condition_variable} object or
+        \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
+                arguments supplied by all concurrently waiting (via \tcode{wait},
+                \tcode{wait_for}, \tcode{wait_until}
+                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+        \end{itemize}
+
+{\color{diffcolor}
+ \pnum \effects Equivalent to:
+\begin{codeblock}
+this_thread::throw_if_interrupted();
+return iwait_until(lock,
+                   std::chrono::steady_clock::now() + rel_time,
+                   std::move(pred));
+\end{codeblock}
+}%diffcolor
+
+ \pnum \remarks
+        If the function fails to meet the postcondition, \tcode{terminate()}
+        shall be called\iref{except.terminate}.
+        \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+
+ \pnum \postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread.
+
+ \pnum \begin{note} The returned value indicates whether the predicate evaluated to
+        \tcode{true} regardless of whether the timeout was triggered
+        {\color{diffcolor} or an interrupt was signaled}. \end{note}
+
+ \pnum \throws Timeout-related exceptions\iref{thread.req.timing} or any exception thrown by \tcode{pred}
+                {\color{diffcolor}or exception \tcode{interrupted} if
+                 \tcode{this_thread::is_interrupted()}}.
+
+{\color{diffcolor}
+ \pnum\sync If the function returns with an interrupted status, 
+                their synchronization behavior is as though it called \tcode{is_interrupted()}.
+}%diffcolor
+\end{itemdescr}
+
+
+%**** untimed wait_until (with pred)
+% return false if itoken.is_interrupted():
+
+{\color{blue}
+[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait()} function.} ]
+}
 
 \begin{itemdecl}
 template <class Predicate>
@@ -1224,37 +1303,56 @@ template <class Predicate>
                   interrupt_token itoken);
 \end{itemdecl}
 \begin{itemdescr}
- \pnum\effects Equivalent to:
+ \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()} is
+        locked by the calling thread, and either
+        \begin{itemize}
+         \item no other thread is waiting on this \tcode{condition_variable} object or
+         \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
+                arguments supplied by all concurrently waiting (via \tcode{wait},
+                \tcode{wait_for}, \tcode{wait_until}
+                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+        \end{itemize}
+
+{\color{diffcolor}
+ \pnum\effects Registers \tcode{*this} to get notified if an interrupt is signaled on \tcode{itoken}
+                and then equivalent to:
 \begin{codeblock}
-while (!pred() && !itoken.is_interrupted())
-  try {
-    wait_or_throw(lock);
-  }
-  catch(interrupted&) {
-  }
+while(!pred() && !itoken.is_interrupted()) {
+  cv.wait(lock, [&pred, &itoken] {
+                  return pred() || itoken.is_interrupted();
+                });
+}
 return pred();
 \end{codeblock}
+}%diffcolor
 
-  \pnum\returns \tcode{cv_status::interrupted} if \tcode{this_thread::is_interrupted() == true},
-                otherwise \tcode{cv_status::no_timeout}.
+ \pnum \begin{note} The returned value indicates whether the predicate evaluated to
+        \tcode{true} regardless of whether the timeout was triggered
+        {\color{diffcolor} or an interrupt was signaled}. \end{note}
 
-  \pnum\begin{note} The returned value indicates whether the predicate evaluates to \tcode{true}
-        regardless of whether the timeout was triggered. \end{note}
+ \pnum \postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread.
 
-  \throws Any exception thrown by \tcode{pred}.
+ \pnum \remarks
+        If the function fails to meet the postcondition, \tcode{terminate()}
+        shall be called\iref{except.terminate}.
+        \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
 
-  \pnum\sync In that case their synchronization behavior is as though they called \tcode{is_interrupted()}.
+ \pnum \throws Any exception thrown by \tcode{pred}.
+
+{\color{diffcolor}
+ \pnum\sync If the function returns with an interrupted status, 
+                their synchronization behavior is as though it called \tcode{is_interrupted()}.
+}%diffcolor
 \end{itemdescr}
 
-\begin{itemdecl}
-template <class Clock, class Duration>
-  cv_status wait_until(unique_lock<mutex>& lock,
-                       const chrono::time_point<Clock, Duration>& abs_time
-                       interrupt_token itoken);
-\end{itemdecl}
-\begin{itemdescr}
- \pnum\effects TODO
-\end{itemdescr}
+
+%**** wait_until (with pred)
+% return false if itoken.is_interrupted():
+
+{\color{blue}
+[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait_until()} function without interrupt token.} ]
+}
 
 \begin{itemdecl}
 template <class Clock, class Duration, class Predicate>
@@ -1264,24 +1362,58 @@ template <class Clock, class Duration, class Predicate>
                   interrupt_token itoken);
 \end{itemdecl}
 \begin{itemdescr}
- \pnum\effects TODO
+ \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()} is
+        locked by the calling thread, and either
+        \begin{itemize}
+         \item no other thread is waiting on this \tcode{condition_variable} object or
+         \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
+                arguments supplied by all concurrently waiting (via \tcode{wait},
+                \tcode{wait_for}, \tcode{wait_until}
+                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+        \end{itemize}
+
+{\color{diffcolor}
+ \pnum\effects Registers \tcode{*this} to get notified if an interrupt is signaled on \tcode{itoken}
+                and then equivalent to:
+\begin{codeblock}
+while(!pred() && !itoken.is_interrupted() && Clock::now() < abs_time) {
+  cv.wait_until(lock,
+                abs_time,
+                [&pred, &itoken] {
+                  return pred() || itoken.is_interrupted();
+                });
+}
+return pred();
+\end{codeblock}
+}%diffcolor
+
+ \pnum \begin{note} The returned value indicates whether the predicate evaluated to
+        \tcode{true} regardless of whether the timeout was triggered
+        {\color{diffcolor} or an interrupt was signaled}. \end{note}
+
+ \pnum \postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread.
+
+ \pnum \remarks
+        If the function fails to meet the postcondition, \tcode{terminate()}
+        shall be called\iref{except.terminate}.
+        \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+
+ \pnum \throws Timeout-related exceptions\iref{thread.req.timing} or any exception thrown by \tcode{pred}.
+
+{\color{diffcolor}
+ \pnum\sync If the function returns with an interrupted status, 
+                their synchronization behavior is as though it called \tcode{is_interrupted()}.
+}%diffcolor
 \end{itemdescr}
 
 
-%**** wait_for NEW
-%NEW:
-%// return std::cv_status::interrupted on interrupt:
+%**** wait_for (with pred)
+% return false if itoken.is_interrupted():
 
-\indexlibrarymember{wait_for}{condition_variable}%
-\begin{itemdecl}
-template <class Rep, class Period>
-  cv_status wait_for(unique_lock<mutex>& lock,
-                     const chrono::duration<Rep, Period>& rel_time,
-                     interrupt_token itoken);
-\end{itemdecl}
-\begin{itemdescr}
- \pnum\effects TODO
-\end{itemdescr}
+{\color{blue}
+[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait_for()} function without interrupt token.} ]
+}
 
 \begin{itemdecl}
 template <class Rep, class Period, class Predicate>
@@ -1291,7 +1423,49 @@ template <class Rep, class Period, class Predicate>
                 interrupt_token itoken);
 \end{itemdecl}
 \begin{itemdescr}
- \pnum\effects TODO
+ \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread, and either
+        \begin{itemize}
+         \item no other thread is waiting on this \tcode{condition_variable} object or
+         \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock} arguments
+                supplied by all concurrently waiting (via \tcode{wait},
+                \tcode{wait_for}, \tcode{wait_until}
+                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+        \end{itemize}
+
+ \pnum \effects Equivalent to:
+\begin{codeblock}
+return wait_until(lock, chrono::steady_clock::now() + rel_time, std::move(pred),
+\end{codeblock}
+{\color{diffcolor}
+\begin{codeblock}
+                  std::move(itoken));
+\end{codeblock}
+}
+
+ \pnum \begin{note} The returned value indicates whether the predicate evaluates to \tcode{true}
+        regardless of whether the timeout was triggered 
+        {\color{diffcolor} or an interrupt was signaled}. \end{note}
+
+ \pnum \begin{note} There is no blocking if \tcode{pred()} is initially \tcode{true}, even if the
+        timeout has already expired. \end{note}
+
+ \pnum \postconditions \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
+        is locked by the calling thread.
+
+ \pnum \remarks
+        If the function fails to meet the postcondition, \tcode{terminate()}
+        shall be called\iref{except.terminate}.
+        \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
+ 
+ \pnum \throws Timeout-related
+        exceptions\iref{thread.req.timing} or any exception thrown by \tcode{pred}
+        {\color{diffcolor} or \tcode{interrupted} if an interrupt was signaled}.
+
+{\color{diffcolor}
+ \pnum\sync If the function returns with an interrupted status, 
+                their synchronization behavior is as though it called \tcode{is_interrupted()}.
+}%diffcolor
 \end{itemdescr}
 
 }%\color{insertcolor}
