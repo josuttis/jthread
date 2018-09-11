@@ -30,10 +30,12 @@ between threads, as summarized in \tref{thread.lib.summary}.
 %******************************************************************
 \rSec1[thread.req]{Requirements}
 
+...
 
 %******************************************************************
 \rSec1[thread.threads]{Threads}
 
+...
 
 \clearpage
 
@@ -56,7 +58,7 @@ namespace std {
   // \ref{interrupted} class \tcode{interrupted}
   class interrupted;
 
-  // \ref{thread.interrupt_token.syn} class \tcode{interrupt_token}
+  // \ref{interrupt_token} class \tcode{interrupt_token}
   class interrupt_token;
 }
 \end{codeblock}
@@ -101,8 +103,8 @@ Constructs an object of class
 \indexlibrary{\idxcode{interrupted}!constructor}%
 \indexlibrarymember{operator=}{interrupted}%
 \begin{itemdecl}
-interrupted(const interrupted&) noexcept;
-interrupted& operator=(const interrupted&) noexcept;
+interrupted(const interrupted& rhs) noexcept;
+interrupted& operator=(const interrupted& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum \effects Copies an object of class \tcode{interrupted}.
@@ -135,7 +137,7 @@ member function of the exception object is called.
 
 %**************************
 \indexlibrary{\idxcode{interrupt_token}}%
-\rSec3[interrupt_token]{Class \tcode{interrupt_token}}
+\rSec2[interrupt_token]{Class \tcode{interrupt_token}}
 
 \pnum
 \indexlibrary{\idxcode{interrupt_token}}%
@@ -151,6 +153,7 @@ the object.
 namespace std {
   class interrupt_token {
   public:
+    // \ref{interrupt_token.constr} create, copy, destroy:
     explicit interrupt_token() noexcept;
     explicit interrupt_token(bool initial_state);
 
@@ -158,6 +161,7 @@ namespace std {
     interrupt_token(interrupt_token&&) noexcept;
     interrupt_token& operator=(const interrupt_token&) noexcept;
     interrupt_token& operator=(interrupt_token&&) noexcept;
+    ~interrupt_token();
     void swap(interrupt_token&) noexcept;
 
     // \ref{interrupt_token.mem} interrupt handling:
@@ -179,15 +183,7 @@ A call to \tcode{interrupt()} synchronizes with any call to \tcode{interrupt()},
 \tcode{is_interrupted()}, or \tcode{throw_if_interrupted()} that observes the interrupt
 (and hence returns \tcode{true} or throws).
 
-% Hans Boehm:
-%The fact that they are atomic operations implies that they appear to be be executed in a single total per-interrupt-token order. We could instead require them to be sequentially consistent, and participate in the SC order. But I think this is another one of those cases in which only clearly silly code can tell the difference. And we've generally not insisted on seq_cst unless there is some real possibility of confusion. (You can implement Dekker's algorithm with interrupt_tokens. But if you do, your code deserves to break.)
-%
-%I'm using "synchronizes with" instead of "strongly happens before" since I'm calling these atomic operations. Since there are no sequentially consistent operations on the atomic, I believe the difference is not observable, even after the memory model fixes.
-%
-% Hans Boehm:
-%We then also need some statement for the waiting functions that if they return with an interrupted status, their synchronization behavior is as though they called is_interrupted().
-
-
+%*****
 \rSec3[interrupt_token.constr]{\tcode{interrupt_token} constructors}
 
 \indexlibrary{\idxcode{interrupt_token}!constructor}%
@@ -212,28 +208,31 @@ interrupt_token(bool initial_state) noexcept;
 
 \indexlibrary{\idxcode{interrupt_token}!constructor}%
 \begin{itemdecl}
-interrupt_token(const interrupt_token& it) noexcept;
+interrupt_token(const interrupt_token& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects If \tcode{it} is not valid, constructs an \tcode{interrupt_token} object
+  \pnum\effects If \tcode{rhs} is not valid, constructs an \tcode{interrupt_token} object
                 that is not valid;
                 otherwise, constructs an \tcode{interrupt_token}
-                that shares the ownership of the interrupt signal with \tcode{it}.
+                that shares the ownership of the interrupt signal with \tcode{rhs}.
 
-  \pnum\postconditions \tcode{valid() == true}.
+  \pnum\postconditions \tcode{valid() == rhs.valid()}
+                and \tcode{is_interrupted() == rhs.is_interrupted()}
+                and \tcode{*this == rhs}.
 \end{itemdescr}
 
 \indexlibrary{\idxcode{interrupt_token}!constructor}%
 \begin{itemdecl}
-interrupt_token(interrupt_token&& it) noexcept;
+interrupt_token(interrupt_token&& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Move constructs an object of type \tcode{interrupt_token} from \tcode{it}.
+  \pnum\effects Move constructs an object of type \tcode{interrupt_token} from \tcode{rhs}.
 
-  \pnum\postconditions \tcode{*this} shall contain the old value of \tcode{it}.
-                        \tcode{it.valid() == false}.
+  \pnum\postconditions \tcode{*this} shall contain the old value of \tcode{rhs} and
+                        \tcode{rhs.valid() == false}.
 \end{itemdescr}
 
+%*****
 \rSec3[thread.thread.destr]{\tcode{thread} destructor}
 
 \indexlibrary{\idxcode{interrupt_token}!destructor}%
@@ -242,7 +241,7 @@ interrupt_token(interrupt_token&& it) noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
- \pnum\effects If \tcode{valid()} and this is the last owner of the interrupt signal,
+ \pnum\effects If \tcode{valid()} and \tcode{*this} is the last owner of the interrupt signal,
                 destructs the underlying interrupt signal.
 \end{itemdescr}
 
@@ -251,20 +250,20 @@ interrupt_token(interrupt_token&& it) noexcept;
 
 \indexlibrarymember{operator=}{interrupt_token}%
 \begin{itemdecl}
-interrupt_token& operator=(const interrupt_token& it) noexcept;
+interrupt_token& operator=(const interrupt_token& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Equivalent to: \tcode{interrupt_token(it).swap(*this);}
+  \pnum\effects Equivalent to: \tcode{interrupt_token(rhs).swap(*this);}
 
   \pnum\returns \tcode{*this}.
 \end{itemdescr}
 
 \indexlibrarymember{operator=}{interrupt_token}%
 \begin{itemdecl}
-interrupt_token& operator=(interrupt_token&& it) noexcept;
+interrupt_token& operator=(interrupt_token&& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Equivalent to: \tcode{interrupt_token(std::move(it)).swap(*this);}
+  \pnum\effects Equivalent to: \tcode{interrupt_token(std::move(rhs)).swap(*this);}
 
   \pnum\returns \tcode{*this}.
 \end{itemdescr}
@@ -274,12 +273,12 @@ interrupt_token& operator=(interrupt_token&& it) noexcept;
 
 \indexlibrarymember{swap}{interrupt_token}%
 \begin{itemdecl}
-void swap(interrupt_token& it) noexcept;
+void swap(interrupt_token& rhs) noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
-\effects Swaps the state of \tcode{*this} and \tcode{it}.
+\effects Swaps the state of \tcode{*this} and \tcode{rhs}.
 \end{itemdescr}
 
 
@@ -339,8 +338,8 @@ bool operator== (const interrupt_token& lhs, const interrupt_token& rhs);
 \begin{itemdescr}
   \pnum\returns \tcode{!lhs.valid() \&\& !rhs.valid()} or
                 whether \tcode{lhs} and \tcode{rhs} refer to the
-                same interrupt token
-                (copied or moved from the same initial object).
+                same interrupt signal
+                (copied or moved from the same initial \tcode{interrupt_token} object).
 \end{itemdescr}
 
 \indexlibrarymember{operator!=}{interrupt_token}%
@@ -356,10 +355,6 @@ bool operator!= (const interrupt_token& lhs, const interrupt_token& rhs);
 
 %******************************************************************
 \rSec1[thread.jthreads]{Joining Threads}
-
-{\color{blue}
-[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to class \tcode{std::thread}.} ]
-}
 
 
 \pnum
@@ -379,7 +374,7 @@ namespace std {
 
   void swap(jthread& x, jthread& y) noexcept;
 
-  // \ref{thread.jthread.this} class \tcode{jthread}
+  // \ref{thread.jthread.this} \tcode{this_thread} interrupt token handling
   namespace this_thread {
     static bool is_interrupted() noexcept;
     static void throw_if_interrupted();
@@ -388,6 +383,11 @@ namespace std {
   }
 }
 \end{codeblock}
+
+{\color{blue}
+[{\itshape{}Editorial note:} The \tcode{this_thread} extensions listed here might instead be added
+        to "33.3.3 Namespace \tcode{this_thread} [thread.thread.this]. ]
+}
 
 %**************************
 \rSec2[thread.jthread.class]{Class \tcode{jthread}}
@@ -398,6 +398,10 @@ which the additional ability to signal interrupts and
 let the destructor \tcode{join()} if still \tcode{joinable()}.
 The functionality is identical to class \tcode{thread}
 except where otherwise specified.
+
+{\color{blue}
+[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to class \tcode{std::thread}.} ]
+}
 
 \indexlibrary{\idxcode{jthread}}%
 \begin{codeblock}
@@ -637,6 +641,11 @@ bool interrupt() noexcept;
 %**************************
 \rSec2[thread.jthread.this]{Namespace \tcode{this_thread} Interrupt Handling}
 
+{\color{blue}
+[{\itshape{}Editorial note:} The \tcode{this_thread} extensions listed here might instead be added
+        to "33.3.3 Namespace \tcode{this_thread} [thread.thread.this]. ]
+}
+
 To be able to deal with signaled interrupt
 \tcode{this_thread} provides the following access to an \tcode{interrupt_token} (\ref{interrupt_token}):
 
@@ -651,7 +660,7 @@ namespace std::this_thread {
 \end{codeblock}
 
 For any thread of execution, \tcode{thread_itoken} is default initialized unless
-the thread was started with a constructor of class \tcode{jthread} (\ref{thread.jthread}).
+the thread was started with a constructor of class \tcode{jthread} (\ref{thread.jthread.class}).
 
 
 \indexlibrarymember{get_interrupt_token}{this_thread}%
@@ -687,9 +696,9 @@ interrupt_token exchange_interrupt_token(const interrupt_token& it) noexcept;
 
   \pnum\returns \tcode{this_thread::thread_itoken} prior to the exchange.
 
-  \begin{note} With this exchange \tcode{this_thread::get_interrupt_token()}
-               will no longer signal interrupts from the calling threads
-               until the returned token is restored.
+  \begin{note} By calling this function for the first time on an object
+                \tcode{this_thread::get_interrupt_token()} will no longer signal interrupts
+                from the calling thread unless the returned token is restored.
                \end{note}
 \end{itemdescr}
 
@@ -736,6 +745,13 @@ namespace std {
     void notify_one() noexcept;
     void notify_all() noexcept;
 
+\end{codeblock}
+{\color{insertcolor}
+\begin{codeblock}
+    // \ref{thread.condition.wait} noninterruptable waits:
+\end{codeblock}
+}%insertcolor
+\begin{codeblock}
     void wait(unique_lock<mutex>& lock);
     template<class Predicate>
       void wait(unique_lock<mutex>& lock, Predicate pred);
@@ -758,9 +774,7 @@ namespace std {
 \end{codeblock}
 {\color{insertcolor}
 \begin{codeblock}
-    // \ref{thread.condition.interrupted} dealing with interrupts:
-
-    // throw \tcode{std::interrupted} if \tcode{this_thread::is_interrupted()}:
+    // \ref{thread.condition.iwait} interruptable waits:
     template<class Predicate>
       void iwait(unique_lock<mutex>& lock, Predicate pred);
 
@@ -773,7 +787,7 @@ namespace std {
                      const chrono::duration<Rep, Period>& rel_time,
                      Predicate pred);
 
-    // return \tcode{false} if \tcode{itoken.is_interrupted()}:
+    // \ref{thread.condition.interrupt_token} \tcode{interrupt_token} waits:
     template <class Predicate>
       bool wait_until(unique_lock<mutex>& lock,
                       Predicate pred,
@@ -856,6 +870,11 @@ void notify_all() noexcept;
 \end{itemdecl}
 
 
+%**************************************
+{\color{insertcolor}
+\rSec3[thread.condition.wait]{Noninterruptable waits}
+}
+
 %*** wait functions:
 
 \begin{itemdescr}
@@ -873,8 +892,8 @@ void wait(unique_lock<mutex>& lock);
          \item no other thread is waiting on this \tcode{condition_variable} object or
          \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
                 arguments supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until}
-                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                \tcode{wait_for}, \tcode{wait_until},
+                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
         \end{itemize}
 
  \pnum\effects
@@ -910,8 +929,8 @@ template<class Predicate>
          \item no other thread is waiting on this \tcode{condition_variable} object or
          \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
                 arguments supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until}
-                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                \tcode{wait_for}, \tcode{wait_until},
+                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
         \end{itemize}
 
  \pnum \effects Equivalent to:
@@ -946,8 +965,8 @@ template<class Clock, class Duration>
          \item no other thread is waiting on this \tcode{condition_variable} object or
          \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
                 arguments supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until}
-                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                \tcode{wait_for}, \tcode{wait_until},
+                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
         \end{itemize}
 
  \pnum \effects
@@ -993,8 +1012,8 @@ template<class Rep, class Period>
          \item no other thread is waiting on this \tcode{condition_variable} object or
          \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock} arguments
                 supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until}
-                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                \tcode{wait_for}, \tcode{wait_until},
+                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
         \end{itemize}
 
  \pnum \effects Equivalent to:
@@ -1034,8 +1053,8 @@ template<class Clock, class Duration, class Predicate>
         \item no other thread is waiting on this \tcode{condition_variable} object or
         \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
                 arguments supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until}
-                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                \tcode{wait_for}, \tcode{wait_until},
+                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
         \end{itemize}
 
  \pnum \effects Equivalent to:
@@ -1077,8 +1096,8 @@ template<class Rep, class Period, class Predicate>
         \item no other thread is waiting on this \tcode{condition_variable} object or
         \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock} arguments
                 supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until}
-                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                \tcode{wait_for}, \tcode{wait_until},
+                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
         \end{itemize}
  
  \pnum \effects Equivalent to:
@@ -1122,24 +1141,24 @@ return wait_until(lock, chrono::steady_clock::now() + rel_time, std::move(pred))
 %\end{codeblock}
 {\color{insertcolor}
 
-%// \ref{thread.condition.interupted} dealing with interrupts:
-\rSec3[thread.condition.interrupted]{\tcode{interrupt_token} handling}
+%**************************************
+\rSec3[thread.condition.iwait]{Interruptable waits}
 
-The following functions respect the state of the \tcode{interrupt_token}
-passed as argument or returned by \tcode{this_thread::get_interrupt_token()}.
-The functions starting with \tcode{i}
-(\tcode{iwait()}, \tcode{iwait_until()}, \tcode{iwait_for()}
-throw \tcode{std::interrupted} on a signaled interrupt.
-The other functions listed here
-(\tcode{wait_until()}, \tcode{wait_for()}
-return \tcode{false} on a signaled interrupt
-(if the predicate evaluates to \tcode{false}). 
+The following functions ensure to get notified
+if an interrupt is signaled for \tcode{this_thread::get_interrupt_token()}.
+In that case they throw \tcode{interrupted} as if
+\tcode{this_thread::throw_if_interrupted()} was called.
 
 % Hans Boehm:
 %We then also need some statement for the waiting functions that if they return with an interrupted status, their synchronization behavior is as though they called is_interrupted().
+{\color{blue}
+[{\itshape{}Editorial note:} Because all signatures here in the effects clause call
+        \tcode{is_interrupted()} or \tcode{throw_if_interrupted()}, we don't need wording
+        that the calls synchronize with \tcode{interrupt()}. ]
+}
 
 {\color{blue}
-[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait...()} function.} ]
+[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait}...\tcode{()} functions.} ]
 }
 
 \indexlibrarymember{iwait}{condition_variable}%
@@ -1155,12 +1174,12 @@ template<class Predicate>
          \item no other thread is waiting on this \tcode{condition_variable} object or
          \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
                 arguments supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until}
-                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                \tcode{wait_for}, \tcode{wait_until},
+                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
         \end{itemize}
 
 {\color{diffcolor}
-  \pnum\effects Registers \tcode{*this} to get notified if an interrupt is signaled on \tcode{this_thread::get_interrupt_token()}
+  \pnum\effects Registers \tcode{*this} to get notified when an interrupt is signaled on \tcode{this_thread::get_interrupt_token()}
                 during this call and then equivalent to:
 \begin{codeblock}
 while(!pred()) {
@@ -1184,10 +1203,10 @@ while(!pred()) {
                 {\color{diffcolor}or exception \tcode{interrupted} if
                  \tcode{this_thread::is_interrupted()}}.
 
-{\color{diffcolor}
- \pnum\sync If the function returns with an interrupted status, 
-                their synchronization behavior is as though it called \tcode{is_interrupted()}.
-}%diffcolor
+%{\color{diffcolor}
+% \pnum\sync If the function returns with an interrupted status, 
+%                their synchronization behavior is as though it called \tcode{is_interrupted()}.
+%}%diffcolor
 \end{itemdescr}
 
 
@@ -1207,12 +1226,12 @@ template<class Clock, class Duration, class Predicate>
         \item no other thread is waiting on this \tcode{condition_variable} object or
         \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
                 arguments supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until}
-                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                \tcode{wait_for}, \tcode{wait_until},
+                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
         \end{itemize}
 
 {\color{diffcolor}
-  \pnum\effects Registers \tcode{*this} to get notified if an interrupt is signaled on \tcode{this_thread::get_interrupt_token()}
+  \pnum\effects Registers \tcode{*this} to get notified when an interrupt is signaled on \tcode{this_thread::get_interrupt_token()}
                 during this call and then equivalent to:
 \begin{codeblock}
 while(!pred() && Clock::now() < abs_time) {
@@ -1242,10 +1261,10 @@ return pred();
                 {\color{diffcolor}or exception \tcode{interrupted} if
                  \tcode{this_thread::is_interrupted()}}.
 
-{\color{diffcolor}
- \pnum\sync If the function returns with an interrupted status, 
-                their synchronization behavior is as though it called \tcode{is_interrupted()}.
-}%diffcolor
+%{\color{diffcolor}
+% \pnum\sync If the function returns with an interrupted status, 
+%                their synchronization behavior is as though it called \tcode{is_interrupted()}.
+%}%diffcolor
 \end{itemdescr}
 
 
@@ -1265,8 +1284,8 @@ template<class Rep, class Period, class Predicate>
         \item no other thread is waiting on this \tcode{condition_variable} object or
         \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
                 arguments supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until}
-                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                \tcode{wait_for}, \tcode{wait_until},
+                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
         \end{itemize}
 
 {\color{diffcolor}
@@ -1295,19 +1314,31 @@ return iwait_until(lock,
                 {\color{diffcolor}or exception \tcode{interrupted} if
                  \tcode{this_thread::is_interrupted()}}.
 
-{\color{diffcolor}
- \pnum\sync If the function returns with an interrupted status, 
-                their synchronization behavior is as though it called \tcode{is_interrupted()}.
-}%diffcolor
+%{\color{diffcolor}
+% \pnum\sync If the function returns with an interrupted status, 
+%                their synchronization behavior is as though it called \tcode{is_interrupted()}.
+%}%diffcolor
 \end{itemdescr}
+
+%**************************************
+\rSec3[thread.condition.interrupt_token]{\tcode{interrupt_token} waits}
+
+The following functions ensure to get notified
+if an interrupt is signaled for the passed \tcode{interrupt_token}.
+In that case they return \tcode{false}
+(if the predicate evaluates to \tcode{false}). 
+
+% Hans Boehm:
+%We then also need some statement for the waiting functions that if they return with an interrupted status, their synchronization behavior is as though they called is_interrupted().
+{\color{blue}
+[{\itshape{}Editorial note:} Because all signatures here in the effects clause call
+        \tcode{is_interrupted()} or \tcode{throw_if_interrupted()}, we don't need wording
+        that the calls synchronize with \tcode{interrupt()}. ]
+}
 
 
 %**** untimed wait_until (with pred)
 % return false if itoken.is_interrupted():
-
-{\color{blue}
-[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait()} function.} ]
-}
 
 \begin{itemdecl}
 template <class Predicate>
@@ -1315,6 +1346,9 @@ template <class Predicate>
                   Predicate pred,
                   interrupt_token itoken);
 \end{itemdecl}
+{\color{blue}
+[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait()} function without the interrupt token parameter.} ]
+}
 \begin{itemdescr}
  \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()} is
         locked by the calling thread, and either
@@ -1322,12 +1356,12 @@ template <class Predicate>
          \item no other thread is waiting on this \tcode{condition_variable} object or
          \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
                 arguments supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until}
-                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                \tcode{wait_for}, \tcode{wait_until},
+                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
         \end{itemize}
 
 {\color{diffcolor}
- \pnum\effects Registers \tcode{*this} to get notified if an interrupt is signaled on \tcode{itoken}
+ \pnum\effects Registers \tcode{*this} to get notified when an interrupt is signaled on \tcode{itoken}
                 during this call and then equivalent to:
 \begin{codeblock}
 while(!pred() && !itoken.is_interrupted()) {
@@ -1353,19 +1387,15 @@ return pred();
 
  \pnum \throws Any exception thrown by \tcode{pred}.
 
-{\color{diffcolor}
- \pnum\sync If the function returns with an interrupted status, 
-                their synchronization behavior is as though it called \tcode{is_interrupted()}.
-}%diffcolor
+%{\color{diffcolor}
+% \pnum\sync If the function returns with an interrupted status, 
+%                their synchronization behavior is as though it called \tcode{is_interrupted()}.
+%}%diffcolor
 \end{itemdescr}
 
 
 %**** wait_until (with pred)
 % return false if itoken.is_interrupted():
-
-{\color{blue}
-[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait_until()} function without interrupt token.} ]
-}
 
 \begin{itemdecl}
 template <class Clock, class Duration, class Predicate>
@@ -1374,6 +1404,9 @@ template <class Clock, class Duration, class Predicate>
                   Predicate pred,
                   interrupt_token itoken);
 \end{itemdecl}
+{\color{blue}
+[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait_until()} function without the interrupt token parameter.} ]
+}
 \begin{itemdescr}
  \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()} is
         locked by the calling thread, and either
@@ -1381,12 +1414,12 @@ template <class Clock, class Duration, class Predicate>
          \item no other thread is waiting on this \tcode{condition_variable} object or
          \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
                 arguments supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until}
-                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                \tcode{wait_for}, \tcode{wait_until},
+                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
         \end{itemize}
 
 {\color{diffcolor}
- \pnum\effects Registers \tcode{*this} to get notified if an interrupt is signaled on \tcode{itoken}
+ \pnum\effects Registers \tcode{*this} to get notified when an interrupt is signaled on \tcode{itoken}
                 during this call and then equivalent to:
 \begin{codeblock}
 while(!pred() && !itoken.is_interrupted() && Clock::now() < abs_time) {
@@ -1414,19 +1447,15 @@ return pred();
 
  \pnum \throws Timeout-related exceptions\iref{thread.req.timing} or any exception thrown by \tcode{pred}.
 
-{\color{diffcolor}
- \pnum\sync If the function returns with an interrupted status, 
-                their synchronization behavior is as though it called \tcode{is_interrupted()}.
-}%diffcolor
+%{\color{diffcolor}
+% \pnum\sync If the function returns with an interrupted status, 
+%                their synchronization behavior is as though it called \tcode{is_interrupted()}.
+%}%diffcolor
 \end{itemdescr}
 
 
 %**** wait_for (with pred)
 % return false if itoken.is_interrupted():
-
-{\color{blue}
-[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait_for()} function without interrupt token.} ]
-}
 
 \begin{itemdecl}
 template <class Rep, class Period, class Predicate>
@@ -1435,6 +1464,9 @@ template <class Rep, class Period, class Predicate>
                 Predicate pred,
                 interrupt_token itoken);
 \end{itemdecl}
+{\color{blue}
+[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait_for()} function without the interrupt token parameter.} ]
+}
 \begin{itemdescr}
  \pnum \requires \tcode{lock.owns_lock()} is \tcode{true} and \tcode{lock.mutex()}
         is locked by the calling thread, and either
@@ -1442,8 +1474,8 @@ template <class Rep, class Period, class Predicate>
          \item no other thread is waiting on this \tcode{condition_variable} object or
          \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock} arguments
                 supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until}
-                {\color{insertcolor}, \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                \tcode{wait_for}, \tcode{wait_until},
+                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
         \end{itemize}
 
  \pnum \effects Equivalent to:
@@ -1472,13 +1504,12 @@ return wait_until(lock, chrono::steady_clock::now() + rel_time, std::move(pred),
         \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
  
  \pnum \throws Timeout-related
-        exceptions\iref{thread.req.timing} or any exception thrown by \tcode{pred}
-        {\color{diffcolor} or \tcode{interrupted} if an interrupt was signaled}.
+        exceptions\iref{thread.req.timing} or any exception thrown by \tcode{pred}.
 
-{\color{diffcolor}
- \pnum\sync If the function returns with an interrupted status, 
-                their synchronization behavior is as though it called \tcode{is_interrupted()}.
-}%diffcolor
+%{\color{diffcolor}
+% \pnum\sync If the function returns with an interrupted status, 
+%                their synchronization behavior is as though it called \tcode{is_interrupted()}.
+%}%diffcolor
 \end{itemdescr}
 
 }%\color{insertcolor}

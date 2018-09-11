@@ -1,0 +1,106 @@
+%!TEX root = std.tex
+\makeevenhead{cpppage}{Josuttis, Sutter, Williams: \tcode{jthread}}{}{\textbf{P0660R4}}
+\makeoddhead{cpppage}{Josuttis, Sutter, Williams: \tcode{jthread}}{}{\textbf{P0660R4}}
+
+{\small
+\begin{tabular}{@{}ll}
+Project:  	& ISO JTC1/SC22/WG21: Programming Language C++ \\
+Doc No: 	& WG21 P0660R4 \\
+Date: 		& 2018-09-11 \\
+Reply to: 	& Nicolai Josuttis (nico@josuttis.de), Herb Sutter (hsutter@microsoft.com), \\
+                &         Anthony Williams (anthony@justsoftwaresolutions.co.uk) \\
+Audience: 	& SG1, LEWG, LWG \\
+Prev. Version:	& \url{www.wg21.link/P0660R3} \\
+\end{tabular}
+}
+
+\section*{{\huge{}A Cooperatively Interruptible Joining Thread, Rev 4}}
+
+\subsubsection*{New in R4}
+\begin{itemize}
+ \item Removed interruptible CV waiting members that don't take a predicate.
+ \item Removed adding a new \tcode{cv_status} value \tcode{interrupted}.
+ \item Added CV members for interruptible timed waits.
+ \item Renamed CV members that wait interruptible.
+\end{itemize}
+
+\subsection*{Purpose}
+
+This is the proposed wording for a cooperatively interruptible joining thread.
+
+For a full discussion fo the motivation, see
+\url{www.wg21.link/p0660r0} and
+\url{www.wg21.link/p0660r1}.
+
+A default implementation exists at:
+\url{github.com/josuttis/jthread}.
+Note that the proposed functionality can be fully implemented 
+on top of the existing C++ standard library.
+
+Basis examples:
+\begin{codeblock}
+void testJThread() 
+{
+  std::jthread t([] {
+                   while (...) {
+                     std:this_thread::throw_if_interrupted();
+                     ...
+                     // temporarily disable interrupts:
+                     auto origToken = std::this_thread::exchange_interrupt_token(std::interrupt_token{});
+                     ...
+                     std::this_thread::exchange_interrupt_token(origToken);
+                     ...
+                   }
+                 });
+  ...
+} // jthread destructor signals interrupt and therefore silently ends the started thread
+\end{codeblock}
+
+\begin{codeblock}
+void testInterruptibleCVWait() 
+{
+  bool ready = false;
+  std::mutex readyMutex;
+  std::condition_variable readyCV;
+  std::jthread t([&ready, &readyMutex, &readyCV] {
+                    while (...) {
+                      ...
+                      {
+                        std::unique_lock lg{readyMutex};
+                        readyCV.iwait_for(lg,
+                                          std::chrono::seconds(2),
+                                          [&ready] {
+                                             return ready;
+                                          });
+                      }
+                      ...
+                    }
+                  });
+  ...
+} // jthread destructor signals interrupt and therefore unblocks the CV wait and silently ends the started thread
+\end{codeblock}
+
+\subsubsection*{Feature Test Macro}
+
+This is a new feature so that it shall have the following feature macro:
+\begin{codeblock}
+	__cpp_lib_jthread
+\end{codeblock}
+
+
+\subsubsection*{Acknowledgements}
+
+Thanks to all who incredibly helped me to prepare this paper, such as all people in the C++ concurrency and library working group.
+Especially, we want to thank: Hans Boehm, Olivier Giroux, Pablo Halpern, Howard Hinnant, Alisdair Meredith, Gor Nishanov, Ville Voutilainen, and Jonathan Wakely.
+
+
+\section*{Proposed Wording}
+All against N4659.
+
+{\color{blue}
+[{\itshape{}Editorial note:} This proposal uses the LaTeX macros of the draft standard.
+        To adopt it please ask for the LaTeX source code of the proposed wording. ]
+}
+
+\clearpage
+

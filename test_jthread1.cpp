@@ -11,7 +11,7 @@ using namespace::std::literals;
 void testJThread()
 {
   // test the basic jthread API
-  std::cout << "\n*** start testJThread()" << std::endl;
+  std::cout << "*** start testJThread()" << std::endl;
 
   assert(std::jthread::hardware_concurrency() == std::thread::hardware_concurrency()); 
   std::interrupt_token itoken;
@@ -273,7 +273,7 @@ void testStdThread()
 void testTemporarilyDisableToken()
 {
   // test exchanging the token to disable it temporarily
-  std::cout << "\n*** start testTemporarilyDisableToken()" << std::endl;
+  std::cout << "*** start testTemporarilyDisableToken()" << std::endl;
 
   enum class State { init, loop, disabled, restored, interrupted };
   std::atomic<State> state{State::init};
