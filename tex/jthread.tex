@@ -233,7 +233,7 @@ interrupt_token(interrupt_token&& rhs) noexcept;
 \end{itemdescr}
 
 %*****
-\rSec3[thread.thread.destr]{\tcode{thread} destructor}
+\rSec3[interrupt_token.destr]{\tcode{interrupt_token} destructor}
 
 \indexlibrary{\idxcode{interrupt_token}!destructor}%
 \begin{itemdecl}
@@ -242,11 +242,11 @@ interrupt_token(interrupt_token&& rhs) noexcept;
 
 \begin{itemdescr}
  \pnum\effects If \tcode{valid()} and \tcode{*this} is the last owner of the interrupt signal,
-                destructs the underlying interrupt signal.
+                destroys the underlying interrupt signal.
 \end{itemdescr}
 
 %*****
-\rSec3[interrupt_token.assign]{\tcode{interrupt_token} assign}
+\rSec3[interrupt_token.assign]{\tcode{interrupt_token} assignment}
 
 \indexlibrarymember{operator=}{interrupt_token}%
 \begin{itemdecl}
@@ -393,11 +393,11 @@ namespace std {
 \rSec2[thread.jthread.class]{Class \tcode{jthread}}
 
 \pnum
-The class \tcode{jthread} provides a mechanism on top of class \tcode{thread} (\ref{thread.thread}),
-which the additional ability to signal interrupts and
-let the destructor \tcode{join()} if still \tcode{joinable()}.
-The functionality is identical to class \tcode{thread}
-except where otherwise specified.
+The class \tcode{jthread} provides a mechanism
+to create a new thread of execution.
+The functionality is identical to class \tcode{thread} (\ref{thread.thread.class})
+with the additional ability to signal an interrupt and to
+automatically \tcode{join()} the started thread.
 
 {\color{blue}
 [{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to class \tcode{std::thread}.} ]
