@@ -1,4 +1,5 @@
 %!TEX root = std.tex
+\setcounter{chapter}{29}
 \rSec0[thread]{Thread support library}
 
 %******************************************************************
@@ -36,6 +37,85 @@ between threads, as summarized in \tref{thread.lib.summary}.
 \rSec1[thread.threads]{Threads}
 
 ...
+
+30.3.2.2 \tcode{thread} constructors [thread.thread.constr]
+
+\indexlibrary{\idxcode{thread}!constructor}%
+\begin{itemdecl}
+thread() noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum\effects Constructs a \tcode{thread} object that does not represent a thread of execution.
+
+\pnum\postconditions \tcode{get_id() == id()}.
+\end{itemdescr}
+
+\indexlibrary{\idxcode{thread}!constructor}%
+\begin{itemdecl}
+template<class F, class... Args> explicit thread(F&& f, Args&&... args);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\requires\ \tcode{F} and each $\tcode{T}_i$ in \tcode{Args} shall satisfy the
+\oldconcept{MoveConstructible} requirements.
+\tcode{%
+\placeholdernc{INVOKE}(\brk{}%
+\placeholdernc{DECAY_COPY}(\brk{}%
+std::forward<F>(f)),
+\placeholdernc{DECAY_COPY}(\brk{}%
+std::forward<Args>(\brk{}args))...)}\iref{func.require} shall be
+a va\-lid expression.
+
+\pnum
+\remarks
+This constructor shall not participate in overload resolution if \tcode{remove_cvref_t<F>}
+is the same type as \tcode{std::thread}.
+
+\pnum
+\effects\ Constructs an object of type \tcode{thread}. The new thread of execution executes
+\tcode{%
+\placeholdernc{INVOKE}(\brk{}%
+\placeholdernc{DECAY_COPY}(\brk{}%
+std::forward<F>(f)),
+\placeholdernc{DECAY_COPY}(\brk{}%
+std::forward<Args>(\brk{}args))...)} with the calls to
+\tcode{\placeholder{DECAY_COPY}} being evaluated in the constructing thread. Any return value from this invocation
+is ignored. \begin{note} This implies that any exceptions not thrown from the invocation of the copy
+of \tcode{f} will be thrown in the constructing thread, not the new thread. \end{note} If the
+invocation of
+\tcode{%
+\placeholdernc{INVOKE}(\brk{}%
+\placeholdernc{DECAY_COPY}(\brk{}%
+std::forward<F>(f)),
+\placeholdernc{DECAY_COPY}(\brk{}%
+std::forward<Args>(args))...)}
+termi\-nates with an uncaught exception, \tcode{terminate} shall be called.
+
+{\color{insertcolor}
+An uncaught \tcode{interrupted} exception in the started thread of execution
+will silently be ignored.
+\begin{note} Thus, an uncaught exception thrown by \tcode{this_thread::throw_if_interrupted()}
+             will cause the started thread to end silently.
+             \end{note}
+}%\color{diffcolor}
+
+\pnum\sync The completion of the invocation of the constructor
+synchronizes with the beginning of the invocation of the copy of \tcode{f}.
+
+\pnum\postconditions \tcode{get_id() != id()}. \tcode{*this} represents the newly started thread.
+
+\pnum\throws \tcode{system_error} if unable to start the new thread.
+
+\pnum\errors
+\begin{itemize}
+\item \tcode{resource_unavailable_try_again} --- the system lacked the necessary
+resources to create another thread, or the system-imposed limit on the number of
+threads in a process would be exceeded.
+\end{itemize}
+\end{itemdescr}
+
 
 \clearpage
 
@@ -141,13 +221,13 @@ member function of the exception object is called.
 
 \pnum
 \indexlibrary{\idxcode{interrupt_token}}%
-The class \tcode{interrupt_token} implements semantics of shared ownership of a 
-token to signal interrupts.
+The class \tcode{interrupt_token} implements semantics of shared ownership of an
+interrupt state (an atomic token to signal an interrupt).
 An interrupt can only be signaled once.
 All owners can signal an interrupt, provided the token is valid.
 All owners can check whether an interrupt was signaled.
-The last remaining owner of the token is responsible for destroying
-the object.
+The last remaining owner of the interrupt state is responsible for 
+releasing the resources associated with the interrupt state.
 
 \begin{codeblock}
 namespace std {
@@ -180,8 +260,8 @@ Calls to \tcode{interrupt()}, \tcode{is_interrupted()}, and \tcode{throw_if_inte
 are atomic operations(6.8.2.1p3 \ref{intro.races}) on an atomic object contained in the interrupt_token.
 Hence concurrent calls to these functions do not introduce data races. 
 A call to \tcode{interrupt()} synchronizes with any call to \tcode{interrupt()},
-\tcode{is_interrupted()}, or \tcode{throw_if_interrupted()} that observes the interrupt
-(and hence returns \tcode{true} or throws).
+\tcode{is_interrupted()}, or \tcode{throw_if_interrupted()} that observes the interrupt.
+%(and hence returns \tcode{true} or throws).
 
 %*****
 \rSec3[interrupt_token.constr]{\tcode{interrupt_token} constructors}
@@ -192,6 +272,7 @@ interrupt_token() noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\effects Constructs a new \tcode{interrupt_token} object that can't be used to signal interrupts.
+                \begin{note} Therefore, no resources have to be associated for the state.  \end{note}
 
   \pnum\postconditions \tcode{valid() == false}.
 \end{itemdescr}
@@ -201,7 +282,8 @@ interrupt_token() noexcept;
 interrupt_token(bool initial_state) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Constructs a new \tcode{interrupt_token} object that can signal interrupts.
+  \pnum\effects Constructs a new \tcode{interrupt_token} object that can signal interrupts
+                via an atomic associated interrupt state.
 
   \pnum\postconditions \tcode{valid() == true} and \tcode{is_interrupted() == initial_state}.
 \end{itemdescr}
@@ -214,7 +296,7 @@ interrupt_token(const interrupt_token& rhs) noexcept;
   \pnum\effects If \tcode{rhs} is not valid, constructs an \tcode{interrupt_token} object
                 that is not valid;
                 otherwise, constructs an \tcode{interrupt_token}
-                that shares the ownership of the interrupt signal with \tcode{rhs}.
+                that shares the ownership of the interrupt state with \tcode{rhs}.
 
   \pnum\postconditions \tcode{valid() == rhs.valid()}
                 and \tcode{is_interrupted() == rhs.is_interrupted()}
@@ -241,8 +323,8 @@ interrupt_token(interrupt_token&& rhs) noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
- \pnum\effects If \tcode{valid()} and \tcode{*this} is the last owner of the interrupt signal,
-                destroys the underlying interrupt signal.
+ \pnum\effects If \tcode{valid()} and \tcode{*this} is the last owner of the interrupt state,
+                releases the associated with the interrupt state.
 \end{itemdescr}
 
 %*****
@@ -308,9 +390,21 @@ bool is_interrupted() const noexcept;
 bool interrupt();
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\requires \tcode{valid() == true}
+  %\pnum\requires \tcode{valid() == true}
+  %Hans:
+  %Did we discuss whether interrupt() on an invalid (e.g. default constructed) interrupt token should be a no-op,
+  %rather than undefined? I would expect that to be convenient if we start passing interrupt_tokens around explicitly.
+  %Presumably a lot of short-lived tasks don't care about interruption, but might be used in a context in which an
+  %interrupt token is expected. With the change, you could just pass a default-constructed one.
 
-  \pnum\effects \tcode{is_interrupted() == true}.
+  \pnum\effects If \tcode{!valid()} or \tcode{is_interrupted()} the call has no effect. 
+                Otherwise, signals an interrupt so that \tcode{is_interrupted() == true}.
+                \begin{note} Signaling an interrupt includes notifying all condition_variables
+                             temporarily registered via a an interruptable wait (\ref{thread.condition.iwait})
+                             \end{note}
+
+
+  \pnum\postconditions \tcode{!valid() || is_interrupted()}
 
   \pnum\returns The value of \tcode{is_interrupted()} prior to the call.
 \end{itemdescr}
@@ -338,7 +432,7 @@ bool operator== (const interrupt_token& lhs, const interrupt_token& rhs);
 \begin{itemdescr}
   \pnum\returns \tcode{!lhs.valid() \&\& !rhs.valid()} or
                 whether \tcode{lhs} and \tcode{rhs} refer to the
-                same interrupt signal
+                same interrupt state
                 (copied or moved from the same initial \tcode{interrupt_token} object).
 \end{itemdescr}
 
@@ -508,7 +602,7 @@ termi\-nates with an uncaught exception, \tcode{terminate} shall be called.
 {\color{diffcolor}
 An uncaught \tcode{interrupted} exception in the started thread of execution
 will silently be ignored.
-\begin{note} Thus, an uncaught exception thrown by \tcode{throw_if_interrupted()}
+\begin{note} Thus, an uncaught exception thrown by \tcode{this_thread::throw_if_interrupted()}
              will cause the started thread to end silently.
              \end{note}
 }%\color{diffcolor}
