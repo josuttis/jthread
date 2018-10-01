@@ -153,7 +153,10 @@ void testThreadWithToken()
     origtoken = std::move(itoken);
     itoken = t1.get_original_interrupt_token();
     assert(!itoken.is_interrupted());
-    itoken.interrupt();
+    auto ret = itoken.interrupt();
+    assert(!ret);
+    ret = itoken.interrupt();
+    assert(ret);
     assert(itoken.is_interrupted());
     assert(!t1done.load());
     assert(!origtoken.is_interrupted());

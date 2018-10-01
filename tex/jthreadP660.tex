@@ -1,20 +1,29 @@
 %!TEX root = std.tex
-\makeevenhead{cpppage}{Josuttis, Sutter, Williams: \tcode{jthread}}{}{\textbf{P0660R4}}
-\makeoddhead{cpppage}{Josuttis, Sutter, Williams: \tcode{jthread}}{}{\textbf{P0660R4}}
+\makeevenhead{cpppage}{Josuttis, Sutter, Williams: \tcode{jthread}}{}{\textbf{P0660R5}}
+\makeoddhead{cpppage}{Josuttis, Sutter, Williams: \tcode{jthread}}{}{\textbf{P0660R5}}
 
 {\small
 \begin{tabular}{@{}ll}
 Project:  	& ISO JTC1/SC22/WG21: Programming Language C++ \\
-Doc No: 	& WG21 P0660R4 \\
-Date: 		& 2018-09-11 \\
+Doc No: 	& WG21 P0660R5 \\
+Date: 		& 2018-10-01 \\
 Reply to: 	& Nicolai Josuttis (nico@josuttis.de), Herb Sutter (hsutter@microsoft.com), \\
                 &         Anthony Williams (anthony@justsoftwaresolutions.co.uk) \\
 Audience: 	& SG1, LEWG, LWG \\
-Prev. Version:	& \url{www.wg21.link/P0660R3} \\
+Prev. Version:	& \url{www.wg21.link/P0660R4} \\
 \end{tabular}
 }
 
-\section*{{\huge{}A Cooperatively Interruptible Joining Thread, Rev 4}}
+\section*{{\huge{}A Cooperatively Interruptible Joining Thread, Rev 5}}
+
+\subsubsection*{New in R5}
+\begin{itemize}
+ \item Removed exception class \tcode{std::interrupted} and the \tcode{throw_if_interrupted()} API.
+ \item Removed all TLS extensions and extensions to \tcode{std::this_thread}.
+ \item Added support so let \tcode{jhread} call a callable that
+        either takes the interrupt token as additional first argument
+        or doesn't get it (taking just all passed arguments).
+\end{itemize}
 
 \subsubsection*{New in R4}
 \begin{itemize}
@@ -39,47 +48,62 @@ Note that the proposed functionality can be fully implemented
 on top of the existing C++ standard library.
 
 Basis examples:
+\begin{itemize}
+ \item Starting a jthread automatically signals an interrupt at the end of its lifetime if still joinable
+        and joins:
 \begin{codeblock}
-void testJThread() 
+void testJThreadWithToken() 
 {
-  std::jthread t([] {
-                   while (...) {
-                     std:this_thread::throw_if_interrupted();
-                     ...
-                     // temporarily disable interrupts:
-                     auto origToken = std::this_thread::exchange_interrupt_token(std::interrupt_token{});
-                     ...
-                     std::this_thread::exchange_interrupt_token(origToken);
+  std::jthread t([] (std::interrupt_token itoken) {
+                   while (!itoken.is_interrupted()) {
                      ...
                    }
                  });
   ...
-} // jthread destructor signals interrupt and therefore silently ends the started thread
+} // jthread destructor signals interrupt and therefore ends the started thread
 \end{codeblock}
 
+This can also explicitly signaled with \tcode{t.interrupt()}.
+
+ \item Don't have to take the interrupt token so that you can pass the same args as to std::thread
+        with the benefit of calling \tcode{join()}
+        if the thread is still joinable:
+\begin{codeblock}
+void testJThreadJoining()
+{
+  std::jthread t([] {
+                   ...
+                 });
+  ...
+} // jthread destructor calls join()
+\end{codeblock}
+
+ \item Extended CV API allows to interrupt CV waits according to the interrupt token
+        (i.e. interrupting the CV wait without polling):
 \begin{codeblock}
 void testInterruptibleCVWait() 
 {
   bool ready = false;
   std::mutex readyMutex;
   std::condition_variable readyCV;
-  std::jthread t([&ready, &readyMutex, &readyCV] {
+  std::jthread t([&ready, &readyMutex, &readyCV] (std::interrupt_token it) {
                     while (...) {
                       ...
                       {
                         std::unique_lock lg{readyMutex};
-                        readyCV.iwait_for(lg,
-                                          std::chrono::seconds(2),
-                                          [&ready] {
-                                             return ready;
-                                          });
+                        readyCV.wait_until(lg,
+                                           [&ready] {
+                                              return ready;
+                                           },
+                                           it);
                       }
                       ...
                     }
                   });
   ...
-} // jthread destructor signals interrupt and therefore unblocks the CV wait and silently ends the started thread
+} // jthread destructor signals interrupt and therefore unblocks the CV wait and ends the started thread
 \end{codeblock}
+\end{itemize}
 
 \subsubsection*{Feature Test Macro}
 
