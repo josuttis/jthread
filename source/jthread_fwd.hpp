@@ -31,9 +31,16 @@ class interrupt_token {
  private:
   struct SharedData {
     ::std::atomic<bool> interrupted;   // true if interrupt signaled
-    ::std::list<condition_variable2*> cvPtrs;  // currently waiting CVs
+    ::std::list<condition_variable2*> cvPtrs{};  // currently waiting CVs
     ::std::mutex cvMutex{};            // we have multistep concurrent access to cvPtrs
-    virtual ~SharedData() = default;   // for future binary-compatible interrupt_token extensions
+    // make polymorphic class for future binary-compatible interrupt_token extensions:
+    SharedData(bool initial_state) : interrupted{initial_state} {
+    }
+    virtual ~SharedData() = default;   // make polymorphic
+    SharedData(const SharedData&) = delete;
+    SharedData(SharedData&&) = delete;
+    SharedData& operator= (const SharedData&) = delete;
+    SharedData& operator= (SharedData&&) = delete;
   };
   ::std::shared_ptr<SharedData> _ip{nullptr};
 
@@ -42,7 +49,7 @@ class interrupt_token {
   explicit interrupt_token() noexcept = default;
   // enable interrupt mechanisms by passing a bool (usually false):
   explicit interrupt_token(bool initial_state)
-   : _ip{new SharedData{initial_state,{}}} {
+   : _ip{new SharedData{initial_state}} {
   }
 
   // special members (default OK):
