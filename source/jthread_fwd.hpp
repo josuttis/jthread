@@ -33,7 +33,7 @@ class interrupt_token {
     ::std::atomic<bool> interrupted;   // true if interrupt signaled
     ::std::list<condition_variable2*> cvPtrs;  // currently waiting CVs
     ::std::mutex cvMutex{};            // we have multistep concurrent access to cvPtrs
-    virtual ~SharedDate() = default;   // for future binary-compatible interrupt_token extensions
+    virtual ~SharedData() = default;   // for future binary-compatible interrupt_token extensions
   };
   ::std::shared_ptr<SharedData> _ip{nullptr};
 
