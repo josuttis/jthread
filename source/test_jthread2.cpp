@@ -42,14 +42,13 @@ void interruptByDestructor()
   bool t1WasInterrupted = false;
   {
    std::cout << "\n- start jthread t1" << std::endl;
-   std::jthread t1([interval, &t1WasInterrupted] {
+   std::jthread t1([interval, &t1WasInterrupted] (std::interrupt_token itoken) {
                      printID("t1 STARTED with interval " + asString(interval) + " with id");
-                     assert(!std::this_thread::is_interrupted());
-                     assert(!std::this_thread::get_interrupt_token().is_interrupted());
+                     assert(!itoken.is_interrupted());
                      try {
                        // loop until interrupted (at most 40 times the interval)
                        for (int i=0; i < 40; ++i) {
-                          if (std::this_thread::is_interrupted()) {
+                          if (itoken.is_interrupted()) {
                             throw "interrupted";
                           }
                           std::this_thread::sleep_for(interval);
@@ -61,8 +60,7 @@ void interruptByDestructor()
                        assert(false);
                      }
                      catch (const char* e) {
-                       assert(std::this_thread::is_interrupted());
-                       assert(std::this_thread::get_interrupt_token().is_interrupted());
+                       assert(itoken.is_interrupted());
                        t1WasInterrupted = true;
                        //throw;
                      }
@@ -93,12 +91,12 @@ void interruptStartedThread()
   {
    std::cout << "\n- start jthread t1" << std::endl;
    bool interrupted = false;
-   std::jthread t1([interval, &interrupted] {
+   std::jthread t1([interval, &interrupted] (std::interrupt_token itoken) {
                      printID("t1 STARTED with interval " + asString(interval) + " with id");
                      try {
                        // loop until interrupted (at most 40 times the interval)
                        for (int i=0; i < 40; ++i) {
-                          if (std::this_thread::is_interrupted()) {
+                          if (itoken.is_interrupted()) {
                             throw "interrupted";
                           }
                           std::this_thread::sleep_for(interval);
@@ -132,17 +130,17 @@ void interruptStartedThreadWithSubthread()
   auto interval = 0.2s;
   {
    std::cout << "\n- start jthread t1 with nested jthread t2" << std::endl;
-   std::jthread t1([interval] {
+   std::jthread t1([interval] (std::interrupt_token itoken) {
                      printID("t1 STARTED with id");
-                     std::jthread t2([interval] {
+                     std::jthread t2([interval, itoken] {
                                        printID("t2 STARTED with id");
-                                       while(!std::this_thread::is_interrupted()) {
+                                       while(!itoken.is_interrupted()) {
                                          std::cout.put('2').flush();
                                          std::this_thread::sleep_for(interval/2.3);
                                        }
                                        std::cout << "\nt2 INTERRUPTED" << std::endl;
                                      });
-                     while(!std::this_thread::is_interrupted()) {
+                     while(!itoken.is_interrupted()) {
                         std::cout.put('1').flush();
                         std::this_thread::sleep_for(interval);
                      }
@@ -199,9 +197,8 @@ void testExchangeToken()
   {
     std::cout << "\n- start jthread t1" << std::endl;
     std::atomic<std::interrupt_token*> itPtr = nullptr;
-    std::jthread t1([&itPtr](){
+    std::jthread t1([&itPtr](std::interrupt_token iToken){
                       printID("t1 STARTED (id: ", ") printing . or - or i");
-		      auto iToken = std::this_thread::get_interrupt_token();
 		      auto actToken = iToken;
                       int numInterrupts = 0;
                       try {
@@ -269,7 +266,7 @@ void testConcurrentInterrupt()
   {
     std::atomic<int> numInterrupts{0};
     std::cout << "\n- start jthread t1" << std::endl;
-    std::jthread t1([it](){
+    std::jthread t1([it](std::interrupt_token itoken){
               printID("t1 STARTED (id: ", ") printing . or - or i");
               try {
                 char c = ' ';
@@ -278,14 +275,13 @@ void testConcurrentInterrupt()
 		    // - '.' if valid and not interrupted,
 		    // - 'i' if valid and interrupted
 		    // - '-' if no valid
-		    if (std::this_thread::is_interrupted()) {
+		    if (itoken.is_interrupted()) {
                       c = 'i';
 		    }
 		    else {
 		      // should never switch back to not interrupted:
                       assert(c != 'i');
-		      c = std::this_thread::get_interrupt_token().valid() ?
-		           '.' : '-';
+		      c = itoken.valid() ?  '.' : '-';
                     }
                     std::cout.put(c).flush();
                     std::this_thread::sleep_for(0.1ms);

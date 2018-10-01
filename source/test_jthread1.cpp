@@ -8,10 +8,10 @@ using namespace::std::literals;
 
 //------------------------------------------------------
 
-void testJThread()
+void testJThreadAPI()
 {
-  // test the basic jthread API
-  std::cout << "*** start testJThread()" << std::endl;
+  // test the basic jthread API (taking interrupt_token arg)
+  std::cout << "*** start testJThreadAPI()" << std::endl;
 
   assert(std::jthread::hardware_concurrency() == std::thread::hardware_concurrency()); 
   std::interrupt_token itoken;
@@ -22,19 +22,17 @@ void testJThread()
     assert((std::is_same_v<decltype(nh), std::thread::native_handle_type>)); 
 
     std::jthread::id t1ID{std::this_thread::get_id()};
-    bool t1IsInterrupted{true};
     std::interrupt_token t1InterruptToken;
     std::atomic<bool> t1AllSet{false};
-    std::jthread t1([&t1ID, &t1IsInterrupted, &t1InterruptToken, &t1AllSet] {
+    std::jthread t1([&t1ID, &t1InterruptToken, &t1AllSet] (std::interrupt_token itoken) {
                    // check some values of the started thread:
                    t1ID = std::this_thread::get_id();
-                   t1IsInterrupted = std::this_thread::is_interrupted();
-                   t1InterruptToken = std::this_thread::get_interrupt_token();
-                   assert(std::this_thread::get_interrupt_token().valid());
-                   assert(!std::this_thread::get_interrupt_token().is_interrupted());
+                   t1InterruptToken = itoken;
+                   assert(itoken.valid());
+                   assert(!itoken.is_interrupted());
                    t1AllSet.store(true);
                    // wait until interrupt is signaled (due to destructor of t1):
-                   for (int i=0; !std::this_thread::is_interrupted(); ++i) {
+                   for (int i=0; !itoken.is_interrupted(); ++i) {
                       std::this_thread::sleep_for(100ms);
                       std::cout.put('.').flush();
                    }
@@ -50,7 +48,6 @@ void testJThread()
     assert(std::interrupt_token{} == t0.get_original_interrupt_token());
     assert(t1.joinable());
     assert(t1ID == t1.get_id());
-    assert(t1IsInterrupted == false);
     assert(t1InterruptToken == t1.get_original_interrupt_token());
     itoken = t1.get_original_interrupt_token();
     assert(t1InterruptToken.valid());
@@ -78,6 +75,99 @@ void testJThread()
 
 //------------------------------------------------------
 
+void testJThreadWithout()
+{
+  // test the basic jthread API (not taking interrupt_token arg)
+  std::cout << "*** start testJThreadWithout()" << std::endl;
+
+  assert(std::jthread::hardware_concurrency() == std::thread::hardware_concurrency()); 
+  std::interrupt_token itoken;
+  assert(!itoken.valid());
+  {
+    std::jthread::id t1ID{std::this_thread::get_id()};
+    std::atomic<bool> t1AllSet{false};
+    std::jthread t1([&t1ID, &t1AllSet] {
+                   // check some values of the started thread:
+                   t1ID = std::this_thread::get_id();
+                   t1AllSet.store(true);
+                   // wait until loop is done (no interrupt checked)
+                   for (int c='9'; c>='0'; --c) {
+                      std::this_thread::sleep_for(222ms);
+                      std::cout.put(static_cast<char>(c)).flush();
+                   }
+                   std::cout << "END t1" << std::endl;
+                 });
+    // wait until t1 has set all initial values:
+    for (int i=0; !t1AllSet.load(); ++i) {
+      std::this_thread::sleep_for(10ms);
+      std::cout.put('o').flush();
+    }
+    // and check all values:
+    assert(t1.joinable());
+    assert(t1ID == t1.get_id());
+    itoken = t1.get_original_interrupt_token();
+    assert(!itoken.is_interrupted());
+  } // leave scope of t1 without join() or detach() (signals cancellation)
+  assert(itoken.is_interrupted());
+  std::cout << "\n*** OK" << std::endl;
+}
+
+//------------------------------------------------------
+
+void testThreadWithToken()
+{
+  // test the basic thread API (taking interrupt_token arg)
+  std::cout << "*** start testThreadWithToken()" << std::endl;
+
+  std::interrupt_token itoken{false};
+  std::interrupt_token origtoken;
+  assert(itoken.valid());
+  assert(!itoken.is_interrupted());
+  {
+    std::jthread::id t1ID{std::this_thread::get_id()};
+    std::atomic<bool> t1AllSet{false};
+    std::atomic<bool> t1done{false};
+    std::jthread t1([&t1ID, &t1AllSet, &t1done] (std::interrupt_token it) {
+                       // check some values of the started thread:
+                       t1ID = std::this_thread::get_id();
+                       t1AllSet.store(true);
+                       // wait until interrupt is signaled (due to destructor of t1):
+                       for (int i=0; !it.is_interrupted(); ++i) {
+                          std::this_thread::sleep_for(100ms);
+                          std::cout.put('.').flush();
+                       }
+                       t1done.store(true);
+                       std::cout << "END t1" << std::endl;
+                     },
+		     itoken);
+    // wait until t1 has set all initial values:
+    for (int i=0; !t1AllSet.load(); ++i) {
+      std::this_thread::sleep_for(10ms);
+      std::cout.put('o').flush();
+    }
+    // and check all values:
+    assert(t1.joinable());
+    assert(t1ID == t1.get_id());
+
+    std::this_thread::sleep_for(470ms);
+    origtoken = std::move(itoken);
+    itoken = t1.get_original_interrupt_token();
+    assert(!itoken.is_interrupted());
+    itoken.interrupt();
+    assert(itoken.is_interrupted());
+    assert(!t1done.load());
+    assert(!origtoken.is_interrupted());
+
+    std::this_thread::sleep_for(470ms);
+    origtoken.interrupt();
+  } // leave scope of t1 without join() or detach() (signals cancellation)
+  assert(origtoken.is_interrupted());
+  assert(itoken.is_interrupted());
+  std::cout << "\n*** OK" << std::endl;
+}
+
+//------------------------------------------------------
+
 void testJoin()
 {
   // test jthread join()
@@ -86,9 +176,9 @@ void testJoin()
   std::interrupt_token itoken;
   assert(!itoken.valid());
   {
-    std::jthread t1([] {
+    std::jthread t1([](std::interrupt_token itoken) {
                       // wait until interrupt is signaled (due to calling interrupt() for the token):
-                      for (int i=0; !std::this_thread::is_interrupted(); ++i) {
+                      for (int i=0; !itoken.is_interrupted(); ++i) {
                          std::this_thread::sleep_for(100ms);
                          std::cout.put('.').flush();
                       }
@@ -131,16 +221,17 @@ void testDetach()
     bool t1IsInterrupted;
     std::interrupt_token t1InterruptToken;
     std::atomic<bool> t1AllSet{false};
-    std::jthread t1([&t1ID, &t1IsInterrupted, &t1InterruptToken, &t1AllSet, &t1FinallyInterrupted] {
+    std::jthread t1([&t1ID, &t1IsInterrupted, &t1InterruptToken, &t1AllSet, &t1FinallyInterrupted]
+	            (std::interrupt_token itoken) {
                    // check some values of the started thread:
                    t1ID = std::this_thread::get_id();
-                   t1IsInterrupted = std::this_thread::is_interrupted();
-                   t1InterruptToken = std::this_thread::get_interrupt_token();
-                   assert(std::this_thread::get_interrupt_token().valid());
-                   assert(!std::this_thread::get_interrupt_token().is_interrupted());
+                   t1InterruptToken = itoken;
+                   t1IsInterrupted = itoken.is_interrupted();
+                   assert(itoken.valid());
+                   assert(!itoken.is_interrupted());
                    t1AllSet.store(true);
                    // wait until interrupt is signaled (due to calling interrupt() for the token):
-                   for (int i=0; !std::this_thread::is_interrupted(); ++i) {
+                   for (int i=0; !itoken.is_interrupted(); ++i) {
                       std::this_thread::sleep_for(100ms);
                       std::cout.put('.').flush();
                    }
@@ -188,15 +279,11 @@ void testStdThread()
   std::cout << "\n*** start testStdThread()" << std::endl;
   std::thread t0;
   std::thread::id t1ID{std::this_thread::get_id()};
-  bool t1IsInterrupted{true};
-  std::interrupt_token t1InterruptToken;
   std::atomic<bool> t1AllSet{false};
   std::interrupt_token t1ShallDie{false};
-  std::thread t1([&t1ID, &t1IsInterrupted, &t1InterruptToken, &t1AllSet, t1ShallDie] {
+  std::thread t1([&t1ID, &t1AllSet, t1ShallDie] {
                    // check some supplementary values of the started thread:
                    t1ID = std::this_thread::get_id();
-                   t1IsInterrupted = std::this_thread::is_interrupted();
-                   t1InterruptToken = std::this_thread::get_interrupt_token();
                    t1AllSet.store(true);
                    // and wait until cancellation is signaled via passed token:
                    try {
@@ -228,9 +315,6 @@ void testStdThread()
   }
   // and check all values:
   assert(t1ID == t1.get_id());
-  assert(t1IsInterrupted == false);
-  assert(!t1InterruptToken.valid());
-  assert(!t1InterruptToken.is_interrupted());
   // signal cancellation via manually installed interrupt token:
   t1ShallDie.interrupt();
   t1.join();
@@ -248,10 +332,9 @@ void testTemporarilyDisableToken()
   std::atomic<State> state{State::init};
   std::interrupt_token t1it;
   {
-    std::jthread t1([&state] {
+    std::jthread t1([&state] (std::interrupt_token itoken) {
                    std::cout << "- start t1" << std::endl;
-                   auto iToken = std::this_thread::get_interrupt_token();
-                   auto actToken = iToken;
+                   auto actToken = itoken;
                    // just loop (no interrupt should occur):
                    state.store(State::loop); 
                    try {
@@ -268,12 +351,12 @@ void testTemporarilyDisableToken()
                    }
                    // temporarily disable interrupts:
                    std::interrupt_token interruptDisabled;
-		   swap(iToken, interruptDisabled);
+		   swap(itoken, interruptDisabled);
                    state.store(State::disabled); 
                    // loop again until interrupt signaled to original interrupt token:
                    try {
                      while (!actToken.is_interrupted()) {
-                        if (iToken.is_interrupted()) {
+                        if (itoken.is_interrupted()) {
                           throw "interrupted";
                         }
                         std::this_thread::sleep_for(100ms);
@@ -289,7 +372,7 @@ void testTemporarilyDisableToken()
                    }
                    state.store(State::restored); 
                    // enable interrupts again:
-		   swap(iToken, interruptDisabled);
+		   swap(itoken, interruptDisabled);
                    // loop again (should immediately throw):
                    assert(!interruptDisabled.is_interrupted());
                    try {
@@ -327,7 +410,11 @@ int main()
 		     });
 
   std::cout << "\n\n**************************\n";
-  testJThread();
+  testJThreadAPI();
+  std::cout << "\n\n**************************\n";
+  testJThreadWithout();
+  std::cout << "\n\n**************************\n";
+  testThreadWithToken();
   std::cout << "\n\n**************************\n";
   testJoin();
   std::cout << "\n\n**************************\n";

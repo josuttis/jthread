@@ -91,27 +91,6 @@ bool operator!= (const interrupt_token& lhs, const interrupt_token& rhs) {
 
 
 //***************************************** 
-//* new this_thread API for interrupts:
-//***************************************** 
-namespace this_thread {
-  static bool is_interrupted() noexcept;
-  static interrupt_token get_interrupt_token() noexcept;
-}
-
-
-//***************************************** 
-//* new cv_status interrupted
-//***************************************** 
-enum class cv_status2 {
-  no_timeout = static_cast<int>(cv_status::no_timeout),
-  timeout = static_cast<int>(cv_status::timeout),
-  interrupted = static_cast<int>(cv_status::no_timeout)
-                 + static_cast<int>(cv_status::timeout)
-                 + 1,
-};
-
-
-//***************************************** 
 //* class condition_variable2
 //* - joining std::thread with interrupt support 
 //***************************************** 

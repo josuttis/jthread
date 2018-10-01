@@ -76,10 +76,6 @@ class jthread
     //*** API for the starting thread:
     interrupt_token _thread_it{};              // interrupt token for started thread
     ::std::thread _thread{::std::thread{}};    // started thread (if any)
-
-    //*** API for the started thread (TLS stuff):
-    inline static thread_local interrupt_token _this_thread_it{}; // int.token for this thread
-    friend interrupt_token this_thread::get_interrupt_token() noexcept;
 };
 
 
@@ -100,9 +96,6 @@ template <typename Callable, typename... Args,
 inline jthread::jthread(Callable&& cb, Args&&... args)
  : _thread_it{false},                             // initialize interrupt token
    _thread{[] (interrupt_token it, auto&& cb, auto&&... args) {   // called lambda in the thread
-                 // pass the interrupt_token to the started thread
-                 _this_thread_it = it;
-
                  // perform tasks of the thread:
                  if constexpr(std::is_invocable_v<Callable, interrupt_token, Args...>) {
                    // pass the interrupt_token as first argument to the started thread:
@@ -158,18 +151,6 @@ void jthread::swap(jthread& t) noexcept {
     std::swap(_thread, t._thread);
 }
 
-
-//***************************************** 
-//* implementation of new this_thread API for interrupts:
-//***************************************** 
-namespace this_thread {
-  static interrupt_token get_interrupt_token() noexcept {
-    return ::std::jthread::_this_thread_it;
-  }
-  static bool is_interrupted() noexcept {
-    return get_interrupt_token().is_interrupted();
-  }
-} // this_thread
 
 } // std
 

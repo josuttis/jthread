@@ -8,7 +8,7 @@
 
 
 //*****************************************************************************
-//* implementation of new this_thread API for interrupts:
+//* implementation of interrupt_token member functions:
 //*****************************************************************************
 #include <cassert>
 #include <iostream> // in case we enable the debug output
