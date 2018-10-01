@@ -38,19 +38,6 @@ void testJThread()
                       std::this_thread::sleep_for(100ms);
                       std::cout.put('.').flush();
                    }
-                   // test itoken setter:
-                   std::interrupt_token it1;
-                   std::this_thread::exchange_interrupt_token(it1);
-                   assert(!std::this_thread::get_interrupt_token().valid());
-                   assert(!std::this_thread::get_interrupt_token().is_interrupted());
-                   std::interrupt_token it2{false};
-                   std::this_thread::exchange_interrupt_token(it2);
-                   assert(std::this_thread::get_interrupt_token().valid());
-                   assert(!std::this_thread::get_interrupt_token().is_interrupted());
-                   std::interrupt_token it3{true};
-                   std::this_thread::exchange_interrupt_token(it3);
-                   assert(std::this_thread::get_interrupt_token().valid());
-                   assert(std::this_thread::get_interrupt_token().is_interrupted());
                    std::cout << "END t1" << std::endl;
                  });
     // wait until t1 has set all initial values:
@@ -211,12 +198,10 @@ void testStdThread()
                    t1IsInterrupted = std::this_thread::is_interrupted();
                    t1InterruptToken = std::this_thread::get_interrupt_token();
                    t1AllSet.store(true);
-                   // manually establish our own interrupt token:
-                   std::this_thread::exchange_interrupt_token(t1ShallDie);
-                   // and wait until cancellation is signaled:
+                   // and wait until cancellation is signaled via passed token:
                    try {
                      for (int i=0; ; ++i) {
-                        if (std::this_thread::is_interrupted()) {
+                        if (t1ShallDie.is_interrupted()) {
                           throw "interrupted";
                         }
                         std::this_thread::sleep_for(100ms);
@@ -265,11 +250,13 @@ void testTemporarilyDisableToken()
   {
     std::jthread t1([&state] {
                    std::cout << "- start t1" << std::endl;
+                   auto iToken = std::this_thread::get_interrupt_token();
+                   auto actToken = iToken;
                    // just loop (no interrupt should occur):
                    state.store(State::loop); 
                    try {
                      for (int i=0; i < 10; ++i) {
-                        if (std::this_thread::is_interrupted()) {
+                        if (actToken.is_interrupted()) {
                           throw "interrupted";
                         }
                         std::this_thread::sleep_for(100ms);
@@ -281,12 +268,12 @@ void testTemporarilyDisableToken()
                    }
                    // temporarily disable interrupts:
                    std::interrupt_token interruptDisabled;
-                   auto origToken = std::this_thread::exchange_interrupt_token(interruptDisabled);
+		   swap(iToken, interruptDisabled);
                    state.store(State::disabled); 
-                   // loop again until interupt signaled to original interrupt token:
+                   // loop again until interrupt signaled to original interrupt token:
                    try {
-                     while (!origToken.is_interrupted()) {
-                        if (std::this_thread::is_interrupted()) {
+                     while (!actToken.is_interrupted()) {
+                        if (iToken.is_interrupted()) {
                           throw "interrupted";
                         }
                         std::this_thread::sleep_for(100ms);
@@ -301,12 +288,12 @@ void testTemporarilyDisableToken()
                      assert(false);
                    }
                    state.store(State::restored); 
+                   // enable interrupts again:
+		   swap(iToken, interruptDisabled);
                    // loop again (should immediately throw):
-                   auto newToken = std::this_thread::exchange_interrupt_token(origToken);
-                   assert(newToken == interruptDisabled);
                    assert(!interruptDisabled.is_interrupted());
                    try {
-                     if (std::this_thread::is_interrupted()) {
+                     if (actToken.is_interrupted()) {
                        throw "interrupted";
                      }
                    }

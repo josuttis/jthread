@@ -10,7 +10,9 @@
 using namespace::std::literals;
 
 // helper to call iwait() and check some assertions
-void cvIWait (int id, bool& ready, std::mutex& readyMutex, std::condition_variable2& readyCV, bool notifyCalled) {
+void cvIWait (std::interrupt_token iToken, int id,
+              bool& ready, std::mutex& readyMutex, std::condition_variable2& readyCV,
+              bool notifyCalled) {
   std::ostringstream strm;
   strm <<"\ncvIWait(" << std::to_string(id) << ") called in thread "
        << std::this_thread::get_id();
@@ -23,13 +25,13 @@ void cvIWait (int id, bool& ready, std::mutex& readyMutex, std::condition_variab
       //readyCV.iwait(lg, [&ready] { return ready; });
       readyCV.wait_until(lg,
                          [&ready] { return ready; },
-                         std::this_thread::get_interrupt_token());
-      if (std::this_thread::is_interrupted()) {
+                         iToken);
+      if (iToken.is_interrupted()) {
         throw "interrupted";
       }
 
     }
-    if (std::this_thread::is_interrupted()) {
+    if (iToken.is_interrupted()) {
       std::string msg = "\ncvIWait(" + std::to_string(id) + "): interrupted";
       std::cout << msg << std::endl;
       assert(false);
@@ -44,7 +46,6 @@ void cvIWait (int id, bool& ready, std::mutex& readyMutex, std::condition_variab
     std::string msg = "\nINTERRUPT in cvIWait(" + std::to_string(id) + "): " + e;
     std::cerr << msg << std::endl;
     assert(!notifyCalled);
-    return;
   }
   catch (const std::exception& e) {
     std::string msg = "\nEXCEPTION in cvIWait(" + std::to_string(id) + "): " + e.what();
@@ -56,6 +57,8 @@ void cvIWait (int id, bool& ready, std::mutex& readyMutex, std::condition_variab
     std::cerr << msg << std::endl;
     assert(false);
   }
+  std::string msg = "\nEND cvIWait(" + std::to_string(id) + ") ";
+  std::cerr << msg << std::endl;
 }
 
 //------------------------------------------------------
@@ -511,7 +514,9 @@ void testManyCV(bool callNotify, bool callInterrupt)
     bool ready = false;
     std::mutex readyMutex;
     std::condition_variable2 readyCV;
-    std::jthread t0(cvIWait, 0, std::ref(ready), std::ref(readyMutex), std::ref(readyCV), callNotify);
+    std::jthread t0(cvIWait, 0,
+                             std::ref(ready), std::ref(readyMutex), std::ref(readyCV),
+                             callNotify);
     {  
       t0itoken = t0.get_original_interrupt_token();
       std::this_thread::sleep_for(0.5s);
@@ -528,9 +533,9 @@ void testManyCV(bool callNotify, bool callInterrupt)
         std::jthread t([idx, t0itoken, &arrReady, &arrReadyMutex, &arrReadyCV, callNotify] {
                          // use interrupt token of t0 instead
                          // NOTE: disables signaling interrupts directly to the thread
-                         std::this_thread::exchange_interrupt_token(t0itoken);
-
-                         cvIWait(idx+1, arrReady[idx], arrReadyMutex[idx], arrReadyCV[idx], callNotify);
+                         cvIWait(t0itoken, idx+1,
+                                 arrReady[idx], arrReadyMutex[idx], arrReadyCV[idx],
+                                 callNotify);
                        });
         vThreads.push_back(std::move(t));
       }

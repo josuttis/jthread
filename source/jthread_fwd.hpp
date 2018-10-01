@@ -96,7 +96,6 @@ bool operator!= (const interrupt_token& lhs, const interrupt_token& rhs) {
 namespace this_thread {
   static bool is_interrupted() noexcept;
   static interrupt_token get_interrupt_token() noexcept;
-  static interrupt_token exchange_interrupt_token(const interrupt_token&) noexcept;
 }
 
 

@@ -200,39 +200,40 @@ void testExchangeToken()
     std::cout << "\n- start jthread t1" << std::endl;
     std::atomic<std::interrupt_token*> itPtr = nullptr;
     std::jthread t1([&itPtr](){
-              printID("t1 STARTED (id: ", ") printing . or - or i");
-              int numInterrupts = 0;
-              try {
-                char c = ' ';
-                for (int i=0; numInterrupts < 2 && i < 500; ++i) {
-		    // if we get a new interrupt token from the caller, take it:
-                    if (itPtr.load()) {
-                      std::this_thread::exchange_interrupt_token(*itPtr);
-                      itPtr.store(nullptr);
-                    }
-		    // print character according to current interrupt token state:
-		    // - '.' if valid and not interrupted,
-		    // - 'i' if valid and interrupted
-		    // - '-' if no valid
-		    if (std::this_thread::is_interrupted()) {
-                      if (c != 'i') {
-                        c = 'i';
-                        ++numInterrupts;
+                      printID("t1 STARTED (id: ", ") printing . or - or i");
+		      auto iToken = std::this_thread::get_interrupt_token();
+		      auto actToken = iToken;
+                      int numInterrupts = 0;
+                      try {
+                        char c = ' ';
+                        for (int i=0; numInterrupts < 2 && i < 500; ++i) {
+		            // if we get a new interrupt token from the caller, take it:
+                            if (itPtr.load()) {
+			      actToken = *itPtr;
+                              itPtr.store(nullptr);
+                            }
+		            // print character according to current interrupt token state:
+		            // - '.' if valid and not interrupted,
+		            // - 'i' if valid and interrupted
+		            // - '-' if no valid
+		            if (actToken.is_interrupted()) {
+                              if (c != 'i') {
+                                c = 'i';
+                                ++numInterrupts;
+                              }
+		            }
+		            else {
+		              c = actToken.valid() ?  '.' : '-';
+                            }
+                            std::cout.put(c).flush();
+                            std::this_thread::sleep_for(0.1ms);
+                        }
                       }
-		    }
-		    else {
-		      c = std::this_thread::get_interrupt_token().valid() ?
-		           '.' : '-';
-                    }
-                    std::cout.put(c).flush();
-                    std::this_thread::sleep_for(0.1ms);
-                }
-              }
-              catch (...) {
-                assert(false);
-              }
-              std::cout << "\nt1 END" << std::endl;
-           });
+                      catch (...) {
+                        assert(false);
+                      }
+                      std::cout << "\nt1 END" << std::endl;
+                   });
 
    std::this_thread::sleep_for(interval);
    std::cout << "\n- signal interrupt" << std::endl;

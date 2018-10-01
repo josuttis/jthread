@@ -7,6 +7,7 @@
 #include "interrupt_token.hpp"
 #include <thread>
 #include <future>
+#include <type_traits>
 #include <functional>  // for invoke()
 #include <iostream>    // for debugging output
 
@@ -33,7 +34,7 @@ class jthread
     jthread() noexcept;
     //template <typename F, typename... Args> explicit jthread(F&& f, Args&&... args);
     // THE constructor that starts the thread:
-    // - NOTE: should SFINAE out copy constructor semantics
+    // - NOTE: does SFINAE out copy constructor semantics
     template <typename Callable, typename... Args,
               typename = ::std::enable_if_t<!::std::is_same_v<::std::decay_t<Callable>, jthread>>>
     explicit jthread(Callable&& cb, Args&&... args);
@@ -79,7 +80,6 @@ class jthread
     //*** API for the started thread (TLS stuff):
     inline static thread_local interrupt_token _this_thread_it{}; // int.token for this thread
     friend interrupt_token this_thread::get_interrupt_token() noexcept;
-    friend interrupt_token this_thread::exchange_interrupt_token(const interrupt_token&) noexcept;
 };
 
 
@@ -94,19 +94,27 @@ inline jthread::jthread() noexcept {
 }
 
 // THE constructor that starts the thread:
-// - NOTE: should SFINAE out copy constructor semantics
+// - NOTE: declaration does SFINAE out copy constructor semantics
 template <typename Callable, typename... Args,
-          typename>
+          typename >
 inline jthread::jthread(Callable&& cb, Args&&... args)
  : _thread_it{false},                             // initialize interrupt token
    _thread{[] (interrupt_token it, auto&& cb, auto&&... args) {   // called lambda in the thread
                  // pass the interrupt_token to the started thread
-                 _this_thread_it = std::move(it);
-                 // in the started thread:
-                 // - store passed future in local thread: 
-                 // - and perform tasks of the thread:
-                 ::std::invoke(::std::forward<decltype(cb)>(cb),
-                               ::std::forward<decltype(args)>(args)...);
+                 _this_thread_it = it;
+
+                 // perform tasks of the thread:
+                 if constexpr(std::is_invocable_v<Callable, interrupt_token, Args...>) {
+                   // pass the interrupt_token as first argument to the started thread:
+                   ::std::invoke(::std::forward<decltype(cb)>(cb),
+                                 std::move(it),
+                                 ::std::forward<decltype(args)>(args)...);
+                 }
+                 else {
+                   // started thread does not expect an interrupt token:
+                   ::std::invoke(::std::forward<decltype(cb)>(cb),
+                                 ::std::forward<decltype(args)>(args)...);
+                 }
                },
                _thread_it,   // not captured due to possible races if immediately set
                ::std::forward<Callable>(cb),  // pass callable
@@ -157,11 +165,6 @@ void jthread::swap(jthread& t) noexcept {
 namespace this_thread {
   static interrupt_token get_interrupt_token() noexcept {
     return ::std::jthread::_this_thread_it;
-  }
-  static interrupt_token exchange_interrupt_token(const interrupt_token& it) noexcept {
-    auto old = ::std::jthread::_this_thread_it;
-    ::std::jthread::_this_thread_it = it;
-    return old;
   }
   static bool is_interrupted() noexcept {
     return get_interrupt_token().is_interrupted();
