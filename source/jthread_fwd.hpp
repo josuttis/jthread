@@ -30,9 +30,10 @@ class register_guard;
 class interrupt_token {
  private:
   struct SharedData {
-    ::std::atomic<bool> interrupted;
-    ::std::list<condition_variable2*> cvPtrs;
-    ::std::mutex cvMutex{};      // for any concurrent access to cv, which might be two operations
+    ::std::atomic<bool> interrupted;   // true if interrupt signaled
+    ::std::list<condition_variable2*> cvPtrs;  // currently waiting CVs
+    ::std::mutex cvMutex{};            // we have multistep concurrent access to cvPtrs
+    virtual ~SharedDate() = default;   // for future binary-compatible interrupt_token extensions
   };
   ::std::shared_ptr<SharedData> _ip{nullptr};
 
