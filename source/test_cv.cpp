@@ -2,6 +2,7 @@
 #include "jthread.hpp"
 #include <iostream>
 #include <string>
+#include <sstream>
 #include <chrono>
 #include <mutex>
 #include <atomic>
@@ -19,7 +20,14 @@ void cvIWait (int id, bool& ready, std::mutex& readyMutex, std::condition_variab
     {
       std::unique_lock lg{readyMutex};
       //std::cout.put(static_cast<char>('0'+id)).flush();
-      readyCV.iwait(lg, [&ready] { return ready; });
+      //readyCV.iwait(lg, [&ready] { return ready; });
+      readyCV.wait_until(lg,
+                         [&ready] { return ready; },
+                         std::this_thread::get_interrupt_token());
+      if (std::this_thread::is_interrupted()) {
+        throw "interrupted";
+      }
+
     }
     if (std::this_thread::is_interrupted()) {
       std::string msg = "\ncvIWait(" + std::to_string(id) + "): interrupted";
@@ -32,11 +40,11 @@ void cvIWait (int id, bool& ready, std::mutex& readyMutex, std::condition_variab
     }
     assert(notifyCalled);
   }
-  catch (const std::interrupted& e) {
-    std::string msg = "\nINTERRUPT in cvIWait(" + std::to_string(id) + "): " + e.what();
+  catch (const char* e) {
+    std::string msg = "\nINTERRUPT in cvIWait(" + std::to_string(id) + "): " + e;
     std::cerr << msg << std::endl;
     assert(!notifyCalled);
-    throw;
+    return;
   }
   catch (const std::exception& e) {
     std::string msg = "\nEXCEPTION in cvIWait(" + std::to_string(id) + "): " + e.what();
@@ -108,13 +116,19 @@ void testCVPred(bool callNotify)
     std::jthread t1([&ready, &readyMutex, &readyCV, callNotify] {
                       try {
                         std::unique_lock lg{readyMutex};
-                        readyCV.iwait(lg, [&ready] { return ready; });
+                        //readyCV.iwait(lg, [&ready] { return ready; });
+                        readyCV.wait_until(lg,
+                                           [&ready] { return ready; },
+                                           std::this_thread::get_interrupt_token());
+                        if (std::this_thread::is_interrupted()) {
+                          throw "interrupted";
+                        }
                         assert(callNotify);
                       }
                       catch (const std::exception&) {  // should be no std::exception
                         assert(false);
                       }
-                      catch (const std::interrupted&) {
+                      catch (const char*) {
                         assert(!callNotify);
                       }
                       catch (...) {
@@ -263,11 +277,12 @@ void testMinimalWaitFor()
                       auto t0 = std::chrono::steady_clock::now();
                       {
                         std::unique_lock lg{readyMutex};
-                        readyCV.iwait_for(lg,
-                                          dur,
-                                          [&ready] {
-                                             return ready;
-                                          });
+                        readyCV.wait_for(lg,
+                                         dur,
+                                         [&ready] {
+                                            return ready;
+                                         },
+                                         std::this_thread::get_interrupt_token());
                       }
                       assert(std::chrono::steady_clock::now() <  t0 + dur);
                       std::cout << "\n- t1 done" << std::endl;
@@ -389,8 +404,12 @@ void testTimedIWait(bool callNotify, bool callInterrupt, Dur dur)
                           std::unique_lock lg{readyMutex};
                           //auto end = std::chrono::system_clock::now() + dur;
                           //auto ret = readyCV.wait_until(lg, end,
-                          auto ret = readyCV.iwait_for(lg, dur,
-                                                       [&ready] { return ready; });
+                          auto ret = readyCV.wait_for(lg, dur,
+                                                      [&ready] { return ready; },
+                                                      std::this_thread::get_interrupt_token());
+                          if (std::this_thread::is_interrupted()) {
+                            throw "interrupted";
+                          }
                           if (dur > 5s) {
                             assert(std::chrono::steady_clock::now() < t0 + dur);
                           }
@@ -409,7 +428,7 @@ void testTimedIWait(bool callNotify, bool callInterrupt, Dur dur)
                             std::cout.put(std::this_thread::is_interrupted() ? 'T' : 't').flush();
                           }
                         }
-                        catch (const std::interrupted& e) {
+                        catch (const char* e) {
                           //std::cout << "t1: interrupted" << std::endl;
                           std::cout.put('i').flush();
                           t1Feedback = State::interrupted;
@@ -418,7 +437,7 @@ void testTimedIWait(bool callNotify, bool callInterrupt, Dur dur)
                           ++timesDone;
                           if (timesDone >= 3) {
                             std::cout << "\n- t1 done" << std::endl;
-                            throw;
+                            return;
                           }
                         }
                         catch (const std::exception& e) {

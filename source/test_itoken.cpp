@@ -52,30 +52,6 @@ void testInterruptToken()
   assert(it1.valid() && it1.is_interrupted());
   assert(it2.valid() && it2.is_interrupted());
 
-  // throw if_interrupted():
-  {
-    std::interrupt_token inotvalid;
-    std::interrupt_token ivalidNotInterrupted{false};
-    std::interrupt_token ivalidInterrupted{true};
-    try {
-      inotvalid.throw_if_interrupted();
-    }
-    catch (...) {
-      assert(false);
-    }
-    try {
-      ivalidNotInterrupted.throw_if_interrupted();
-    }
-    catch (...) {
-      assert(false);
-    }
-    try {
-      ivalidInterrupted.throw_if_interrupted();
-      assert(false);
-    }
-    catch (...) {
-    }
-  }
   std::cout << "**** all OK\n";
 
   // == and !=:
@@ -123,99 +99,41 @@ void testIToken(D dur)
     assert(!it_interruptor.is_interrupted());
     assert(!it_interruptee.is_interrupted());
 
-    std::cout << "---- interruptee.throw_if_interrupted();   (should not throw)\n";
-    try {
-      it_interruptee.throw_if_interrupted();
-      ++okSteps; sleep(dur); // 2
-    }
-    catch (...) {
-      assert(false);
-    }
-    assert(!it_interruptor.is_interrupted());
-    assert(!it_interruptee.is_interrupted());
-
     std::cout << "---- call interruptor.interrupt(): \n";
     it_interruptor.interrupt();  // INTERRUPT !!!
-    ++okSteps; sleep(dur);  // 3
+    ++okSteps; sleep(dur);  // 2
     assert(it_interruptor.is_interrupted());
     assert(it_interruptee.is_interrupted());
 
     std::cout << "---- call interruptor.interrupt() again:  (should have no effect)\n";
     it_interruptor.interrupt();
-    ++okSteps; sleep(dur);  // 4
-    assert(it_interruptor.is_interrupted());
-    assert(it_interruptee.is_interrupted());
-
-    std::cout << "---- interruptee.throw_if_interrupted();   (should throw std::interrupted)\n";
-    try {
-      it_interruptee.throw_if_interrupted();
-      assert(false);
-    }
-    catch (const std::exception& e) {
-      assert(false);
-    }
-    catch (const std::interrupted& e) {
-      //std::cout << "OK: EXCEPTION (std::interrupted): " << e.what() << '\n';
-      ++okSteps; sleep(dur);  // 5
-    }
-    catch (...) {
-      assert(false);
-    }
+    ++okSteps; sleep(dur);  // 3
     assert(it_interruptor.is_interrupted());
     assert(it_interruptee.is_interrupted());
 
     std::cout << "---- simulate reset\n";
     it_interruptor = std::interrupt_token{false};
     it_interruptee = it_interruptor;
-    ++okSteps; sleep(dur);  // 6
-    assert(!it_interruptor.is_interrupted());
-    assert(!it_interruptee.is_interrupted());
-
-    std::cout << "---- interruptee.throw_if_interrupted();   (should not throw)\n";
-    try {
-      it_interruptee.throw_if_interrupted();
-      ++okSteps; sleep(dur); // 7
-    }
-    catch (...) {
-      assert(false);
-    }
+    ++okSteps; sleep(dur);  // 4
     assert(!it_interruptor.is_interrupted());
     assert(!it_interruptee.is_interrupted());
 
     std::cout << "---- call interruptor.interrupt(): \n";
     it_interruptor.interrupt();  // INTERRUPT !!!
-    ++okSteps; sleep(dur);  // 8
+    ++okSteps; sleep(dur);  // 5
     assert(it_interruptor.is_interrupted());
     assert(it_interruptee.is_interrupted());
 
     std::cout << "---- call interruptor.interrupt() again:  (should have no effect)\n";
     it_interruptor.interrupt();
-    ++okSteps; sleep(dur);  // 9
-    assert(it_interruptor.is_interrupted());
-    assert(it_interruptee.is_interrupted());
-
-    std::cout << "---- interruptee.throw_if_interrupted();   (should throw std::interrupted)\n";
-    try {
-      it_interruptee.throw_if_interrupted();
-      assert(false);
-    }
-    catch (const std::exception& e) {
-      assert(false);
-    }
-    catch (const std::interrupted& e) {
-      //std::cout << "OK: EXCEPTION (std::interrupted): " << e.what() << '\n';
-      ++okSteps; sleep(dur);  // 10
-    }
-    catch (...) {
-      assert(false);
-    }
+    ++okSteps; sleep(dur);  // 6
     assert(it_interruptor.is_interrupted());
     assert(it_interruptee.is_interrupted());
   }
   catch (...) {
     assert(false);
   }
-  assert(okSteps == 10);
+  assert(okSteps == 6);
   std::cout << "**** all OK\n";
 }
 

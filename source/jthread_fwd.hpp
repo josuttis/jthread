@@ -60,7 +60,6 @@ class interrupt_token {
   bool is_interrupted() const noexcept {
     return _ip && _ip->interrupted.load();
   }
-  void throw_if_interrupted() const;
 
   bool interrupt();
   
@@ -88,7 +87,6 @@ bool operator!= (const interrupt_token& lhs, const interrupt_token& rhs) {
 //***************************************** 
 namespace this_thread {
   static bool is_interrupted() noexcept;
-  static void throw_if_interrupted();
   static interrupt_token get_interrupt_token() noexcept;
   static interrupt_token exchange_interrupt_token(const interrupt_token&) noexcept;
 }
@@ -167,20 +165,6 @@ class condition_variable2
     //***************************************** 
 
     // x.6.2.1 dealing with interrupts:
-
-    // throw std::interrupted on interrupt:
-    template<class Predicate>
-     void iwait(unique_lock<mutex>& lock, Predicate pred);
-
-    template<class Clock, class Duration, class Predicate>
-     bool iwait_until(unique_lock<mutex>& lock,
-                      const chrono::time_point<Clock, Duration>& abs_time,
-                      Predicate pred);
-
-    template<class Rep, class Period, class Predicate>
-     bool iwait_for(unique_lock<mutex>& lock,
-                    const chrono::duration<Rep, Period>& rel_time,
-                    Predicate pred);
 
     // return:
     // - true if pred yields true

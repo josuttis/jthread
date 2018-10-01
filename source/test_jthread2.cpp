@@ -1,6 +1,7 @@
 #include "jthread.hpp"
 #include <iostream>
 #include <string>
+#include <sstream>
 #include <chrono>
 #include <cassert>
 #include <atomic>
@@ -48,7 +49,9 @@ void interruptByDestructor()
                      try {
                        // loop until interrupted (at most 40 times the interval)
                        for (int i=0; i < 40; ++i) {
-                          std::this_thread::throw_if_interrupted();
+                          if (std::this_thread::is_interrupted()) {
+                            throw "interrupted";
+                          }
                           std::this_thread::sleep_for(interval);
                           std::cout.put('.').flush();
                        }
@@ -57,11 +60,11 @@ void interruptByDestructor()
                      catch (std::exception&) { // interrupted not derived from std::exception
                        assert(false);
                      }
-                     catch (std::interrupted& e) {
+                     catch (const char* e) {
                        assert(std::this_thread::is_interrupted());
                        assert(std::this_thread::get_interrupt_token().is_interrupted());
                        t1WasInterrupted = true;
-                       throw;
+                       //throw;
                      }
                      catch (...) {
                        assert(false);
@@ -95,7 +98,9 @@ void interruptStartedThread()
                      try {
                        // loop until interrupted (at most 40 times the interval)
                        for (int i=0; i < 40; ++i) {
-                          std::this_thread::throw_if_interrupted();
+                          if (std::this_thread::is_interrupted()) {
+                            throw "interrupted";
+                          }
                           std::this_thread::sleep_for(interval);
                           std::cout.put('.').flush();
                        }
@@ -103,7 +108,7 @@ void interruptStartedThread()
                      }
                      catch (...) {
                        interrupted = true;
-                       throw;
+                       //throw;
                      }
                    });
 

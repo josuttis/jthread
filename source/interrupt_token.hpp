@@ -10,18 +10,10 @@
 //*****************************************************************************
 //* implementation of new this_thread API for interrupts:
 //*****************************************************************************
-#include "interrupted.hpp"
 #include <cassert>
 #include <iostream> // in case we enable the debug output
 
 namespace std {
-
-void interrupt_token::throw_if_interrupted() const
-{
-  if (_ip && _ip->interrupted.load()) {
-    throw ::std::interrupted();
-  }
-}
 
 bool interrupt_token::interrupt()
 {

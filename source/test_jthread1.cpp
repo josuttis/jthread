@@ -32,12 +32,6 @@ void testJThread()
                    t1InterruptToken = std::this_thread::get_interrupt_token();
                    assert(std::this_thread::get_interrupt_token().valid());
                    assert(!std::this_thread::get_interrupt_token().is_interrupted());
-                   try {
-                     std::this_thread::throw_if_interrupted();
-                   }
-                   catch (...) {
-                     assert(false);
-                   }
                    t1AllSet.store(true);
                    // wait until interrupt is signaled (due to destructor of t1):
                    for (int i=0; !std::this_thread::is_interrupted(); ++i) {
@@ -157,12 +151,6 @@ void testDetach()
                    t1InterruptToken = std::this_thread::get_interrupt_token();
                    assert(std::this_thread::get_interrupt_token().valid());
                    assert(!std::this_thread::get_interrupt_token().is_interrupted());
-                   try {
-                     std::this_thread::throw_if_interrupted();
-                   }
-                   catch (...) {
-                     assert(false);
-                   }
                    t1AllSet.store(true);
                    // wait until interrupt is signaled (due to calling interrupt() for the token):
                    for (int i=0; !std::this_thread::is_interrupted(); ++i) {
@@ -222,19 +210,15 @@ void testStdThread()
                    t1ID = std::this_thread::get_id();
                    t1IsInterrupted = std::this_thread::is_interrupted();
                    t1InterruptToken = std::this_thread::get_interrupt_token();
-                   try {
-                     std::this_thread::throw_if_interrupted();
-                   }
-                   catch (...) {
-                     assert(false);
-                   }
                    t1AllSet.store(true);
                    // manually establish our own interrupt token:
                    std::this_thread::exchange_interrupt_token(t1ShallDie);
                    // and wait until cancellation is signaled:
                    try {
                      for (int i=0; ; ++i) {
-                        std::this_thread::throw_if_interrupted();
+                        if (std::this_thread::is_interrupted()) {
+                          throw "interrupted";
+                        }
                         std::this_thread::sleep_for(100ms);
                         std::cout.put('.').flush();
                      }
@@ -243,8 +227,8 @@ void testStdThread()
 		   catch (std::exception&) { // interrupted not derived from std::exception
 		     assert(false);
 		   }
-                   catch (const std::interrupted& e) {
-                     std::cout << e.what() << std::endl;
+                   catch (const char* e) {
+                     std::cout << e << std::endl;
                    }
                    catch (...) {
                      assert(false);
@@ -285,7 +269,9 @@ void testTemporarilyDisableToken()
                    state.store(State::loop); 
                    try {
                      for (int i=0; i < 10; ++i) {
-                        std::this_thread::throw_if_interrupted();
+                        if (std::this_thread::is_interrupted()) {
+                          throw "interrupted";
+                        }
                         std::this_thread::sleep_for(100ms);
                         std::cout.put('.').flush();
                      }
@@ -300,7 +286,9 @@ void testTemporarilyDisableToken()
                    // loop again until interupt signaled to original interrupt token:
                    try {
                      while (!origToken.is_interrupted()) {
-                        std::this_thread::throw_if_interrupted();
+                        if (std::this_thread::is_interrupted()) {
+                          throw "interrupted";
+                        }
                         std::this_thread::sleep_for(100ms);
                         std::cout.put('d').flush();
                      }
@@ -318,9 +306,11 @@ void testTemporarilyDisableToken()
                    assert(newToken == interruptDisabled);
                    assert(!interruptDisabled.is_interrupted());
                    try {
-                     std::this_thread::throw_if_interrupted();
+                     if (std::this_thread::is_interrupted()) {
+                       throw "interrupted";
+                     }
                    }
-                   catch (std::interrupted) {
+                   catch (const char* e) {
                      std::cout.put('i').flush();
                      state.store(State::interrupted); 
                    }
@@ -331,7 +321,7 @@ void testTemporarilyDisableToken()
       std::cout.put('m').flush();
     }
     std::this_thread::sleep_for(500ms);
-    std::cout << "\n- leave scope (should inuterrupt started thread)" << std::endl;
+    std::cout << "\n- leave scope (should interrupt started thread)" << std::endl;
     t1it = t1.get_original_interrupt_token();
   } // leave scope of t1 without join() or detach() (signals cancellation)
   assert(t1it.is_interrupted());

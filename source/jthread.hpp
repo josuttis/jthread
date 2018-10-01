@@ -105,32 +105,8 @@ inline jthread::jthread(Callable&& cb, Args&&... args)
                  // in the started thread:
                  // - store passed future in local thread: 
                  // - and perform tasks of the thread:
-                 try {
-                   ::std::invoke(::std::forward<decltype(cb)>(cb),
-                                 ::std::forward<decltype(args)>(args)...);
-                   // TODO: should we signel interrupted here with end of thread?
-                 }
-                 // we catch and ignore std::interrupted if not caught yet:
-#ifndef DEBUG
-                 catch (const std::interrupted& e) {
-                 }
-#else
-                 catch (const std::interrupted& e) {
-                   std::cout << "\njthread info: thread " << ::std::this_thread::get_id()
-                             << " was interrupted (exception ignored)" << std::endl;
-                 }
-                 // but we don't catch any other exception:
-                 catch (const std::exception& e) {
-                   std::cerr << "\nWARNING: jthread " << ::std::this_thread::get_id()
-                             << " died with uncaught exception: " << e.what() << std::endl;
-                   throw;
-                 }
-                 catch (...) {
-                   std::cerr << "\nWARNING: jthread " << ::std::this_thread::get_id()
-                             << " died with uncaught exception" << std::endl;
-                   throw;
-                 }
-#endif
+                 ::std::invoke(::std::forward<decltype(cb)>(cb),
+                               ::std::forward<decltype(args)>(args)...);
                },
                _thread_it,   // not captured due to possible races if immediately set
                ::std::forward<Callable>(cb),  // pass callable
@@ -189,9 +165,6 @@ namespace this_thread {
   }
   static bool is_interrupted() noexcept {
     return get_interrupt_token().is_interrupted();
-  }
-  static void throw_if_interrupted() {
-    get_interrupt_token().throw_if_interrupted();
   }
 } // this_thread
 
