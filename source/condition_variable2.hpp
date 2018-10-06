@@ -24,11 +24,9 @@ class register_guard
      : itoken{&i}, cvPtr{cp} {
         itoken->registerCV(cvPtr);
     }
-
     ~register_guard() {
         itoken->unregisterCV(cvPtr);
     }
-
     register_guard(register_guard&) = delete;
     register_guard& operator=(register_guard&) = delete;
 };
@@ -41,8 +39,8 @@ class register_guard
 // wait_until(): wait with interrupt handling 
 // - returns on interrupt
 // return value:
-//   true:  pred() yields true
-//   false: pred() yields false (other reason => interrupt signaled)
+// - true if pred() yields true
+// - false otherwise (i.e. on interrupt)
 template <class Predicate>
 inline bool condition_variable2::wait_until(unique_lock<mutex>& lock,
                                             Predicate pred,
@@ -52,8 +50,9 @@ inline bool condition_variable2::wait_until(unique_lock<mutex>& lock,
       return pred();
     }
     register_guard rg{itoken, this};
+    // Note: Only after registration a notification is guaranteed.
+    //       Thus, to avoid a race, we have to check for is_interrupted() again:
     while(!pred() && !itoken.is_interrupted()) {
-      //std::cout.put(itoken.is_interrupted() ? 'i' : '.').flush();
       cv.wait(lock, [&pred, &itoken] {
                       return pred() || itoken.is_interrupted();
                     });
@@ -64,7 +63,7 @@ inline bool condition_variable2::wait_until(unique_lock<mutex>& lock,
 // wait_until(): timed wait with interrupt handling 
 // - returns on interrupt
 // return:
-// - true if pred yields true
+// - true if pred() yields true
 // - false otherwise (i.e. on timeout or interrupt)
 template <class Clock, class Duration, class Predicate>
 inline bool condition_variable2::wait_until(unique_lock<mutex>& lock,
@@ -73,6 +72,8 @@ inline bool condition_variable2::wait_until(unique_lock<mutex>& lock,
                                             interrupt_token itoken)
 {
     register_guard rg{itoken, this};
+    // Note: Only after registration a notification is guaranteed.
+    //       Thus, to avoid a race, we have to check for is_interrupted() again:
     while(!pred() && !itoken.is_interrupted() && Clock::now() < abs_time) {
       //std::cout.put(itoken.is_interrupted() ? 'i' : '.').flush();
       cv.wait_until(lock,
@@ -87,7 +88,7 @@ inline bool condition_variable2::wait_until(unique_lock<mutex>& lock,
 // wait_for(): timed wait with interrupt handling 
 // - returns on interrupt
 // return:
-// - true if pred yields true
+// - true if pred() yields true
 // - false otherwise (i.e. on timeout or interrupt)
 template <class Rep, class Period, class Predicate>
 inline bool condition_variable2::wait_for(unique_lock<mutex>& lock,

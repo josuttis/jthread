@@ -153,7 +153,7 @@ class condition_variable2
     // x.6.2.1 dealing with interrupts:
 
     // return:
-    // - true if pred yields true
+    // - true if pred() yields true
     // - false otherwise (i.e. on interrupt)
     template <class Predicate>
       bool wait_until(unique_lock<mutex>& lock,
@@ -161,7 +161,7 @@ class condition_variable2
                       interrupt_token itoken);
 
     // return:
-    // - true if pred yields true
+    // - true if pred() yields true
     // - false otherwise (i.e. on timeout or interrupt)
     template <class Clock, class Duration, class Predicate>
       bool wait_until(unique_lock<mutex>& lock,
@@ -169,7 +169,7 @@ class condition_variable2
                       Predicate pred,
                       interrupt_token itoken);
     // return:
-    // - true if pred yields true
+    // - true if pred() yields true
     // - false otherwise (i.e. on timeout or interrupt)
     template <class Rep, class Period, class Predicate>
       bool wait_for(unique_lock<mutex>& lock,
