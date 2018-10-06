@@ -73,8 +73,8 @@ interrupt state (an atomic token to signal an interrupt).
 An interrupt can only be signaled once.
 All owners can signal an interrupt, provided the token is valid.
 All owners can check whether an interrupt was signaled.
-The last remaining owner of the interrupt state is responsible for 
-releasing the resources associated with the interrupt state.
+The last remaining owner of the interrupt state automatically 
+releases the resources associated with the interrupt state.
 
 \begin{codeblock}
 namespace std {
@@ -103,7 +103,7 @@ bool operator!= (const interrupt_token& lhs, const interrupt_token& rhs);
 \end{codeblock}
 
 Calls to \tcode{interrupt()} and \tcode{is_interrupted()}
-are atomic operations(6.8.2.1p3 \ref{intro.races})
+are atomic operations (6.8.2.1p3 \ref{intro.races})
 on the interrupt state contained in the \tcode{interrupt_token} object.
 Hence concurrent calls to these functions do not introduce data races. 
 A call to \tcode{interrupt()} synchronizes with any call to \tcode{interrupt()} and
@@ -176,7 +176,7 @@ interrupt_token(interrupt_token&& rhs) noexcept;
 
 \begin{itemdescr}
  \pnum\effects If \tcode{valid()} and \tcode{*this} is the last owner of the interrupt state,
-                releases the associated with the interrupt state.
+                releases the resources associated with the interrupt state.
 \end{itemdescr}
 
 %*****
@@ -252,7 +252,7 @@ bool interrupt();
   \pnum\effects If \tcode{!valid()} or \tcode{is_interrupted()} the call has no effect. 
                 Otherwise, signals an interrupt so that \tcode{is_interrupted() == true}.
                 \begin{note} Signaling an interrupt includes notifying all condition_variables
-                             temporarily registered via a an interruptable wait (\ref{thread.condition.iwait})
+                             temporarily registered via a an interruptable wait (\ref{thread.condition.interrupt_token})
                              \end{note}
 
 
@@ -317,7 +317,7 @@ namespace std {
 \pnum
 The class \tcode{jthread} provides a mechanism
 to create a new thread of execution.
-The functionality is identical to class \tcode{thread} (\ref{thread.thread.class})
+The functionality is the same as for class \tcode{thread} (\ref{thread.thread.class})
 with the additional ability to signal an interrupt and to
 automatically \tcode{join()} the started thread.
 
@@ -396,13 +396,7 @@ template<class F, class... Args> explicit jthread(F&& f, Args&&... args);
   \pnum
 \requires\ \tcode{F} and each $\tcode{T}_i$ in \tcode{Args} shall satisfy the
 \oldconcept{MoveConstructible} requirements.
-        \tcode{%
-                \placeholdernc{INVOKE}(\brk{}%
-                \placeholdernc{DECAY_COPY}(\brk{}%
-                std::forward<F>(f)),
-                \placeholdernc{DECAY_COPY}(\brk{}%
-                std::forward<Args>(\brk{}args))...)}
-{\color{diffcolor} or
+{\color{diffcolor}
         \tcode{%
                 \placeholdernc{INVOKE}(\brk{}%
                 \placeholdernc{DECAY_COPY}(\brk{}%
@@ -410,7 +404,14 @@ template<class F, class... Args> explicit jthread(F&& f, Args&&... args);
                 itoken,
                 \placeholdernc{DECAY_COPY}(\brk{}%
                 std::forward<Args>(\brk{}args))...)}
+        or
 }
+        \tcode{%
+                \placeholdernc{INVOKE}(\brk{}%
+                \placeholdernc{DECAY_COPY}(\brk{}%
+                std::forward<F>(f)),
+                \placeholdernc{DECAY_COPY}(\brk{}%
+                std::forward<Args>(\brk{}args))...)}
 \iref{func.require} shall be a valid expression.
 
 \pnum\remarks
@@ -418,10 +419,10 @@ This constructor shall not participate in overload resolution if \tcode{remove_c
 is the same type as \tcode{std::jthread}.
 
 \pnum\effects
-{\color{diffcolor} initializes \tcode{itoken} with \tcode{false} and
+{\color{diffcolor} Initializes \tcode{itoken} with \tcode{false} and
 }
-constructs an object of type \tcode{jthread}. The new thread of execution executes
-either 
+constructs an object of type \tcode{jthread}.
+The new thread of execution executes
 {\color{diffcolor}
         \tcode{%
                 \placeholdernc{INVOKE}(\brk{}%
@@ -430,7 +431,8 @@ either
                 itoken,%
                 \placeholdernc{DECAY_COPY}(\brk{}%
                 std::forward<Args>(\brk{}args))...)}
-or
+if that expression is well-formed,
+otherwise
 }
         \tcode{%
                 \placeholdernc{INVOKE}(\brk{}%
@@ -452,15 +454,17 @@ with \tcode{\placeholdernc{INVOKE}()}
 %std::forward<F>(f)),
 %\placeholdernc{DECAY_COPY}(\brk{}%
 %std::forward<Args>(args))...)}
-terminates with an uncaught exception, \tcode{terminate} shall be called.
+terminates with an uncaught exception, \tcode{terminate()} shall be called.
 
 \pnum\sync The completion of the invocation of the constructor
 synchronizes with the beginning of the invocation of the copy of \tcode{f}.
 
-{\color{diffcolor}
 \pnum\postconditions \tcode{get_id() != id()}.
+{\color{diffcolor}
                      \tcode{itoken.valid() == true}.
+}
                      \tcode{*this} represents the newly started thread.
+{\color{diffcolor}
 \begin{note} Note that the calling thread can signal an interrupt only once,
                 because it can't replace this interrupt token.  \end{note}
 }%\color{diffcolor}
@@ -754,8 +758,7 @@ void wait(unique_lock<mutex>& lock);
          \item no other thread is waiting on this \tcode{condition_variable} object or
          \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
                 arguments supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until},
-                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                \tcode{wait_for}, \tcode{wait_until}) threads.
         \end{itemize}
 
  \pnum\effects
@@ -791,8 +794,7 @@ template<class Predicate>
          \item no other thread is waiting on this \tcode{condition_variable} object or
          \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
                 arguments supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until},
-                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                \tcode{wait_for}, \tcode{wait_until}) threads.
         \end{itemize}
 
  \pnum \effects Equivalent to:
@@ -827,8 +829,7 @@ template<class Clock, class Duration>
          \item no other thread is waiting on this \tcode{condition_variable} object or
          \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
                 arguments supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until},
-                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                \tcode{wait_for}, \tcode{wait_until}) threads.
         \end{itemize}
 
  \pnum \effects
@@ -874,8 +875,7 @@ template<class Rep, class Period>
          \item no other thread is waiting on this \tcode{condition_variable} object or
          \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock} arguments
                 supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until},
-                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                \tcode{wait_for}, \tcode{wait_until}) threads.
         \end{itemize}
 
  \pnum \effects Equivalent to:
@@ -915,8 +915,7 @@ template<class Clock, class Duration, class Predicate>
         \item no other thread is waiting on this \tcode{condition_variable} object or
         \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
                 arguments supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until},
-                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                \tcode{wait_for}, \tcode{wait_until}) threads.
         \end{itemize}
 
  \pnum \effects Equivalent to:
@@ -958,8 +957,7 @@ template<class Rep, class Period, class Predicate>
         \item no other thread is waiting on this \tcode{condition_variable} object or
         \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock} arguments
                 supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until},
-                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                \tcode{wait_for}, \tcode{wait_until}) threads.
         \end{itemize}
  
  \pnum \effects Equivalent to:
@@ -1008,8 +1006,8 @@ return wait_until(lock, chrono::steady_clock::now() + rel_time, std::move(pred))
 
 The following functions ensure to get notified
 if an interrupt is signaled for the passed \tcode{interrupt_token}.
-In that case they return \tcode{false}
-(if the predicate evaluates to \tcode{false}). 
+In that case they return
+(returning \tcode{false} if the predicate evaluates to \tcode{false}). 
 
 % Hans Boehm:
 %We then also need some statement for the waiting functions that if they return with an interrupted status, their synchronization behavior is as though they called is_interrupted().
@@ -1038,9 +1036,8 @@ template <class Predicate>
         \begin{itemize}
          \item no other thread is waiting on this \tcode{condition_variable} object or
          \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
-                arguments supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until},
-                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                arguments supplied by all concurrently waiting
+                (via \tcode{wait}, \tcode{wait_for}, \tcode{wait_until}) threads.
         \end{itemize}
 
 {\color{diffcolor}
@@ -1096,9 +1093,8 @@ template <class Clock, class Duration, class Predicate>
         \begin{itemize}
          \item no other thread is waiting on this \tcode{condition_variable} object or
          \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock}
-                arguments supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until},
-                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                arguments supplied by all concurrently waiting
+                (via \tcode{wait}, \tcode{wait_for}, \tcode{wait_until}) threads.
         \end{itemize}
 
 {\color{diffcolor}
@@ -1156,9 +1152,8 @@ template <class Rep, class Period, class Predicate>
         \begin{itemize}
          \item no other thread is waiting on this \tcode{condition_variable} object or
          \item \tcode{lock.mutex()} returns the same value for each of the \tcode{lock} arguments
-                supplied by all concurrently waiting (via \tcode{wait},
-                \tcode{wait_for}, \tcode{wait_until},
-                {\color{insertcolor} \tcode{iwait}, \tcode{iwait_for}, or \tcode{iwait_until}}) threads.
+                supplied by all concurrently waiting
+                (via \tcode{wait}, \tcode{wait_for}, \tcode{wait_until} threads.
         \end{itemize}
 
  \pnum \effects Equivalent to:

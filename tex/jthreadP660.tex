@@ -6,7 +6,7 @@
 \begin{tabular}{@{}ll}
 Project:  	& ISO JTC1/SC22/WG21: Programming Language C++ \\
 Doc No: 	& WG21 P0660R5 \\
-Date: 		& 2018-10-01 \\
+Date: 		& 2018-10-05 \\
 Reply to: 	& Nicolai Josuttis (nico@josuttis.de), Herb Sutter (hsutter@microsoft.com), \\
                 &         Anthony Williams (anthony@justsoftwaresolutions.co.uk) \\
 Audience: 	& SG1, LEWG, LWG \\
@@ -17,10 +17,12 @@ Prev. Version:	& \url{www.wg21.link/P0660R4} \\
 \section*{{\huge{}A Cooperatively Interruptible Joining Thread, Rev 5}}
 
 \subsubsection*{New in R5}
+As requested at
+\href{http://wiki.edg.com/bin/view/ExecSeattle2018/MinutesDay2}{the SG1 meeting in Seattle 2018}:
 \begin{itemize}
  \item Removed exception class \tcode{std::interrupted} and the \tcode{throw_if_interrupted()} API.
  \item Removed all TLS extensions and extensions to \tcode{std::this_thread}.
- \item Added support so let \tcode{jhread} call a callable that
+ \item Added support to let \tcode{jhread} call a callable that
         either takes the interrupt token as additional first argument
         or doesn't get it (taking just all passed arguments).
 \end{itemize}
@@ -43,42 +45,60 @@ For a full discussion fo the motivation, see
 \url{www.wg21.link/p0660r1}.
 
 A default implementation exists at:
-\url{github.com/josuttis/jthread}.
+\url{http://github.com/josuttis/jthread}.
 Note that the proposed functionality can be fully implemented 
-on top of the existing C++ standard library.
+on top of the existing C++ standard library without special OS support.
 
-Basis examples:
+\subsection*{Basis examples}
+
 \begin{itemize}
- \item Starting a jthread automatically signals an interrupt at the end of its lifetime if still joinable
-        and joins:
+ \item A jthread automatically signals an interrupt at the end of its lifetime to the started thread
+        (if still joinable) and joins:
 \begin{codeblock}
 void testJThreadWithToken() 
 {
-  std::jthread t([] (std::interrupt_token itoken) {
-                   while (!itoken.is_interrupted()) {
-                     ...
-                   }
-                 });
-  ...
-} // jthread destructor signals interrupt and therefore ends the started thread
+    std::jthread t([] (std::interrupt_token itoken) {
+                     while (!itoken.is_interrupted()) {
+                       //...
+                     }
+                   });
+    //...
+} // jthread destructor signals interrupt and therefore ends the started thread and joins
 \end{codeblock}
 
-This can also explicitly signaled with \tcode{t.interrupt()}.
+The interrupt could also be explicitly signaled with \tcode{t.interrupt()}.
 
- \item Don't have to take the interrupt token so that you can pass the same args as to std::thread
-        with the benefit of calling \tcode{join()}
-        if the thread is still joinable:
+ \item If the started thread doesn't take an interrupt token, 
+        the destructor still has the benefit of calling \tcode{join()} (if still joinable):
 \begin{codeblock}
 void testJThreadJoining()
 {
-  std::jthread t([] {
-                   ...
-                 });
-  ...
+    std::jthread t([] {
+                     //...
+                   });
+    //...
 } // jthread destructor calls join()
 \end{codeblock}
+        This is a significant improvement over \tcode{std::thread} where you had to program the following
+        to get the same behavior (which is common in many scenarios):
+\begin{codeblock}
+void compareWithStdThreadJoining()
+{
+    std::thread t([] {
+                    //...
+                  });
+    try {
+      //...
+    }
+    catch (...) {
+      j.join();
+      throw;  // rethrow
+    }
+    t.join();
+}
+\end{codeblock}
 
- \item Extended CV API allows to interrupt CV waits according to the interrupt token
+ \item An extended CV API enables to interrupt CV waits using the passed interrupt token
         (i.e. interrupting the CV wait without polling):
 \begin{codeblock}
 void testInterruptibleCVWait() 
@@ -95,7 +115,7 @@ void testInterruptibleCVWait()
                                            [&ready] {
                                               return ready;
                                            },
-                                           it);
+                                           it);  // also ends wait if \tcode{it} interrupted
                       }
                       ...
                     }
