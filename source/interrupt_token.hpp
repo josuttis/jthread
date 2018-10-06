@@ -21,7 +21,7 @@ bool interrupt_token::interrupt()
   if (!valid()) return false;
   auto wasInterrupted = _ip->interrupted.exchange(true);
   if (!wasInterrupted) {
-    ::std::scoped_lock lg{_ip->cvMutex};  // might throw
+    ::std::scoped_lock lg{_ip->cvPtrsMutex};  // might throw
     for (const auto& cvPtr : _ip->cvPtrs) {
       cvPtr->notify_all();
     }
@@ -34,7 +34,7 @@ bool interrupt_token::registerCV(condition_variable2* cvPtr) {
   //std::cout.put('R').flush();
   if (!valid()) return false;
   {
-    std::scoped_lock lg{_ip->cvMutex};
+    std::scoped_lock lg{_ip->cvPtrsMutex};
     _ip->cvPtrs.push_front(cvPtr);  // might throw
   }
   //std::cout.put('r').flush();
@@ -45,7 +45,7 @@ bool interrupt_token::unregisterCV(condition_variable2* cvPtr) {
   //std::cout.put('U').flush();
   if (!valid()) return false;
   {
-    std::scoped_lock lg{_ip->cvMutex};
+    std::scoped_lock lg{_ip->cvPtrsMutex};
     // remove the FIRST found cv
     for (auto pos = _ip->cvPtrs.begin(); pos != _ip->cvPtrs.end(); ++pos) {
       if (*pos == cvPtr) {

@@ -32,7 +32,7 @@ class interrupt_token {
   struct SharedData {
     ::std::atomic<bool> interrupted;   // true if interrupt signaled
     ::std::list<condition_variable2*> cvPtrs{};  // currently waiting CVs
-    ::std::mutex cvMutex{};            // we have multistep concurrent access to cvPtrs
+    ::std::mutex cvPtrsMutex{};            // we have multistep concurrent access to cvPtrs
     // make polymorphic class for future binary-compatible interrupt_token extensions:
     SharedData(bool initial_state) : interrupted{initial_state} {
     }
