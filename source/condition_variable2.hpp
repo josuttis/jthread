@@ -20,9 +20,9 @@ class register_guard
     interrupt_token*  itoken;
     condition_variable2*  cvPtr;
   public:
-    explicit register_guard(interrupt_token& i, condition_variable2* cp)
-     : itoken{&i}, cvPtr{cp} {
-        itoken->registerCV(cvPtr);
+    explicit register_guard(interrupt_token& i, condition_variable2* cvp, mutex* cvmxp)
+     : itoken{&i}, cvPtr{cvp} {
+        itoken->registerCV(cvp, cvmxp);
     }
     ~register_guard() {
         itoken->unregisterCV(cvPtr);
@@ -49,7 +49,7 @@ inline bool condition_variable2::wait_until(unique_lock<mutex>& lock,
     if (itoken.is_interrupted()) {
       return pred();
     }
-    register_guard rg{itoken, this};
+    register_guard rg{itoken, this, lock.mutex()};
     // Note: Only after registration a notification is guaranteed.
     //       Thus, to avoid a race, we have to check for is_interrupted() again:
     while(!pred() && !itoken.is_interrupted()) {
@@ -71,7 +71,8 @@ inline bool condition_variable2::wait_until(unique_lock<mutex>& lock,
                                             Predicate pred,
                                             interrupt_token itoken)
 {
-    register_guard rg{itoken, this};
+    std::cout << "== locked: " << &lock << " threadid: " << std::this_thread::get_id() << '\n';
+    register_guard rg{itoken, this, lock.mutex()};
     // Note: Only after registration a notification is guaranteed.
     //       Thus, to avoid a race, we have to check for is_interrupted() again:
     while(!pred() && !itoken.is_interrupted() && Clock::now() < abs_time) {

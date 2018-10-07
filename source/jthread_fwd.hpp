@@ -29,14 +29,22 @@ class register_guard;
 
 class interrupt_token {
  private:
-  struct SharedData {
-    ::std::atomic<bool> interrupted;   // true if interrupt signaled
-    ::std::list<condition_variable2*> cvPtrs{};  // currently waiting CVs
-    ::std::mutex cvPtrsMutex{};            // we have multistep concurrent access to cvPtrs
-    // make polymorphic class for future binary-compatible interrupt_token extensions:
-    SharedData(bool initial_state) : interrupted{initial_state} {
+  struct CVData {
+    condition_variable2* cvPtr;     // currently waiting CVs
+    mutex*               cvMxPtr;   // associated mutex
+    CVData(condition_variable2* cvp, mutex* cvmxp)
+     : cvPtr{cvp}, cvMxPtr{cvmxp} {
     }
-    virtual ~SharedData() = default;   // make polymorphic
+  };
+  struct SharedData {
+    ::std::atomic<bool> interrupted;  // true if interrupt signaled
+    ::std::list<CVData> cvData{};     // currently waiting CVs and its lock
+    ::std::mutex cvDataMutex{};       // we have multistep concurrent access to cvPtrs
+    // make polymorphic class for future binary-compatible interrupt_token extensions:
+    SharedData(bool initial_state)
+     : interrupted{initial_state} {
+    }
+    virtual ~SharedData() = default;  // make polymorphic
     SharedData(const SharedData&) = delete;
     SharedData(SharedData&&) = delete;
     SharedData& operator= (const SharedData&) = delete;
@@ -77,7 +85,7 @@ class interrupt_token {
   // stuff to registered condition variables for notofication: 
   friend class ::std::condition_variable2;
   friend class ::std::register_guard;
-  bool registerCV(condition_variable2* cvPtr);
+  bool registerCV(condition_variable2* cvPtr, mutex* cvMxPtr);
   bool unregisterCV(condition_variable2* cvPtr);
 };
 

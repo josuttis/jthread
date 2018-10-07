@@ -265,36 +265,112 @@ void testCVStdThreadPred(bool callNotify)
 
 //------------------------------------------------------
 
-void testMinimalWaitFor() 
+void testMinimalWait(int sec)
+{
+  // test the basic CV wait API
+  std::cout << "*** start testMinimalWait(" << sec << "s)" << std::endl;
+  auto dur = std::chrono::seconds{sec};   // duration until interrupt is called
+
+  try {
+    bool ready = false;
+    std::mutex readyMutex;
+    std::condition_variable2 readyCV;
+    {
+      std::jthread t1([&ready, &readyMutex, &readyCV, dur] (std::interrupt_token it) {
+                        try {
+                          std::cout << "\n- start t1" << std::endl;
+                          auto t0 = std::chrono::steady_clock::now();
+                          std::cout.put('A').flush();
+                          std::cout << "== t1lock: " << &readyMutex << " threadid: " << std::this_thread::get_id() << std::endl;
+                          {
+                            std::unique_lock lg{readyMutex};
+                            std::cout.put('B').flush();
+                            readyCV.wait_until(lg,
+                                               [&ready] {
+                                                  return ready;
+                                               },
+                                               it);
+                            std::cout.put('C').flush();
+                          }
+                          assert(std::chrono::steady_clock::now() <  t0 + dur + 1s);
+                          std::cout << "\n- t1 done" << std::endl;
+                        }
+                        catch(const std::exception& e) {
+                          std::cout << "STARTED THREAD EXCEPTION: " << e.what() << '\n';
+                        }
+                        catch(...) {
+                          std::cout << "STARTED THREAD EXCEPTION\n";
+                        }
+                      });
+      
+      std::this_thread::sleep_for(dur);
+      std::cout << "- leave scope (should signal interrupt and unblock CV wait)" << std::endl;
+    } // leave scope of t1 without join() or detach() (signals cancellation)
+    std::cout << "\n*** OK" << std::endl;
+  }
+  catch(const std::exception& e) {
+    std::cout << "MAIN THREAD EXCEPTION: " << e.what() << '\n';
+  }
+  catch(...) {
+    std::cout << "MAIN THREAD EXCEPTION\n";
+  }
+}
+
+//------------------------------------------------------
+
+void testMinimalWaitFor(int sec1, int sec2) 
 {
   // test the basic timed CV wait API
-  std::cout << "*** start testMinimalWaitFor()" << std::endl;
-  auto dur = std::chrono::seconds{5};
+  std::cout << "*** start testMinimalWaitFor(interruptAfter=" << sec1
+                                      << "s, waitfor=" << sec2 << "s)" << std::endl;
+  auto durInt = std::chrono::seconds{sec1};
+  auto durWait = std::chrono::seconds{sec2};
 
+  try {
   bool ready = false;
   std::mutex readyMutex;
   std::condition_variable2 readyCV;
   {
-    std::jthread t1([&ready, &readyMutex, &readyCV, dur] (std::interrupt_token it) {
+    std::jthread t1([&ready, &readyMutex, &readyCV, durInt, durWait] (std::interrupt_token it) {
+                      try {
                       std::cout << "\n- start t1" << std::endl;
                       auto t0 = std::chrono::steady_clock::now();
                       {
+                        std::cout.put('A').flush();
+                        std::cout << "== t1lock: " << &readyMutex << " threadid: " << std::this_thread::get_id() << std::endl;
                         std::unique_lock lg{readyMutex};
+                        std::cout.put('B').flush();
                         readyCV.wait_for(lg,
-                                         dur,
+                                         durWait,
                                          [&ready] {
                                             return ready;
                                          },
                                          it);
+                        std::cout.put('C').flush();
                       }
-                      assert(std::chrono::steady_clock::now() <  t0 + dur);
+                      assert(std::chrono::steady_clock::now() <  t0 + durInt + 1s);
+                      assert(std::chrono::steady_clock::now() <  t0 + durWait + 1s);
                       std::cout << "\n- t1 done" << std::endl;
+                      }
+                      catch(const std::exception& e) {
+                        std::cout << "STARTED THREAD EXCEPTION: " << e.what() << '\n';
+                      }
+                      catch(...) {
+                        std::cout << "STARTED THREAD EXCEPTION\n";
+                      }
                     });
     
-    std::this_thread::sleep_for(1.5s);
+    std::this_thread::sleep_for(durInt);
     std::cout << "- leave scope (should signal interrupt and unblock CV wait)" << std::endl;
   } // leave scope of t1 without join() or detach() (signals cancellation)
   std::cout << "\n*** OK" << std::endl;
+  }
+  catch(const std::exception& e) {
+    std::cout << "MAIN THREAD EXCEPTION: " << e.what() << '\n';
+  }
+  catch(...) {
+    std::cout << "MAIN THREAD EXCEPTION\n";
+  }
 }
 
 //------------------------------------------------------
@@ -600,7 +676,19 @@ int main()
   std::cout << std::boolalpha;
 
   std::cout << "\n\n**************************\n";
-  testMinimalWaitFor();
+  testMinimalWait(0);
+  std::cout << "\n\n**************************\n";
+  testMinimalWait(1);
+  std::cout << "\n\n**************************\n";
+  testMinimalWaitFor(0, 0);
+  std::cout << "\n\n**************************\n";
+  testMinimalWaitFor(0, 2);  // 0s for interrupt, 2s for wait
+  std::cout << "\n\n**************************\n";
+  testMinimalWaitFor(2, 0);  // 2s for interrupt, 0s for wait
+  std::cout << "\n\n**************************\n";
+  testMinimalWaitFor(1, 3);  // 1s for interrupt, 3s for wait
+  std::cout << "\n\n**************************\n";
+  testMinimalWaitFor(3, 1);  // 3s for interrupt, 1s for wait
 
   std::cout << "\n\n**************************\n";
   testCVStdThreadNoPred(false);  // signal cancellation
