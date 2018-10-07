@@ -583,7 +583,13 @@ bool interrupt() noexcept;
 
 }%\color{insertcolor}
 
+
 \clearpage
+
+%******************************************************************
+\rSec1[thread.mutex]{Mutual exclusion}
+
+...
 
 %******************************************************************
 \rSec1[thread.condition]{Condition variables}
@@ -984,13 +990,8 @@ return wait_until(lock, chrono::steady_clock::now() + rel_time, std::move(pred))
 
 
 
-%**** wait
 
-
-
-
-
-
+\clearpage
 
 %**********************************************************
 %\begin{codeblock}
@@ -1190,6 +1191,13 @@ return wait_until(lock, chrono::steady_clock::now() + rel_time, std::move(pred),
 %}%diffcolor
 \end{itemdescr}
 
-
 }%\color{insertcolor}
+
+
+\vspace{5ex}
+
+%******************************************************************
+\rSec1[futures]{Futures}
+
+...
 
