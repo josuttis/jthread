@@ -76,7 +76,6 @@ inline bool condition_variable2::wait_until(unique_lock<mutex>& lock,
     // Note: Only after registration a notification is guaranteed.
     //       Thus, to avoid a race, we have to check for is_interrupted() again:
     while(!pred() && !itoken.is_interrupted() && Clock::now() < abs_time) {
-      //std::cout.put(itoken.is_interrupted() ? 'i' : '.').flush();
       cv.wait_until(lock,
                     abs_time,
                     [&pred, &itoken] {
