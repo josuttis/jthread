@@ -280,26 +280,22 @@ void testMinimalWait(int sec)
                         try {
                           std::cout << "\n- start t1" << std::endl;
                           auto t0 = std::chrono::steady_clock::now();
-                          std::cout.put('A').flush();
-                          std::cout << "== t1lock: " << &readyMutex << " threadid: " << std::this_thread::get_id() << std::endl;
                           {
                             std::unique_lock lg{readyMutex};
-                            std::cout.put('B').flush();
                             readyCV.wait_until(lg,
                                                [&ready] {
                                                   return ready;
                                                },
                                                it);
-                            std::cout.put('C').flush();
                           }
                           assert(std::chrono::steady_clock::now() <  t0 + dur + 1s);
                           std::cout << "\n- t1 done" << std::endl;
                         }
                         catch(const std::exception& e) {
-                          std::cout << "STARTED THREAD EXCEPTION: " << e.what() << '\n';
+                          std::cout << "THREAD EXCEPTION: " << e.what() << '\n';
                         }
                         catch(...) {
-                          std::cout << "STARTED THREAD EXCEPTION\n";
+                          std::cout << "THREAD EXCEPTION\n";
                         }
                       });
       
@@ -309,10 +305,10 @@ void testMinimalWait(int sec)
     std::cout << "\n*** OK" << std::endl;
   }
   catch(const std::exception& e) {
-    std::cout << "MAIN THREAD EXCEPTION: " << e.what() << '\n';
+    std::cout << "MAIN EXCEPTION: " << e.what() << '\n';
   }
   catch(...) {
-    std::cout << "MAIN THREAD EXCEPTION\n";
+    std::cout << "MAIN EXCEPTION\n";
   }
 }
 
@@ -336,27 +332,23 @@ void testMinimalWaitFor(int sec1, int sec2)
                       std::cout << "\n- start t1" << std::endl;
                       auto t0 = std::chrono::steady_clock::now();
                       {
-                        std::cout.put('A').flush();
-                        std::cout << "== t1lock: " << &readyMutex << " threadid: " << std::this_thread::get_id() << std::endl;
                         std::unique_lock lg{readyMutex};
-                        std::cout.put('B').flush();
                         readyCV.wait_for(lg,
                                          durWait,
                                          [&ready] {
                                             return ready;
                                          },
                                          it);
-                        std::cout.put('C').flush();
                       }
                       assert(std::chrono::steady_clock::now() <  t0 + durInt + 1s);
                       assert(std::chrono::steady_clock::now() <  t0 + durWait + 1s);
                       std::cout << "\n- t1 done" << std::endl;
                       }
                       catch(const std::exception& e) {
-                        std::cout << "STARTED THREAD EXCEPTION: " << e.what() << '\n';
+                        std::cout << "THREAD EXCEPTION: " << e.what() << '\n';
                       }
                       catch(...) {
-                        std::cout << "STARTED THREAD EXCEPTION\n";
+                        std::cout << "THREAD EXCEPTION\n";
                       }
                     });
     
@@ -366,10 +358,10 @@ void testMinimalWaitFor(int sec1, int sec2)
   std::cout << "\n*** OK" << std::endl;
   }
   catch(const std::exception& e) {
-    std::cout << "MAIN THREAD EXCEPTION: " << e.what() << '\n';
+    std::cout << "MAIN EXCEPTION: " << e.what() << '\n';
   }
   catch(...) {
-    std::cout << "MAIN THREAD EXCEPTION\n";
+    std::cout << "MAIN EXCEPTION\n";
   }
 }
 

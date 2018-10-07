@@ -17,42 +17,36 @@ namespace std {
 
 bool interrupt_token::interrupt()
 {
-  std::cout.put('I').flush();
+  //std::cout.put('I').flush();
   if (!valid()) return false;
   auto wasInterrupted = _ip->interrupted.exchange(true);
-  std::cout.put('1').flush();
   if (!wasInterrupted) {
     ::std::scoped_lock lg{_ip->cvDataMutex};  // might throw
-    std::cout.put('2').flush();
     for (const auto& cvd : _ip->cvData) {
-      // we have to ensure that notify() is not called between CV's
-      // check for is_interrupted() and the wait call:
-      std::cout.put('3').flush();
-      std::cout << "== lock: " << cvd.cvMxPtr << " threadid: " << std::this_thread::get_id() << std::endl;
-      std::cout.put('3').flush();
+      // We have to ensure that notify() is not called between CV's check
+      //  for is_interrupted() and the wait call:
+      // Thus, we lock the CV mutex before we call notify():
       std::lock_guard sl{*(cvd.cvMxPtr)};
-      std::cout.put('4').flush();
       cvd.cvPtr->notify_all();
-      std::cout.put('5').flush();
     }
   }
-  std::cout.put('i').flush();
+  //std::cout.put('i').flush();
   return wasInterrupted;
 }
 
 bool interrupt_token::registerCV(condition_variable2* cvPtr, mutex* cvMxPtr) {
-  std::cout.put('R').flush();
+  //std::cout.put('R').flush();
   if (!valid()) return false;
   {
     std::scoped_lock lg{_ip->cvDataMutex};
     _ip->cvData.emplace_front(cvPtr, cvMxPtr);  // might throw
   }
-  std::cout.put('r').flush();
+  //std::cout.put('r').flush();
   return _ip->interrupted.load();
 }
 
 bool interrupt_token::unregisterCV(condition_variable2* cvPtr) {
-  std::cout.put('U').flush();
+  //std::cout.put('U').flush();
   if (!valid()) return false;
   {
     std::scoped_lock lg{_ip->cvDataMutex};
@@ -64,7 +58,7 @@ bool interrupt_token::unregisterCV(condition_variable2* cvPtr) {
       }
     }
   }
-  std::cout.put('u').flush();
+  //std::cout.put('u').flush();
   return _ip->interrupted.load();
 }
 
