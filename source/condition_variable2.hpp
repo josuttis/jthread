@@ -71,7 +71,9 @@ inline bool condition_variable2::wait_until(unique_lock<mutex>& lock,
                                             Predicate pred,
                                             interrupt_token itoken)
 {
-    std::cout << "== locked: " << &lock << " threadid: " << std::this_thread::get_id() << '\n';
+    if (itoken.is_interrupted()) {
+      return pred();
+    }
     register_guard rg{itoken, this, lock.mutex()};
     // Note: Only after registration a notification is guaranteed.
     //       Thus, to avoid a race, we have to check for is_interrupted() again:
