@@ -26,7 +26,7 @@ bool interrupt_token::interrupt()
       // We have to ensure that notify() is not called between CV's check
       //  for is_interrupted() and the wait call:
       // Thus, we lock the CV mutex before we call notify():
-      std::lock_guard sl{*(cvd.cvMxPtr)};
+      std::scoped_lock sl{*(cvd.cvMxPtr)};
       cvd.cvPtr->notify_all();
     }
   }
