@@ -30,10 +30,11 @@ class register_guard;
 class interrupt_token {
  private:
   struct CVData {
-    condition_variable2* cvPtr;     // currently waiting CVs
-    mutex*               cvMxPtr;   // associated mutex
+    condition_variable2* cvPtr;         // currently waiting CVs
+    mutex*               cvMxPtr;       // associated mutex
+    bool                 readyToErase;  // CV entry no longer needed (for interrupt())
     CVData(condition_variable2* cvp, mutex* cvmxp)
-     : cvPtr{cvp}, cvMxPtr{cvmxp} {
+     : cvPtr{cvp}, cvMxPtr{cvmxp}, readyToErase{false} {
     }
   };
   struct SharedData {
@@ -85,8 +86,8 @@ class interrupt_token {
   // stuff to registered condition variables for notofication: 
   friend class ::std::condition_variable2;
   friend class ::std::register_guard;
-  bool registerCV(condition_variable2* cvPtr, mutex* cvMxPtr);
-  bool unregisterCV(condition_variable2* cvPtr);
+  void registerCV(condition_variable2* cvPtr, mutex* cvMxPtr);
+  void unregisterCV(condition_variable2* cvPtr);
 };
 
 bool operator== (const interrupt_token& lhs, const interrupt_token& rhs) {
