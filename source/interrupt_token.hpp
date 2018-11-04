@@ -25,21 +25,24 @@ bool interrupt_token::interrupt()
     // HOWEVER: We have to avoid deadlocks.
     //          CV's might be locked (e.g. while trying to (un)register).
     //          In that case delay notifications until we get access. 
-    // Thus: We LOOP until we got access to all CVs
+    // Thus: We LOOP until we got access to  and notified all CVs
+	//       - NOT locking the list all the time
+	//         to give CV's a chance to unregister()
+	//       and finally clear the list
     bool oneCVNotNotified = true;
     while(oneCVNotNotified) {
       oneCVNotNotified = false;
       {
         ::std::scoped_lock lg{_ip->cvDataMutex};  // might throw
         for (auto& cvd : _ip->cvData) {
-          if (!cvd.readyToErase) {
+          if (!cvd.readyToErase.load()) {
             // We have to ensure that notify() is not called between CV's check
             //  for is_interrupted() and the wait call:
             // Thus, we (try to) lock the CV mutex before we call notify():
             std::unique_lock ul{*(cvd.cvMxPtr), std::try_to_lock};
             if (ul) {
               cvd.cvPtr->notify_all();
-              cvd.readyToErase = true;
+              cvd.readyToErase.store(true);
             }
             else {
               oneCVNotNotified = true;
@@ -58,6 +61,7 @@ bool interrupt_token::interrupt()
     //       - register() or unregister() have the CV mutex and wait for the token mutex
     //       So register() and unregister() can return immediately
     //       when interrupt is signaled and we are here in this loop
+    ::std::scoped_lock lg{_ip->cvDataMutex};  // might throw
     _ip->cvData.clear();
   }
   //std::cout.put('i').flush();
@@ -83,13 +87,13 @@ void interrupt_token::unregisterCV(condition_variable2* cvPtr) {
   //std::cout.put('U').flush();
   if (!valid()) return;
 
-  // don't register anymore when already interrupted
+  // ideally don't lock cvDataMutex when already interrupted
   // - important to avoid the deadlock descibed in interrupt()
-  if (_ip->interrupted.load()) return;
-
+  // But to avoid calling notify for a deleted CV, we have to
+  // disable/erase it in the collection, while not using it in interrupt()
   {
     std::scoped_lock lg{_ip->cvDataMutex};
-    // remove the FIRST matching CV
+    // remove the matching CV
     for (auto pos = _ip->cvData.begin(); pos != _ip->cvData.end(); ++pos) {
       if (pos->cvPtr == cvPtr) {
         _ip->cvData.erase(pos);

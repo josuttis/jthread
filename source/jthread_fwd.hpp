@@ -32,7 +32,7 @@ class interrupt_token {
   struct CVData {
     condition_variable2* cvPtr;         // currently waiting CVs
     mutex*               cvMxPtr;       // associated mutex
-    bool                 readyToErase;  // CV entry no longer needed (for interrupt())
+    std::atomic<bool>    readyToErase;  // CV entry no longer needed (for interrupt())
     CVData(condition_variable2* cvp, mutex* cvmxp)
      : cvPtr{cvp}, cvMxPtr{cvmxp}, readyToErase{false} {
     }
