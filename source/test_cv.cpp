@@ -11,7 +11,7 @@ using namespace::std::literals;
 
 // helper to call iwait() and check some assertions
 void cvIWait (std::interrupt_token iToken, int id,
-              bool& ready, std::recursive_mutex& readyMutex, std::condition_variable_any2& readyCV,
+              bool& ready, std::mutex& readyMutex, std::condition_variable_any2& readyCV,
               bool notifyCalled) {
   std::ostringstream strm;
   strm <<"\ncvIWait(" << std::to_string(id) << ") called in thread "
@@ -69,7 +69,7 @@ void testStdCV(bool callNotify)
   std::cout << "*** start testStdCV(callNotify=" << callNotify << ")" << std::endl;
 
   bool ready = false;
-  std::recursive_mutex readyMutex;
+  std::mutex readyMutex;
   std::condition_variable_any2 readyCV;
   
   {
@@ -112,7 +112,7 @@ void testCVPred(bool callNotify)
   std::cout << "*** start testCVPred(callNotify=" << callNotify << ")" << std::endl;
 
   bool ready = false;
-  std::recursive_mutex readyMutex;
+  std::mutex readyMutex;
   std::condition_variable_any2 readyCV;
   
   {
@@ -168,7 +168,7 @@ void testCVStdThreadNoPred(bool callNotify)
   std::cout << "*** start testCVStdThreadNoPred(callNotify=" << callNotify << ")" << std::endl;
 
   bool ready = false;
-  std::recursive_mutex readyMutex;
+  std::mutex readyMutex;
   std::condition_variable_any2 readyCV;
   
   std::interrupt_token it{false};
@@ -219,7 +219,7 @@ void testCVStdThreadPred(bool callNotify)
   std::cout << "*** start testCVStdThreadPred(callNotify=" << callNotify << ")" << std::endl;
 
   bool ready = false;
-  std::recursive_mutex readyMutex;
+  std::mutex readyMutex;
   std::condition_variable_any2 readyCV;
   
   std::interrupt_token it{false};
@@ -273,7 +273,7 @@ void testMinimalWait(int sec)
 
   try {
     bool ready = false;
-    std::recursive_mutex readyMutex;
+    std::mutex readyMutex;
     std::condition_variable_any2 readyCV;
     {
       std::jthread t1([&ready, &readyMutex, &readyCV, dur] (std::interrupt_token it) {
@@ -324,7 +324,7 @@ void testMinimalWaitFor(int sec1, int sec2)
 
   try {
   bool ready = false;
-  std::recursive_mutex readyMutex;
+  std::mutex readyMutex;
   std::condition_variable_any2 readyCV;
   {
     std::jthread t1([&ready, &readyMutex, &readyCV, durInt, durWait] (std::interrupt_token it) {
@@ -377,7 +377,7 @@ void testTimedCV(bool callNotify, bool callInterrupt, Dur dur)
   using namespace std::literals;
 
   bool ready = false;
-  std::recursive_mutex readyMutex;
+  std::mutex readyMutex;
   std::condition_variable_any2 readyCV;
   
   {
@@ -460,7 +460,7 @@ void testTimedIWait(bool callNotify, bool callInterrupt, Dur dur)
   using namespace std::literals;
 
   bool ready = false;
-  std::recursive_mutex readyMutex;
+  std::mutex readyMutex;
   std::condition_variable_any2 readyCV;
   
   enum class State { loop, ready, interrupted };
@@ -580,7 +580,7 @@ void testManyCV(bool callNotify, bool callInterrupt)
   {
     // thread t0 with CV:
     bool ready = false;
-    std::recursive_mutex readyMutex;
+    std::mutex readyMutex;
     std::condition_variable_any2 readyCV;
     std::jthread t0(cvIWait, 0,
                              std::ref(ready), std::ref(readyMutex), std::ref(readyCV),
@@ -592,7 +592,7 @@ void testManyCV(bool callNotify, bool callInterrupt)
       // starts thread concurrently calling interrupt() for the same token:
       std::cout << "\n- loop to start " << numExtraCV << " threads sharing the token and waiting concurently" << std::endl;
       std::array<bool,numExtraCV> arrReady{};  // don't forget to initialize with {} here !!!
-      std::array<std::recursive_mutex,numExtraCV> arrReadyMutex{};
+      std::array<std::mutex,numExtraCV> arrReadyMutex{};
       std::array<std::condition_variable_any2,numExtraCV> arrReadyCV{};
 
       std::vector<std::jthread> vThreads;

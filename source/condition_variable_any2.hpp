@@ -20,9 +20,9 @@ class register_guard
     interrupt_token*  itoken;
     condition_variable_any2*  cvPtr;
   public:
-    explicit register_guard(interrupt_token& i, condition_variable_any2* cvp, recursive_mutex* cvmxp)
+    explicit register_guard(interrupt_token& i, condition_variable_any2* cvp)
      : itoken{&i}, cvPtr{cvp} {
-        itoken->registerCV(cvp, cvmxp);
+        itoken->registerCV(cvp);
     }
     ~register_guard() {
         itoken->unregisterCV(cvPtr);
@@ -33,7 +33,7 @@ class register_guard
 
 
 //*****************************************************************************
-//* implementation of class condition_variable2
+//* implementation of class condition_variable_any2
 //*****************************************************************************
 
 // wait_until(): wait with interrupt handling 
@@ -41,21 +41,22 @@ class register_guard
 // return value:
 // - true if pred() yields true
 // - false otherwise (i.e. on interrupt)
-template <class Predicate>
-inline bool condition_variable_any2::wait_until(unique_lock<recursive_mutex>& lock,
-                                                Predicate pred,
-                                                interrupt_token itoken)
+template <class Lockable, class Predicate>
+inline bool condition_variable_any2::wait_until(Lockable& lock,
+                                            Predicate pred,
+                                            interrupt_token itoken)
 {
     if (itoken.is_interrupted()) {
       return pred();
     }
-    register_guard rg{itoken, this, lock.mutex()};
-    // Note: Only after registration a notification is guaranteed.
-    //       Thus, to avoid a race, we have to check for is_interrupted() again:
-    while(!pred() && !itoken.is_interrupted()) {
-      cv.wait(lock, [&pred, &itoken] {
-                      return pred() || itoken.is_interrupted();
-                    });
+    register_guard rg{itoken, this};
+    while(!pred()) {
+        std::unique_lock<std::mutex> first_internal_lock(mut);
+        if(itoken.is_interrupted())
+            break;
+        unlock_guard<Lockable> unlocker(lock);
+        std::unique_lock<std::mutex> second_internal_lock(std::move(first_internal_lock));
+        cv.wait(second_internal_lock);
     }
     return pred();
 }
@@ -65,24 +66,23 @@ inline bool condition_variable_any2::wait_until(unique_lock<recursive_mutex>& lo
 // return:
 // - true if pred() yields true
 // - false otherwise (i.e. on timeout or interrupt)
-template <class Clock, class Duration, class Predicate>
-inline bool condition_variable_any2::wait_until(unique_lock<recursive_mutex>& lock,
-                                                const chrono::time_point<Clock, Duration>& abs_time,
-                                                Predicate pred,
-                                                interrupt_token itoken)
+template <class Lockable, class Clock, class Duration, class Predicate>
+inline bool condition_variable_any2::wait_until(Lockable& lock,
+                                            const chrono::time_point<Clock, Duration>& abs_time,
+                                            Predicate pred,
+                                            interrupt_token itoken)
 {
     if (itoken.is_interrupted()) {
       return pred();
     }
-    register_guard rg{itoken, this, lock.mutex()};
-    // Note: Only after registration a notification is guaranteed.
-    //       Thus, to avoid a race, we have to check for is_interrupted() again:
-    while(!pred() && !itoken.is_interrupted() && Clock::now() < abs_time) {
-      cv.wait_until(lock,
-                    abs_time,
-                    [&pred, &itoken] {
-                      return pred() || itoken.is_interrupted();
-                    });
+    register_guard rg{itoken, this};
+    while(!pred()  && Clock::now() < abs_time) {
+        std::unique_lock<std::mutex> first_internal_lock(mut);
+        if(itoken.is_interrupted())
+            break;
+        unlock_guard<Lockable> unlocker(lock);
+        std::unique_lock<std::mutex> second_internal_lock(std::move(first_internal_lock));
+        cv.wait_until(second_internal_lock,abs_time);
     }
     return pred();
 }
@@ -92,11 +92,11 @@ inline bool condition_variable_any2::wait_until(unique_lock<recursive_mutex>& lo
 // return:
 // - true if pred() yields true
 // - false otherwise (i.e. on timeout or interrupt)
-template <class Rep, class Period, class Predicate>
-inline bool condition_variable_any2::wait_for(unique_lock<recursive_mutex>& lock,
-                                              const chrono::duration<Rep, Period>& rel_time,
-                                              Predicate pred,
-                                              interrupt_token itoken)
+template <class Lockable,class Rep, class Period, class Predicate>
+inline bool condition_variable_any2::wait_for(Lockable& lock,
+                                          const chrono::duration<Rep, Period>& rel_time,
+                                          Predicate pred,
+                                          interrupt_token itoken)
 {
   auto abs_time = std::chrono::steady_clock::now() + rel_time;
   return wait_until(lock,
