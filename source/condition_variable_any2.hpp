@@ -18,9 +18,9 @@ class register_guard
 {
   private:
     interrupt_token*  itoken;
-    condition_variable2*  cvPtr;
+    condition_variable_any2*  cvPtr;
   public:
-    explicit register_guard(interrupt_token& i, condition_variable2* cvp, mutex* cvmxp)
+    explicit register_guard(interrupt_token& i, condition_variable_any2* cvp, recursive_mutex* cvmxp)
      : itoken{&i}, cvPtr{cvp} {
         itoken->registerCV(cvp, cvmxp);
     }
@@ -42,9 +42,9 @@ class register_guard
 // - true if pred() yields true
 // - false otherwise (i.e. on interrupt)
 template <class Predicate>
-inline bool condition_variable2::wait_until(unique_lock<mutex>& lock,
-                                            Predicate pred,
-                                            interrupt_token itoken)
+inline bool condition_variable_any2::wait_until(unique_lock<recursive_mutex>& lock,
+                                                Predicate pred,
+                                                interrupt_token itoken)
 {
     if (itoken.is_interrupted()) {
       return pred();
@@ -66,10 +66,10 @@ inline bool condition_variable2::wait_until(unique_lock<mutex>& lock,
 // - true if pred() yields true
 // - false otherwise (i.e. on timeout or interrupt)
 template <class Clock, class Duration, class Predicate>
-inline bool condition_variable2::wait_until(unique_lock<mutex>& lock,
-                                            const chrono::time_point<Clock, Duration>& abs_time,
-                                            Predicate pred,
-                                            interrupt_token itoken)
+inline bool condition_variable_any2::wait_until(unique_lock<recursive_mutex>& lock,
+                                                const chrono::time_point<Clock, Duration>& abs_time,
+                                                Predicate pred,
+                                                interrupt_token itoken)
 {
     if (itoken.is_interrupted()) {
       return pred();
@@ -93,10 +93,10 @@ inline bool condition_variable2::wait_until(unique_lock<mutex>& lock,
 // - true if pred() yields true
 // - false otherwise (i.e. on timeout or interrupt)
 template <class Rep, class Period, class Predicate>
-inline bool condition_variable2::wait_for(unique_lock<mutex>& lock,
-                                          const chrono::duration<Rep, Period>& rel_time,
-                                          Predicate pred,
-                                          interrupt_token itoken)
+inline bool condition_variable_any2::wait_for(unique_lock<recursive_mutex>& lock,
+                                              const chrono::duration<Rep, Period>& rel_time,
+                                              Predicate pred,
+                                              interrupt_token itoken)
 {
   auto abs_time = std::chrono::steady_clock::now() + rel_time;
   return wait_until(lock,

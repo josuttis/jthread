@@ -1,7 +1,7 @@
 //*****************************************************************************
 // forward declarations of
 // - class interrupt_token
-// - class condition_variable2
+// - class condition_variable_any2
 // due to cyclic dependencies
 //*****************************************************************************
 #ifndef ITOKEN_AND_CV_FWD_HPP
@@ -17,7 +17,7 @@
 namespace std {
 
 // forward declarations to avoid including header file:
-class condition_variable2;
+class condition_variable_any2;
 class register_guard;
 
 //***************************************** 
@@ -30,10 +30,10 @@ class register_guard;
 class interrupt_token {
  private:
   struct CVData {
-    condition_variable2* cvPtr;         // currently waiting CVs
-    mutex*               cvMxPtr;       // associated mutex
-    std::atomic<bool>    readyToErase;  // CV entry no longer needed (for interrupt())
-    CVData(condition_variable2* cvp, mutex* cvmxp)
+    condition_variable_any2* cvPtr;         // currently waiting CVs
+    recursive_mutex*         cvMxPtr;       // associated mutex
+    std::atomic<bool>        readyToErase;  // CV entry no longer needed (for interrupt())
+    CVData(condition_variable_any2* cvp, recursive_mutex* cvmxp)
      : cvPtr{cvp}, cvMxPtr{cvmxp}, readyToErase{false} {
     }
   };
@@ -84,10 +84,10 @@ class interrupt_token {
  
  private:
   // stuff to registered condition variables for notofication: 
-  friend class ::std::condition_variable2;
+  friend class ::std::condition_variable_any2;
   friend class ::std::register_guard;
-  void registerCV(condition_variable2* cvPtr, mutex* cvMxPtr);
-  void unregisterCV(condition_variable2* cvPtr);
+  void registerCV(condition_variable_any2* cvPtr, recursive_mutex* cvMxPtr);
+  void unregisterCV(condition_variable_any2* cvPtr);
 };
 
 bool operator== (const interrupt_token& lhs, const interrupt_token& rhs) {
@@ -100,23 +100,23 @@ bool operator!= (const interrupt_token& lhs, const interrupt_token& rhs) {
 
 
 //***************************************** 
-//* class condition_variable2
+//* class condition_variable_any2
 //* - joining std::thread with interrupt support 
 //***************************************** 
-class condition_variable2
+class condition_variable_any2
 {
   public:
     //***************************************** 
-    //* standardized API for condition_variable:
+    //* standardized API for condition_variable_any:
     //***************************************** 
 
-    condition_variable2()
+    condition_variable_any2()
      : cv{} {
     }
-    ~condition_variable2() {
+    ~condition_variable_any2() {
     }
-    condition_variable2(const condition_variable2&) = delete;
-    condition_variable2& operator=(const condition_variable2&) = delete;
+    condition_variable_any2(const condition_variable_any2&) = delete;
+    condition_variable_any2& operator=(const condition_variable_any2&) = delete;
 
     void notify_one() noexcept {
       cv.notify_one();
@@ -125,31 +125,32 @@ class condition_variable2
       cv.notify_all();
     }
 
-    void wait(unique_lock<mutex>& lock) {
+    template<class Lock>
+    void wait(Lock& lock) {
       cv.wait(lock);
     }
-    template<class Predicate>
-     void wait(unique_lock<mutex>& lock, Predicate pred) {
+    template<class Lock, class Predicate>
+     void wait(Lock& lock, Predicate pred) {
       cv.wait(lock,pred);
     }
-    template<class Clock, class Duration>
-     cv_status wait_until(unique_lock<mutex>& lock,
+    template<class Lock, class Clock, class Duration>
+     cv_status wait_until(Lock& lock,
                           const chrono::time_point<Clock, Duration>& abs_time) {
       return cv.wait_until(lock, abs_time);
     }
-    template<class Clock, class Duration, class Predicate>
-     bool wait_until(unique_lock<mutex>& lock,
+    template<class Lock, class Clock, class Duration, class Predicate>
+     bool wait_until(Lock& lock,
                      const chrono::time_point<Clock, Duration>& abs_time,
                      Predicate pred) {
       return cv.wait_until(lock, abs_time, pred);
     }
-    template<class Rep, class Period>
-     cv_status wait_for(unique_lock<mutex>& lock,
+    template<class Lock, class Rep, class Period>
+     cv_status wait_for(Lock& lock,
                         const chrono::duration<Rep, Period>& rel_time) {
       return cv.wait_for(lock, rel_time);
     }
-    template<class Rep, class Period, class Predicate>
-     bool wait_for(unique_lock<mutex>& lock,
+    template<class Lock, class Rep, class Period, class Predicate>
+     bool wait_for(Lock& lock,
                    const chrono::duration<Rep, Period>& rel_time,
                    Predicate pred) {
       return cv.wait_for(lock, rel_time, pred);
@@ -165,7 +166,7 @@ class condition_variable2
     // - true if pred() yields true
     // - false otherwise (i.e. on interrupt)
     template <class Predicate>
-      bool wait_until(unique_lock<mutex>& lock,
+      bool wait_until(unique_lock<recursive_mutex>& lock,
                       Predicate pred,
                       interrupt_token itoken);
 
@@ -173,7 +174,7 @@ class condition_variable2
     // - true if pred() yields true
     // - false otherwise (i.e. on timeout or interrupt)
     template <class Clock, class Duration, class Predicate>
-      bool wait_until(unique_lock<mutex>& lock,
+      bool wait_until(unique_lock<recursive_mutex>& lock,
                       const chrono::time_point<Clock, Duration>& abs_time,
                       Predicate pred,
                       interrupt_token itoken);
@@ -181,7 +182,7 @@ class condition_variable2
     // - true if pred() yields true
     // - false otherwise (i.e. on timeout or interrupt)
     template <class Rep, class Period, class Predicate>
-      bool wait_for(unique_lock<mutex>& lock,
+      bool wait_for(unique_lock<recursive_mutex>& lock,
                     const chrono::duration<Rep, Period>& rel_time,
                     Predicate pred,
                     interrupt_token itoken);
@@ -192,7 +193,7 @@ class condition_variable2
 
   private:
     //*** API for the starting thread:
-    condition_variable cv;
+    condition_variable_any cv;
 };
 
 

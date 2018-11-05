@@ -68,7 +68,7 @@ bool interrupt_token::interrupt()
   return wasInterrupted;
 }
 
-void interrupt_token::registerCV(condition_variable2* cvPtr, mutex* cvMxPtr) {
+void interrupt_token::registerCV(condition_variable_any2* cvPtr, recursive_mutex* cvMxPtr) {
   //std::cout.put('R').flush();
   if (!valid()) return;
 
@@ -83,7 +83,7 @@ void interrupt_token::registerCV(condition_variable2* cvPtr, mutex* cvMxPtr) {
   //std::cout.put('r').flush();
 }
 
-void interrupt_token::unregisterCV(condition_variable2* cvPtr) {
+void interrupt_token::unregisterCV(condition_variable_any2* cvPtr) {
   //std::cout.put('U').flush();
   if (!valid()) return;
 
