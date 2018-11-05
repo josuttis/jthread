@@ -1,4 +1,4 @@
-#include "condition_variable2.hpp"
+#include "condition_variable_any2.hpp"
 #include "jthread.hpp"
 #include <iostream>
 #include <string>
@@ -23,7 +23,7 @@ void exampleProducerConsumer(double prodSec, double consSec, bool interrupt)
 
   std::vector<int> items;
   std::mutex itemsMx;
-  std::condition_variable2 itemsCV;
+  std::condition_variable_any2 itemsCV;
   std::interrupt_token itoken{ false };
   constexpr size_t maxQueueSize = 100;
 

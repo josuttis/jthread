@@ -1,7 +1,7 @@
 include Makefile.h
 
 default: all
-all:: test_itoken test_jthread1 test_jthread2 test_cv
+all:: test_itoken test_jthread1 test_jthread2 test_cv test_cvdead test_cvprodcons
 all::
 	@echo ""
 	@echo "Testcases:"
@@ -9,6 +9,7 @@ all::
 	@echo "  test_jthread1"
 	@echo "  test_jthread2"
 	@echo "  test_cv"
+	@echo "  test_cvdead"
 	@echo "  test_cvprodcons"
 
 test_itoken: jthread_fwd.hpp interrupt_token.hpp condition_variable_any2.hpp test_itoken.cpp Makefile
