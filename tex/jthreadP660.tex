@@ -1,20 +1,30 @@
 %!TEX root = std.tex
-\makeevenhead{cpppage}{Josuttis, Sutter, Williams: \tcode{jthread}}{}{\textbf{P0660R5}}
-\makeoddhead{cpppage}{Josuttis, Sutter, Williams: \tcode{jthread}}{}{\textbf{P0660R5}}
+\makeevenhead{cpppage}{Josuttis, O'Neil, Sutter, Williams: \tcode{jthread}}{}{\textbf{P0660R5}}
+\makeoddhead{cpppage}{Josuttis, O'Neil, Sutter, Williams: \tcode{jthread}}{}{\textbf{P0660R5}}
 
 {\small
 \begin{tabular}{@{}ll}
 Project:  	& ISO JTC1/SC22/WG21: Programming Language C++ \\
-Doc No: 	& WG21 P0660R5 \\
-Date: 		& 2018-10-06 \\
-Reply to: 	& Nicolai Josuttis (nico@josuttis.de), Herb Sutter (hsutter@microsoft.com), \\
+Doc No: 	& WG21 P0660R6 \\
+Date: 		& 2018-11-04 \\
+Reply to: 	& Nicolai Josuttis (nico@josuttis.de), \\
+                &         Billy O'Neal (VC LIBS) <bion@microsoft.com> \\
+                &         Herb Sutter (hsutter@microsoft.com), \\
                 &         Anthony Williams (anthony@justsoftwaresolutions.co.uk) \\
 Audience: 	& SG1, LEWG, LWG \\
-Prev. Version:	& \url{www.wg21.link/P0660R4} \\
+Prev. Version:	& \url{www.wg21.link/P0660R5} \\
 \end{tabular}
 }
 
-\section*{{\huge{}A Cooperatively Interruptible Joining Thread, Rev 5}}
+\section*{{\huge{}A Cooperatively Interruptible Joining Thread, Rev 6}}
+
+\subsubsection*{New in R6}
+\begin{itemize}
+ \item User \tcode{condition_variable_any} instead of \tcode{consition_variable}
+        to avoid all possible races, deadlocks, and unintended undefined behavior.
+ \item Clarify future binary compatibility for interrupt handling
+        (mention requirements for future callback support and allow \tcode{bad_alloc} exceptions on waits.
+\end{itemize}
 
 \subsubsection*{New in R5}
 As requested at
@@ -105,7 +115,7 @@ void testInterruptibleCVWait()
 {
   bool ready = false;
   std::mutex readyMutex;
-  std::condition_variable readyCV;
+  std::condition_variable_any readyCV;
   std::jthread t([&ready, &readyMutex, &readyCV] (std::interrupt_token it) {
                     while (...) {
                       ...
