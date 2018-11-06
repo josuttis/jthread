@@ -150,6 +150,7 @@ bool interrupt_token::interrupt()
         lg.unlock();
         bool destructorHasRunInsideCallback{false};
         elem->destructorHasRunInsideCallback = &destructorHasRunInsideCallback;
+        std::cout<<std::this_thread::get_id()<<": call callback "<<std::endl;
         elem->run();  // don't call the callback locked
         if (!destructorHasRunInsideCallback) {
           elem->destructorHasRunInsideCallback = nullptr;
@@ -163,7 +164,7 @@ bool interrupt_token::interrupt()
 }
 
 void interrupt_token::registerCB(interrupt_callback_base* cbPtr) {
-  //std::cout.put('R').flush();
+  std::cout.put('R').flush();
   if (!valid()) return;
 
   std::unique_lock lg{_ip->cbDataMutex};
@@ -176,7 +177,7 @@ void interrupt_token::registerCB(interrupt_callback_base* cbPtr) {
   else {
     _ip->cbData.emplace_front(cbPtr);  // might throw
   }
-  //std::cout.put('r').flush();
+  std::cout.put('r').flush();
 }
 
 void interrupt_token::unregisterCB(interrupt_callback_base* cbPtr) {
