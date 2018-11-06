@@ -7,6 +7,7 @@
 #include <mutex>
 #include <list>
 #include <thread>
+#include <cassert>
 
 // for debugging
 #include <iostream> // in case we enable the debug output
@@ -24,6 +25,7 @@ namespace std {
 // callbacks objects have different types => type erase them
 struct interrupt_callback_base {
   std::atomic<bool> finishedExecuting{false};
+  bool* destructorHasRunInsideCallback{nullptr};
   virtual void run() noexcept = 0;
   virtual ~interrupt_callback_base() = default;
 };
@@ -35,6 +37,8 @@ struct SharedData {
     ::std::list<interrupt_callback_base*> cbData{};     // currently waiting CVs and its lock
     ::std::mutex cbDataMutex{};       // we have multistep concurrent access to cvPtrs
 
+    std::thread::id interruptingThreadID{};
+    
     // make polymorphic class for future binary-compatible interrupt_token extensions:
     SharedData(bool initial_state)
      : interrupted{initial_state} {
@@ -123,6 +127,7 @@ struct interrupt_callback : interrupt_callback_base
   private:
     virtual void run() noexcept override {
       callback();  //or: std::invoke(callback);
+      finishedExecuting.store(true);
     }    
 };
 
@@ -134,6 +139,7 @@ bool interrupt_token::interrupt()
   if (!valid()) return false;
   auto wasInterrupted = _ip->interrupted.exchange(true);
   if (!wasInterrupted) {
+      _ip->interruptingThreadID = std::this_thread::get_id();
       ::std::unique_lock lg{_ip->cbDataMutex};  // might throw
       // note, we no longer accept new callbacks here in the list
       // but other callbacks might be unregistered
@@ -142,7 +148,13 @@ bool interrupt_token::interrupt()
         auto elem = _ip->cbData.front();
         _ip->cbData.pop_front();
         lg.unlock();
+        bool destructorHasRunInsideCallback{false};
+        elem->destructorHasRunInsideCallback = &destructorHasRunInsideCallback;
         elem->run();  // don't call the callback locked
+        if (!destructorHasRunInsideCallback) {
+          elem->destructorHasRunInsideCallback = nullptr;
+          elem->finishedExecuting.store(true);
+        }
         lg.lock();
       }
   }
@@ -177,8 +189,29 @@ void interrupt_token::unregisterCB(interrupt_callback_base* cbPtr) {
     for (auto pos = _ip->cbData.begin(); pos != _ip->cbData.end(); ++pos) {
       if (*pos == cbPtr) {
         _ip->cbData.erase(pos);
-        break;
+        return;
       }
+    }
+  }
+  // If we come here, the callback either has executed or is being executed
+  // So we have to find out whether we are inside the callback
+  // - for that we compare thread IDs 
+  if (std::this_thread::get_id() == _ip->interruptingThreadID) {
+    if (cbPtr->destructorHasRunInsideCallback) {
+      // we are inside callback of cpPtr
+      *(cbPtr->destructorHasRunInsideCallback) = true;
+    }
+    else {
+      // callback had run before, so:
+      assert(cbPtr->finishedExecuting.load());
+    }
+  }
+  else {
+    // different thread than where interrupt was called:
+    // => wait for the end:
+    // busy waiting, better use a binary semaphore or a futex
+    while (!cbPtr->finishedExecuting.load()) {
+      std::this_thread::yield();
     }
   }
   //std::cout.put('u').flush();
