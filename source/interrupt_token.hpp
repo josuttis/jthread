@@ -23,54 +23,49 @@ bool interrupt_token::interrupt()
   if (!valid()) return false;
   auto wasInterrupted = _ip->interrupted.exchange(true);
   if (!wasInterrupted) {
-      ::std::scoped_lock lg{_ip->cvDataMutex};  // might throw
-      for (auto& cvd : _ip->cvData) {
-          std::cout<<std::this_thread::get_id()<<": Notifying "<<std::endl;
-          // no need to lock here, or anything, as internal lock in notify_all handles synchronization
-          cvd.cvPtr->notify_all();
+      ::std::unique_lock lg{_ip->cbDataMutex};  // might throw
+      // note, we no longer accept new callbacks here in the list
+      // but other callbacks might be unregistered
+      while(!_ip->cbData.empty()) {
+        std::cout<<std::this_thread::get_id()<<": Notifying "<<std::endl;
+        auto elem = _ip->cbData.front();
+        _ip->cbData.pop_front();
+        lg.unlock();
+        elem->run();  // don't call the callback locked
+        lg.lock();
       }
-    
-    // NOTE: We remove all registered CV's here because we have to avoid the
-    //       following deadlocks or unnecessary locks:
-    //       - we locked the token mutex and wait here for the CV mutex
-    //       - register() or unregister() have the CV mutex and wait for the token mutex
-    //       So register() and unregister() can return immediately
-    //       when interrupt is signaled and we are here in this loop
-    _ip->cvData.clear();
   }
   //std::cout.put('i').flush();
   return wasInterrupted;
 }
 
-void interrupt_token::registerCV(condition_variable_any2* cvPtr) {
+void interrupt_token::registerCB(interrupt_callback_base* cbPtr) {
   //std::cout.put('R').flush();
   if (!valid()) return;
 
-  // don't register anymore when already interrupted
-  // - important to avoid the deadlock descibed in interrupt()
-  if (_ip->interrupted.load()) return;
-
-  {
-    std::scoped_lock lg{_ip->cvDataMutex};
-    _ip->cvData.emplace_front(cvPtr);  // might throw
+  std::unique_lock lg{_ip->cbDataMutex};
+  if (_ip->interrupted.load()) {
+    // if already interrupted, make sure the callback is durectly called
+    // - but not blocking others
+    lg.unlock();
+    cbPtr->run();
+  }
+  else {
+    _ip->cbData.emplace_front(cbPtr);  // might throw
   }
   //std::cout.put('r').flush();
 }
 
-void interrupt_token::unregisterCV(condition_variable_any2* cvPtr) {
+void interrupt_token::unregisterCB(interrupt_callback_base* cbPtr) {
   //std::cout.put('U').flush();
   if (!valid()) return;
 
-  // don't register anymore when already interrupted
-  // - important to avoid the deadlock descibed in interrupt()
-  if (_ip->interrupted.load()) return;
-
   {
-    std::scoped_lock lg{_ip->cvDataMutex};
-    // remove the FIRST matching CV
-    for (auto pos = _ip->cvData.begin(); pos != _ip->cvData.end(); ++pos) {
-      if (pos->cvPtr == cvPtr) {
-        _ip->cvData.erase(pos);
+    std::scoped_lock lg{_ip->cbDataMutex};
+    // remove the matching CB
+    for (auto pos = _ip->cbData.begin(); pos != _ip->cbData.end(); ++pos) {
+      if (*pos == cbPtr) {
+        _ip->cbData.erase(pos);
         break;
       }
     }

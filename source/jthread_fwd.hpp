@@ -16,9 +16,6 @@
 
 namespace std {
 
-// forward declarations to avoid including header file:
-class condition_variable_any2;
-class register_guard;
 
 //***************************************** 
 //* new class for interrupt tokens
@@ -27,18 +24,20 @@ class register_guard;
 //* - for both interrupter and interruptee
 //***************************************** 
 
-class interrupt_token {
- private:
-  struct CVData {
-    condition_variable_any2* cvPtr;         // currently waiting CVs
-    CVData(condition_variable_any2* cvp)
-     : cvPtr{cvp} {
-    }
-  };
-  struct SharedData {
+// callbacks objects have different types => type erase them
+struct interrupt_callback_base {
+  std::atomic<bool> finishedExecuting{false};
+  virtual void run() noexcept = 0;
+  virtual ~interrupt_callback_base() = default;
+};
+
+
+struct SharedData {
     ::std::atomic<bool> interrupted;  // true if interrupt signaled
-    ::std::list<CVData> cvData{};     // currently waiting CVs and its lock
-    ::std::mutex cvDataMutex{};       // we have multistep concurrent access to cvPtrs
+
+    ::std::list<interrupt_callback_base*> cbData{};     // currently waiting CVs and its lock
+    ::std::mutex cbDataMutex{};       // we have multistep concurrent access to cvPtrs
+
     // make polymorphic class for future binary-compatible interrupt_token extensions:
     SharedData(bool initial_state)
      : interrupted{initial_state} {
@@ -48,7 +47,13 @@ class interrupt_token {
     SharedData(SharedData&&) = delete;
     SharedData& operator= (const SharedData&) = delete;
     SharedData& operator= (SharedData&&) = delete;
-  };
+};
+
+template <typename Callback>
+class interrupt_callback;
+
+class interrupt_token {
+ private:
   ::std::shared_ptr<SharedData> _ip{nullptr};
 
  public:
@@ -82,10 +87,10 @@ class interrupt_token {
  
  private:
   // stuff to registered condition variables for notofication: 
-  friend class ::std::condition_variable_any2;
-  friend class ::std::register_guard;
-  void registerCV(condition_variable_any2* cvPtr);
-  void unregisterCV(condition_variable_any2* cvPtr);
+  template <typename T>
+  friend class ::std::interrupt_callback;
+  void registerCB(interrupt_callback_base* cvPtr);
+  void unregisterCB(interrupt_callback_base* cvPtr);
 };
 
 bool operator== (const interrupt_token& lhs, const interrupt_token& rhs) {
@@ -95,6 +100,35 @@ bool operator== (const interrupt_token& lhs, const interrupt_token& rhs) {
 bool operator!= (const interrupt_token& lhs, const interrupt_token& rhs) {
   return !(lhs==rhs);
 }
+
+template <typename Callback>
+struct interrupt_callback : interrupt_callback_base
+{
+  private:
+    interrupt_token itoken;
+    Callback callback;
+  public:
+    interrupt_callback(interrupt_token it, Callback&& cb)
+     : itoken{std::move(it)}, callback{std::forward<Callback>(cb)} {
+        if (itoken.valid()) {
+          itoken.registerCB(this);
+        }
+    }
+    ~interrupt_callback() {
+        if (itoken.valid()) {
+          itoken.unregisterCB(this);
+        }
+    }
+    interrupt_callback(const interrupt_callback&) = delete;
+    interrupt_callback(interrupt_callback&&) = delete;
+    interrupt_callback& operator=(const interrupt_callback&) = delete;
+    interrupt_callback& operator=(interrupt_callback&&) = delete;
+  private:
+    virtual void run() noexcept override {
+      callback();  //or: std::invoke(callback);
+    }    
+};
+
 
 
 //***************************************** 

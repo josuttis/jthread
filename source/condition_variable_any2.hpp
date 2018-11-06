@@ -13,25 +13,6 @@
 
 namespace std {
 
-// RAII helper to ensure interrupt_token::unregister(cv) is called 
-class register_guard
-{
-  private:
-    interrupt_token*  itoken;
-    condition_variable_any2*  cvPtr;
-  public:
-    explicit register_guard(interrupt_token& i, condition_variable_any2* cvp)
-     : itoken{&i}, cvPtr{cvp} {
-        itoken->registerCV(cvp);
-    }
-    ~register_guard() {
-        itoken->unregisterCV(cvPtr);
-    }
-    register_guard(register_guard&) = delete;
-    register_guard& operator=(register_guard&) = delete;
-};
-
-
 //*****************************************************************************
 //* implementation of class condition_variable_any2
 //*****************************************************************************
@@ -49,7 +30,8 @@ inline bool condition_variable_any2::wait_until(Lockable& lock,
     if (itoken.is_interrupted()) {
       return pred();
     }
-    register_guard rg{itoken, this};
+    interrupt_callback cb(itoken, [this] { this->notify_all(); });
+    //register_guard rg{itoken, this};
     while(!pred()) {
         std::unique_lock<std::mutex> first_internal_lock(mut);
         if(itoken.is_interrupted())
@@ -75,7 +57,8 @@ inline bool condition_variable_any2::wait_until(Lockable& lock,
     if (itoken.is_interrupted()) {
       return pred();
     }
-    register_guard rg{itoken, this};
+    interrupt_callback cb(itoken, [this] { this->notify_all(); });
+    //register_guard rg{itoken, this};
     while(!pred()  && Clock::now() < abs_time) {
         std::unique_lock<std::mutex> first_internal_lock(mut);
         if(itoken.is_interrupted())
