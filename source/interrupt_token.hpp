@@ -33,15 +33,17 @@ struct interrupt_callback_base {
 
 struct SharedData {
     ::std::atomic<bool> interrupted;  // true if interrupt signaled
+    ::std::atomic<std::size_t> numSources;
 
     ::std::list<interrupt_callback_base*> cbData{};     // currently waiting CVs and its lock
     ::std::mutex cbDataMutex{};       // we have multistep concurrent access to cvPtrs
 
     std::thread::id interruptingThreadID{};
     
+    // TODO: NO LONGER 
     // make polymorphic class for future binary-compatible interrupt_token extensions:
     SharedData(bool initial_state)
-     : interrupted{initial_state} {
+     : interrupted{initial_state}, numSources{1} {
     }
     virtual ~SharedData() = default;  // make polymorphic
     SharedData(const SharedData&) = delete;
@@ -53,6 +55,8 @@ struct SharedData {
 template <typename Callback>
 class interrupt_callback;
 
+class interrupt_source;
+
 class interrupt_token {
  private:
   ::std::shared_ptr<SharedData> _ip{nullptr};
@@ -60,10 +64,6 @@ class interrupt_token {
  public:
   // default constructor is cheap:
   explicit interrupt_token() noexcept = default;
-  // enable interrupt mechanisms by passing a bool (usually false):
-  explicit interrupt_token(bool initial_state)
-   : _ip{new SharedData{initial_state}} {
-  }
 
   // special members (default OK):
   //interrupt_token(const interrupt_token&) noexcept;
@@ -75,15 +75,13 @@ class interrupt_token {
   }
 
   // interrupt handling:
-  bool valid() const {
+  bool is_interruptible() const {
     return _ip != nullptr;
   }
   bool is_interrupted() const noexcept {
     return _ip && _ip->interrupted.load();
   }
 
-  bool interrupt();
-  
   friend bool operator== (const interrupt_token& lhs, const interrupt_token& rhs);
  
  private:
@@ -92,13 +90,79 @@ class interrupt_token {
   friend class ::std::interrupt_callback;
   void registerCB(interrupt_callback_base* cvPtr);
   void unregisterCB(interrupt_callback_base* cvPtr);
+
+  friend class interrupt_source;
+  explicit interrupt_token(::std::shared_ptr<SharedData> ip)
+   : _ip{std::move(ip)} {
+  }
 };
 
 bool operator== (const interrupt_token& lhs, const interrupt_token& rhs) {
-  return (!lhs.valid() && !rhs.valid())
+  // TODO: just comparing _ip is enough?
+  return (!lhs.is_interruptible() && !rhs.is_interruptible())
          || (lhs._ip.get() == rhs._ip.get());
 }
 bool operator!= (const interrupt_token& lhs, const interrupt_token& rhs) {
+  return !(lhs==rhs);
+}
+
+
+class interrupt_source {
+ private:
+  ::std::shared_ptr<SharedData> _ip{nullptr};
+
+ public:
+  // default constructor is cheap:
+  explicit interrupt_source() noexcept 
+   : _ip{new SharedData{false}} {
+  }
+
+  interrupt_token get_token() const noexcept {
+    return interrupt_token(_ip);
+  }
+  
+  // special members (default OK):
+  interrupt_source(const interrupt_source& is) noexcept
+   : _ip{is._ip} {
+       if (_ip) {
+         ++(_ip->numSources);
+       }
+  }
+  interrupt_source(interrupt_source&&) noexcept = default;
+  // pass by value to do the increments/decrements right:
+  interrupt_source& operator=(interrupt_source is) noexcept {
+    swap(is);
+    return *this;
+  }
+  ~interrupt_source () {
+     if (_ip) {
+       --(_ip->numSources);
+     }
+  }
+
+  void swap(interrupt_source& it) noexcept {
+    _ip.swap(it._ip);
+  }
+
+  // interrupt handling:
+  bool is_interruptible() const {
+    return _ip != nullptr;
+  }
+  bool is_interrupted() const noexcept {
+    return _ip && _ip->interrupted.load();
+  }
+
+  bool interrupt();
+  
+  friend bool operator== (const interrupt_source& lhs, const interrupt_source& rhs);
+};
+
+bool operator== (const interrupt_source& lhs, const interrupt_source& rhs) {
+  // TODO: just comparing _ip is enough?
+  return (!lhs.is_interruptible() && !rhs.is_interruptible())
+         || (lhs._ip.get() == rhs._ip.get());
+}
+bool operator!= (const interrupt_source& lhs, const interrupt_source& rhs) {
   return !(lhs==rhs);
 }
 
@@ -111,12 +175,12 @@ struct interrupt_callback : interrupt_callback_base
   public:
     interrupt_callback(interrupt_token it, Callback&& cb)
      : itoken{std::move(it)}, callback{std::forward<Callback>(cb)} {
-        if (itoken.valid()) {
+        if (itoken.is_interruptible()) {
           itoken.registerCB(this);
         }
     }
     ~interrupt_callback() {
-        if (itoken.valid()) {
+        if (itoken.is_interruptible()) {
           itoken.unregisterCB(this);
         }
     }
@@ -132,11 +196,11 @@ struct interrupt_callback : interrupt_callback_base
 };
 
 
-bool interrupt_token::interrupt()
+bool interrupt_source::interrupt()
 {
   std::cout<<std::this_thread::get_id()<<": Interrupting "<<std::endl;
   //std::cout.put('I').flush();
-  if (!valid()) return false;
+  if (!is_interruptible()) return false;
   auto wasInterrupted = _ip->interrupted.exchange(true);
   if (!wasInterrupted) {
       _ip->interruptingThreadID = std::this_thread::get_id();
@@ -165,7 +229,7 @@ bool interrupt_token::interrupt()
 
 void interrupt_token::registerCB(interrupt_callback_base* cbPtr) {
   std::cout.put('R').flush();
-  if (!valid()) return;
+  if (!is_interruptible()) return;
 
   std::unique_lock lg{_ip->cbDataMutex};
   if (_ip->interrupted.load()) {
@@ -182,7 +246,7 @@ void interrupt_token::registerCB(interrupt_callback_base* cbPtr) {
 
 void interrupt_token::unregisterCB(interrupt_callback_base* cbPtr) {
   //std::cout.put('U').flush();
-  if (!valid()) return;
+  if (!is_interruptible()) return;
 
   {
     std::scoped_lock lg{_ip->cbDataMutex};
