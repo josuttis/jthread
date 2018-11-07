@@ -32,13 +32,14 @@ struct interrupt_callback_base {
 
 
 struct SharedData {
-    ::std::atomic<bool> interrupted;  // true if interrupt signaled
-    ::std::atomic<std::size_t> numSources;
+    // the callbacks to call on interrupt:
+    ::std::list<interrupt_callback_base*> cbData{};   // currently registered callbacks
+    ::std::mutex cbDataMutex{};                       // which is concurrently used/modified
 
-    ::std::list<interrupt_callback_base*> cbData{};     // currently waiting CVs and its lock
-    ::std::mutex cbDataMutex{};       // we have multistep concurrent access to cvPtrs
-
-    std::thread::id interruptingThreadID{};
+    // state flags for (tricky) races:
+    ::std::atomic<bool> interrupted;          // true if interrupt signaled
+    ::std::atomic<std::size_t> numSources;    // number of interrupt_sources (for is_interruptible())
+    std::thread::id interruptingThreadID{};   // temporary ID of interrupting thread
     
     // TODO: NO LONGER 
     // make polymorphic class for future binary-compatible interrupt_token extensions:
@@ -52,9 +53,9 @@ struct SharedData {
     SharedData& operator= (SharedData&&) = delete;
 };
 
-template <typename Callback>
-class interrupt_callback;
 
+// forward declarations:
+template <typename Callback> class interrupt_callback;
 class interrupt_source;
 
 
@@ -63,27 +64,29 @@ class interrupt_source;
 //***************************************** 
 class interrupt_token {
  private:
-  ::std::shared_ptr<SharedData> _ip{nullptr};
+  ::std::shared_ptr<SharedData> _sp{nullptr};
 
  public:
   // default constructor is cheap:
   explicit interrupt_token() noexcept = default;
 
-  // special members (default OK):
-  //interrupt_token(const interrupt_token&) noexcept;
-  //interrupt_token(interrupt_token&&) noexcept;
-  //interrupt_token& operator=(const interrupt_token&) noexcept;
-  //interrupt_token& operator=(interrupt_token&&) noexcept;
+  // special members (all defaults are OK):
+  //interrupt_token(const interrupt_token&) noexcept = default;
+  //interrupt_token(interrupt_token&&) noexcept = default;
+  //interrupt_token& operator=(const interrupt_token&) noexcept = default;
+  //interrupt_token& operator=(interrupt_token&&) noexcept = default;
+  //~interrupt_token() noexcept = default;
   void swap(interrupt_token& it) noexcept {
-    _ip.swap(it._ip);
+    _sp.swap(it._sp);
   }
 
   // interrupt handling:
   bool is_interruptible() const {
-    return _ip != nullptr;
+    // also false if no more interrupt_source exists
+    return _sp != nullptr && _sp->numSources > 0;
   }
   bool is_interrupted() const noexcept {
-    return _ip && _ip->interrupted.load();
+    return _sp && _sp->interrupted.load();
   }
 
   friend bool operator== (const interrupt_token& lhs, const interrupt_token& rhs);
@@ -97,14 +100,14 @@ class interrupt_token {
 
   friend class interrupt_source;
   explicit interrupt_token(::std::shared_ptr<SharedData> ip)
-   : _ip{std::move(ip)} {
+   : _sp{std::move(ip)} {
   }
 };
 
 bool operator== (const interrupt_token& lhs, const interrupt_token& rhs) {
-  // TODO: just comparing _ip is enough?
+  // TODO: just comparing _sp is enough?
   return (!lhs.is_interruptible() && !rhs.is_interruptible())
-         || (lhs._ip.get() == rhs._ip.get());
+         || (lhs._sp.get() == rhs._sp.get());
 }
 bool operator!= (const interrupt_token& lhs, const interrupt_token& rhs) {
   return !(lhs==rhs);
@@ -116,28 +119,28 @@ bool operator!= (const interrupt_token& lhs, const interrupt_token& rhs) {
 //***************************************** 
 class interrupt_source {
  private:
-  ::std::shared_ptr<SharedData> _ip{nullptr};
+  ::std::shared_ptr<SharedData> _sp{nullptr};
 
  public:
   // default constructor is expensive:
   explicit interrupt_source() noexcept 
-   : _ip{new SharedData{false}} {
+   : _sp{new SharedData{false}} {
   }
   // cheap constructor in case we need it:
   // - see e.g. class jthread
   explicit interrupt_source(std::nullptr_t) noexcept 
-   : _ip{nullptr} {
+   : _sp{nullptr} {
   }
 
   interrupt_token get_token() const noexcept {
-    return interrupt_token(_ip);
+    return interrupt_token(_sp);
   }
   
   // special members (default OK):
   interrupt_source(const interrupt_source& is) noexcept
-   : _ip{is._ip} {
-       if (_ip) {
-         ++(_ip->numSources);
+   : _sp{is._sp} {
+       if (_sp) {
+         ++(_sp->numSources);
        }
   }
   interrupt_source(interrupt_source&&) noexcept = default;
@@ -147,21 +150,21 @@ class interrupt_source {
     return *this;
   }
   ~interrupt_source () {
-     if (_ip) {
-       --(_ip->numSources);
+     if (_sp) {
+       --(_sp->numSources);
      }
   }
 
   void swap(interrupt_source& it) noexcept {
-    _ip.swap(it._ip);
+    _sp.swap(it._sp);
   }
 
   // interrupt handling:
   bool is_valid() const {
-    return _ip != nullptr;
+    return _sp != nullptr;
   }
   bool is_interrupted() const noexcept {
-    return _ip && _ip->interrupted.load();
+    return _sp && _sp->interrupted.load();
   }
 
   bool interrupt();
@@ -170,9 +173,9 @@ class interrupt_source {
 };
 
 bool operator== (const interrupt_source& lhs, const interrupt_source& rhs) {
-  // TODO: just comparing _ip is enough?
+  // TODO: just comparing _sp is enough?
   return (!lhs.is_valid() && !rhs.is_valid())
-         || (lhs._ip.get() == rhs._ip.get());
+         || (lhs._sp.get() == rhs._sp.get());
 }
 bool operator!= (const interrupt_source& lhs, const interrupt_source& rhs) {
   return !(lhs==rhs);
@@ -213,16 +216,16 @@ bool interrupt_source::interrupt()
   std::cout<<std::this_thread::get_id()<<": Interrupting "<<std::endl;
   //std::cout.put('I').flush();
   if (!is_valid()) return false;
-  auto wasInterrupted = _ip->interrupted.exchange(true);
+  auto wasInterrupted = _sp->interrupted.exchange(true);
   if (!wasInterrupted) {
-      _ip->interruptingThreadID = std::this_thread::get_id();
-      ::std::unique_lock lg{_ip->cbDataMutex};  // might throw
+      _sp->interruptingThreadID = std::this_thread::get_id();
+      ::std::unique_lock lg{_sp->cbDataMutex};  // might throw
       // note, we no longer accept new callbacks here in the list
       // but other callbacks might be unregistered
-      while(!_ip->cbData.empty()) {
+      while(!_sp->cbData.empty()) {
         std::cout<<std::this_thread::get_id()<<": Notifying "<<std::endl;
-        auto elem = _ip->cbData.front();
-        _ip->cbData.pop_front();
+        auto elem = _sp->cbData.front();
+        _sp->cbData.pop_front();
         lg.unlock();
         bool destructorHasRunInsideCallback{false};
         elem->destructorHasRunInsideCallback = &destructorHasRunInsideCallback;
@@ -243,15 +246,15 @@ void interrupt_token::registerCB(interrupt_callback_base* cbPtr) {
   std::cout.put('R').flush();
   if (!is_interruptible()) return;
 
-  std::unique_lock lg{_ip->cbDataMutex};
-  if (_ip->interrupted.load()) {
+  std::unique_lock lg{_sp->cbDataMutex};
+  if (_sp->interrupted.load()) {
     // if already interrupted, make sure the callback is durectly called
     // - but not blocking others
     lg.unlock();
     cbPtr->run();
   }
   else {
-    _ip->cbData.emplace_front(cbPtr);  // might throw
+    _sp->cbData.emplace_front(cbPtr);  // might throw
   }
   std::cout.put('r').flush();
 }
@@ -261,11 +264,11 @@ void interrupt_token::unregisterCB(interrupt_callback_base* cbPtr) {
   if (!is_interruptible()) return;
 
   {
-    std::scoped_lock lg{_ip->cbDataMutex};
+    std::scoped_lock lg{_sp->cbDataMutex};
     // remove the matching CB
-    for (auto pos = _ip->cbData.begin(); pos != _ip->cbData.end(); ++pos) {
+    for (auto pos = _sp->cbData.begin(); pos != _sp->cbData.end(); ++pos) {
       if (*pos == cbPtr) {
-        _ip->cbData.erase(pos);
+        _sp->cbData.erase(pos);
         return;
       }
     }
@@ -273,7 +276,7 @@ void interrupt_token::unregisterCB(interrupt_callback_base* cbPtr) {
   // If we come here, the callback either has executed or is being executed
   // So we have to find out whether we are inside the callback
   // - for that we compare thread IDs 
-  if (std::this_thread::get_id() == _ip->interruptingThreadID) {
+  if (std::this_thread::get_id() == _sp->interruptingThreadID) {
     if (cbPtr->destructorHasRunInsideCallback) {
       // we are inside callback of cpPtr
       *(cbPtr->destructorHasRunInsideCallback) = true;
