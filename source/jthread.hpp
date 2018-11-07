@@ -62,9 +62,9 @@ class jthread
     //***************************************** 
     // - supplementary API:
     //   - for the calling thread:
-    interrupt_token get_original_interrupt_token() const noexcept;
+    interrupt_source get_original_interrupt_source() const noexcept;
     bool interrupt() noexcept {
-      return get_original_interrupt_token().interrupt();
+      return get_original_interrupt_source().interrupt();
     }
 
 
@@ -74,7 +74,7 @@ class jthread
 
   private:
     //*** API for the starting thread:
-    interrupt_token _thread_it{};              // interrupt token for started thread
+    interrupt_source _thread_is;               // interrupt token for started thread
     ::std::thread _thread{::std::thread{}};    // started thread (if any)
 };
 
@@ -86,7 +86,8 @@ class jthread
 //***************************************** 
 
 // default constructor:
-inline jthread::jthread() noexcept {
+inline jthread::jthread() noexcept
+ : _thread_is{nullptr} {
 }
 
 // THE constructor that starts the thread:
@@ -94,7 +95,7 @@ inline jthread::jthread() noexcept {
 template <typename Callable, typename... Args,
           typename >
 inline jthread::jthread(Callable&& cb, Args&&... args)
- : _thread_it{false},                             // initialize interrupt token
+ : _thread_is{},                             // initialize interrupt token
    _thread{[] (interrupt_token it, auto&& cb, auto&&... args) {   // called lambda in the thread
                  // perform tasks of the thread:
                  if constexpr(std::is_invocable_v<Callable, interrupt_token, Args...>) {
@@ -109,7 +110,7 @@ inline jthread::jthread(Callable&& cb, Args&&... args)
                                  ::std::forward<decltype(args)>(args)...);
                  }
                },
-               _thread_it,   // not captured due to possible races if immediately set
+               _thread_is.get_token(),   // not captured due to possible races if immediately set
                ::std::forward<Callable>(cb),  // pass callable
                ::std::forward<Args>(args)...  // pass arguments for callable
            }
@@ -142,12 +143,12 @@ inline typename jthread::native_handle_type jthread::native_handle() {
   return _thread.native_handle();
 }
 
-inline interrupt_token jthread::get_original_interrupt_token() const noexcept {
-  return _thread_it;
+inline interrupt_source jthread::get_original_interrupt_source() const noexcept {
+  return _thread_is;
 }
 
 void jthread::swap(jthread& t) noexcept {
-    std::swap(_thread_it, t._thread_it);
+    std::swap(_thread_is, t._thread_is);
     std::swap(_thread, t._thread);
 }
 

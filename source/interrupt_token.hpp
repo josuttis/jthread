@@ -15,7 +15,7 @@
 
 namespace std {
 
-  //***************************************** 
+//***************************************** 
 //* new class for interrupt tokens
 //* - very cheap to create
 //* - cheap to copy
@@ -57,6 +57,10 @@ class interrupt_callback;
 
 class interrupt_source;
 
+
+//***************************************** 
+// interrupt_token
+//***************************************** 
 class interrupt_token {
  private:
   ::std::shared_ptr<SharedData> _ip{nullptr};
@@ -107,14 +111,22 @@ bool operator!= (const interrupt_token& lhs, const interrupt_token& rhs) {
 }
 
 
+//***************************************** 
+// interrupt_source
+//***************************************** 
 class interrupt_source {
  private:
   ::std::shared_ptr<SharedData> _ip{nullptr};
 
  public:
-  // default constructor is cheap:
+  // default constructor is expensive:
   explicit interrupt_source() noexcept 
    : _ip{new SharedData{false}} {
+  }
+  // cheap constructor in case we need it:
+  // - see e.g. class jthread
+  explicit interrupt_source(std::nullptr_t) noexcept 
+   : _ip{nullptr} {
   }
 
   interrupt_token get_token() const noexcept {
