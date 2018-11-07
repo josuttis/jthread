@@ -1,11 +1,12 @@
 include Makefile.h
 
 default: all
-all:: test_itoken test_jthread1 test_jthread2 test_cv test_cvdead test_cvprodcons
+all:: test_itoken test_itokencb test_jthread1 test_jthread2 test_cv test_cvdead test_cvprodcons
 all::
 	@echo ""
 	@echo "Testcases:"
 	@echo "  test_itoken"
+	@echo "  test_itokencb"
 	@echo "  test_jthread1"
 	@echo "  test_jthread2"
 	@echo "  test_cv"
