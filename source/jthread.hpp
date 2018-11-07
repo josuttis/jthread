@@ -62,9 +62,9 @@ class jthread
     //***************************************** 
     // - supplementary API:
     //   - for the calling thread:
-    interrupt_source get_original_interrupt_source() const noexcept;
+    interrupt_source get_interrupt_source() const noexcept;
     bool interrupt() noexcept {
-      return get_original_interrupt_source().interrupt();
+      return get_interrupt_source().interrupt();
     }
 
 
@@ -143,7 +143,7 @@ inline typename jthread::native_handle_type jthread::native_handle() {
   return _thread.native_handle();
 }
 
-inline interrupt_source jthread::get_original_interrupt_source() const noexcept {
+inline interrupt_source jthread::get_interrupt_source() const noexcept {
   return _thread_is;
 }
 

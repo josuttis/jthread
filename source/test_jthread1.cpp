@@ -38,7 +38,7 @@ void testJThreadWithout()
     // and check all values:
     assert(t1.joinable());
     assert(t1ID == t1.get_id());
-    itoken = t1.get_original_interrupt_source().get_token();
+    itoken = t1.get_interrupt_source().get_token();
     assert(!itoken.is_interrupted());
   } // leave scope of t1 without join() or detach() (signals cancellation)
   assert(itoken.is_interrupted());
@@ -84,7 +84,7 @@ void testThreadWithToken()
 
     std::this_thread::sleep_for(470ms);
     origsource = std::move(isource);
-    isource = t1.get_original_interrupt_source();
+    isource = t1.get_interrupt_source();
     assert(!isource.is_interrupted());
     auto ret = isource.interrupt();
     assert(!ret);
@@ -120,7 +120,7 @@ void testJoin()
                       }
                       std::cout << "END t1" << std::endl;
                  });
-    isource = t1.get_original_interrupt_source();
+    isource = t1.get_interrupt_source();
     // let nother thread signal cancellation after some time:
     std::jthread t2([isource] () mutable {
                      for (int i=0; i < 10; ++i) {
@@ -181,12 +181,12 @@ void testDetach()
     }
     // and check all values:
     assert(!t0.joinable());
-    //assert(std::interrupt_source{} == t0.get_original_interrupt_source());
+    //assert(std::interrupt_source{} == t0.get_interrupt_source());
     assert(t1.joinable());
     assert(t1ID == t1.get_id());
     assert(t1IsInterrupted == false);
-    assert(t1InterruptToken == t1.get_original_interrupt_source().get_token());
-    isource = t1.get_original_interrupt_source();
+    assert(t1InterruptToken == t1.get_interrupt_source().get_token());
+    isource = t1.get_interrupt_source();
     assert(t1InterruptToken.is_interruptible());
     assert(!t1InterruptToken.is_interrupted());
     // test detach():
@@ -328,7 +328,7 @@ void testTemporarilyDisableToken()
     }
     std::this_thread::sleep_for(500ms);
     std::cout << "\n- leave scope (should interrupt started thread)" << std::endl;
-    t1is = t1.get_original_interrupt_source();
+    t1is = t1.get_interrupt_source();
   } // leave scope of t1 without join() or detach() (signals cancellation)
   assert(t1is.is_interrupted());
   assert(state.load() == State::interrupted);
@@ -357,7 +357,7 @@ void testJThreadAPI()
   assert(!t0.joinable());
   std::interrupt_source isourceStolen{std::move(isource)};
   assert(!isource.is_valid());
-  assert(isource == t0.get_original_interrupt_source());
+  assert(isource == t0.get_interrupt_source());
 
   {
     std::jthread::id t1ID{std::this_thread::get_id()};
@@ -385,26 +385,26 @@ void testJThreadAPI()
     // and check all values:
     assert(t1.joinable());
     assert(t1ID == t1.get_id());
-    assert(t1InterruptToken == t1.get_original_interrupt_source().get_token());
-    itoken = t1.get_original_interrupt_source().get_token();
+    assert(t1InterruptToken == t1.get_interrupt_source().get_token());
+    itoken = t1.get_interrupt_source().get_token();
     assert(t1InterruptToken.is_interruptible());
     assert(!t1InterruptToken.is_interrupted());
     // test swap():
     std::swap(t0, t1);
     assert(!t1.joinable());
-    assert(std::interrupt_token{} == t1.get_original_interrupt_source().get_token());
+    assert(std::interrupt_token{} == t1.get_interrupt_source().get_token());
     assert(t0.joinable());
     assert(t1ID == t0.get_id());
-    assert(t1InterruptToken == t0.get_original_interrupt_source().get_token());
+    assert(t1InterruptToken == t0.get_interrupt_source().get_token());
     // manual swap with move():
     auto ttmp{std::move(t0)};
     t0 = std::move(t1);
     t1 = std::move(ttmp);
     assert(!t0.joinable());
-    assert(std::interrupt_token{} == t0.get_original_interrupt_source().get_token());
+    assert(std::interrupt_token{} == t0.get_interrupt_source().get_token());
     assert(t1.joinable());
     assert(t1ID == t1.get_id());
-    assert(t1InterruptToken == t1.get_original_interrupt_source().get_token());
+    assert(t1InterruptToken == t1.get_interrupt_source().get_token());
   } // leave scope of t1 without join() or detach() (signals cancellation)
   assert(itoken.is_interrupted());
   std::cout << "\n*** OK" << std::endl;

@@ -68,11 +68,11 @@ void interruptByDestructor()
                        assert(false);
                      }
                    });
-   assert(!t1.get_original_interrupt_source().is_interrupted());
+   assert(!t1.get_interrupt_source().is_interrupted());
 
    // call destructor after 4 times the interval (should signal the interrupt)
    std::this_thread::sleep_for(4 * interval);
-   assert(!t1.get_original_interrupt_source().is_interrupted());
+   assert(!t1.get_interrupt_source().is_interrupted());
    std::cout << "\n- destruct jthread t1 (should signal interrupt)" << std::endl;
   }
 
@@ -113,7 +113,7 @@ void interruptStartedThread()
    std::this_thread::sleep_for(4 * interval);
    std::cout << "\n- interrupt jthread t1" << std::endl;
    t1.interrupt();
-   assert(t1.get_original_interrupt_source().is_interrupted());
+   assert(t1.get_interrupt_source().is_interrupted());
    std::cout << "\n- join jthread t1" << std::endl;
    t1.join();
    assert(interrupted);
@@ -150,7 +150,7 @@ void interruptStartedThreadWithSubthread()
    std::this_thread::sleep_for(4 * interval);
    std::cout << "\n- interrupt jthread t1 (should signal interrupt to t2)" << std::endl;
    t1.interrupt();
-   assert(t1.get_original_interrupt_source().is_interrupted());
+   assert(t1.get_interrupt_source().is_interrupted());
    std::cout << "\n- join jthread t1" << std::endl;
    t1.join();
    std::cout << "\n- destruct jthread t1" << std::endl;
@@ -174,7 +174,7 @@ void basicAPIWithFunc()
   {
     std::cout << "\n- start jthread t1" << std::endl;
     std::jthread t(&foo, "foo() called in thread with id: ");
-    is = t.get_original_interrupt_source();
+    is = t.get_interrupt_source();
     std::cout << is.is_interrupted() << std::endl;
     assert(is.is_valid());
     assert(!is.is_interrupted());

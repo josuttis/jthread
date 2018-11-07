@@ -1,7 +1,6 @@
 #ifndef INTERRUPT_TOKEN_HPP
 #define INTERRUPT_TOKEN_HPP
 
-//*****************************************************************************
 #include <memory>
 #include <atomic>
 #include <mutex>
@@ -132,10 +131,6 @@ class interrupt_source {
    : _sp{nullptr} {
   }
 
-  interrupt_token get_token() const noexcept {
-    return interrupt_token(_sp);
-  }
-  
   // special members (default OK):
   interrupt_source(const interrupt_source& is) noexcept
    : _sp{is._sp} {
@@ -159,6 +154,11 @@ class interrupt_source {
     _sp.swap(it._sp);
   }
 
+  // get_token()
+  interrupt_token get_token() const noexcept {
+    return interrupt_token(_sp);
+  }
+  
   // interrupt handling:
   bool is_valid() const {
     return _sp != nullptr;
@@ -181,6 +181,10 @@ bool operator!= (const interrupt_source& lhs, const interrupt_source& rhs) {
   return !(lhs==rhs);
 }
 
+
+//***************************************** 
+// interrupt_callback
+//***************************************** 
 template <typename Callback>
 struct interrupt_callback : interrupt_callback_base
 {
@@ -210,6 +214,11 @@ struct interrupt_callback : interrupt_callback_base
     }    
 };
 
+
+
+//***************************************** 
+// key member function for registering and calling callbacks
+//***************************************** 
 
 bool interrupt_source::interrupt()
 {

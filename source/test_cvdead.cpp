@@ -46,14 +46,14 @@ void testCVDeadlock()
                       }
                     });
 
-    auto t1InterruptToken = t1.get_original_interrupt_token();
+    auto t1InterruptSource = t1.get_interrupt_source();
 
     std::this_thread::sleep_for(1s);
-    std::jthread t2([&ready, &readyMutex, &readyCV, &t1InterruptToken] (std::interrupt_token /*t2_interrupt_token_not_used*/) {
+    std::jthread t2([&ready, &readyMutex, &readyCV, &t1InterruptSource] (std::interrupt_token /*t2_interrupt_token_not_used*/) {
                         std::cout << "\n" <<std::this_thread::get_id()<<": t2: lock " <<&readyMutex << std::endl;
                       std::unique_lock<std::mutex> lg{readyMutex};
                       std::cout << "\n" <<std::this_thread::get_id()<<": t2: interrupt" << std::endl;
-		      t1InterruptToken.interrupt();
+		      t1InterruptSource.interrupt();
                       std::cout << "\n" <<std::this_thread::get_id()<<": t2: interrupt done" << std::endl;
                     });
 

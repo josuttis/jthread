@@ -171,9 +171,9 @@ void testCVStdThreadNoPred(bool callNotify)
   std::mutex readyMutex;
   std::condition_variable_any2 readyCV;
   
-  std::interrupt_token it{false};
+  std::interrupt_source is;
   {
-    std::thread t1([&ready, &readyMutex, &readyCV, it, callNotify] {
+    std::thread t1([&ready, &readyMutex, &readyCV, it=is.get_token(), callNotify] {
                       {
                         std::unique_lock lg{readyMutex};
                         bool ret = readyCV.wait_until(lg,
@@ -192,7 +192,7 @@ void testCVStdThreadNoPred(bool callNotify)
                     });
     
     std::this_thread::sleep_for(0.5s);
-    assert(!it.is_interrupted());
+    assert(!is.is_interrupted());
     std::this_thread::sleep_for(0.5s);
     if (callNotify) {
       {
@@ -204,7 +204,7 @@ void testCVStdThreadNoPred(bool callNotify)
     }
     else {
       std::cout << "- signal interrupt" << std::endl;
-      it.interrupt();
+      is.interrupt();
     }
     t1.join();
   } // leave scope of t1 without join() or detach() (signals cancellation)
@@ -222,9 +222,9 @@ void testCVStdThreadPred(bool callNotify)
   std::mutex readyMutex;
   std::condition_variable_any2 readyCV;
   
-  std::interrupt_token it{false};
+  std::interrupt_source is;
   {
-    std::thread t1([&ready, &readyMutex, &readyCV, it, callNotify] {
+    std::thread t1([&ready, &readyMutex, &readyCV, it=is.get_token(), callNotify] {
                       bool ret;
                       {
                         std::unique_lock lg{readyMutex};
@@ -244,7 +244,7 @@ void testCVStdThreadPred(bool callNotify)
                     });
     
     std::this_thread::sleep_for(0.5s);
-    assert(!it.is_interrupted());
+    assert(!is.is_interrupted());
     std::this_thread::sleep_for(0.5s);
     if (callNotify) {
       {
@@ -256,7 +256,7 @@ void testCVStdThreadPred(bool callNotify)
     }
     else {
       std::cout << "- signal interrupt" << std::endl;
-      it.interrupt();
+      is.interrupt();
     }
     t1.join();
   } // leave scope of t1 without join() or detach() (signals cancellation)
@@ -421,7 +421,7 @@ void testTimedCV(bool callNotify, bool callInterrupt, Dur dur)
                     });
     
     std::this_thread::sleep_for(0.5s);
-    assert(!t1.get_original_interrupt_token().is_interrupted());
+    assert(!t1.get_interrupt_source().is_interrupted());
     std::this_thread::sleep_for(0.5s);
     if (callNotify) {
       std::cout << "\n- set ready" << std::endl;
@@ -525,7 +525,7 @@ void testTimedIWait(bool callNotify, bool callInterrupt, Dur dur)
                     });
     
     std::this_thread::sleep_for(0.5s);
-    assert(!t1.get_original_interrupt_token().is_interrupted());
+    assert(!t1.get_interrupt_source().is_interrupted());
     std::this_thread::sleep_for(0.5s);
     if (callNotify) {
       std::cout << "\n- set ready" << std::endl;
@@ -576,7 +576,6 @@ void testManyCV(bool callNotify, bool callInterrupt)
             << "callInterrupt=" << callInterrupt << ", "
             << "numExtraCV=" << numExtraCV << ")" << std::endl;
 
-  std::interrupt_token t0itoken;
   {
     // thread t0 with CV:
     bool ready = false;
@@ -586,7 +585,7 @@ void testManyCV(bool callNotify, bool callInterrupt)
                              std::ref(ready), std::ref(readyMutex), std::ref(readyCV),
                              callNotify);
     {  
-      t0itoken = t0.get_original_interrupt_token();
+      auto t0isource = t0.get_interrupt_source();
       std::this_thread::sleep_for(0.5s);
 
       // starts thread concurrently calling interrupt() for the same token:
@@ -598,7 +597,7 @@ void testManyCV(bool callNotify, bool callInterrupt)
       std::vector<std::jthread> vThreads;
       for (int idx = 0; idx < numExtraCV; ++idx) {
         std::this_thread::sleep_for(0.1ms);
-        std::jthread t([idx, t0itoken, &arrReady, &arrReadyMutex, &arrReadyCV, callNotify] {
+        std::jthread t([idx, t0itoken=t0isource.get_token(), &arrReady, &arrReadyMutex, &arrReadyCV, callNotify] {
                          // use interrupt token of t0 instead
                          // NOTE: disables signaling interrupts directly to the thread
                          cvIWait(t0itoken, idx+1,

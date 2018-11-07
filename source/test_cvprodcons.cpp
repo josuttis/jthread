@@ -24,7 +24,8 @@ void exampleProducerConsumer(double prodSec, double consSec, bool interrupt)
   std::vector<int> items;
   std::mutex itemsMx;
   std::condition_variable_any2 itemsCV;
-  std::interrupt_token itoken{ false };
+  std::interrupt_source isource;
+  std::interrupt_token itoken{isource.get_token()};
   constexpr size_t maxQueueSize = 100;
 
   std::thread producer{
@@ -99,7 +100,7 @@ void exampleProducerConsumer(double prodSec, double consSec, bool interrupt)
             // Found the item I'm looking for. Cancel producer.
             // Whoops, this is being called while holding a lock on mutex 'itemMx'!
             strm << " INTERRUPT";
-            itoken.interrupt();
+            isource.interrupt();
             return;
           }
         }
@@ -116,7 +117,7 @@ void exampleProducerConsumer(double prodSec, double consSec, bool interrupt)
 
   if (interrupt) {
     std::this_thread::sleep_for(prodSleep*10);
-    itoken.interrupt();
+    isource.interrupt();
   }
 #ifdef QQQ
   {
