@@ -157,7 +157,7 @@ class interrupt_source {
   }
 
   // interrupt handling:
-  bool is_interruptible() const {
+  bool is_valid() const {
     return _ip != nullptr;
   }
   bool is_interrupted() const noexcept {
@@ -171,7 +171,7 @@ class interrupt_source {
 
 bool operator== (const interrupt_source& lhs, const interrupt_source& rhs) {
   // TODO: just comparing _ip is enough?
-  return (!lhs.is_interruptible() && !rhs.is_interruptible())
+  return (!lhs.is_valid() && !rhs.is_valid())
          || (lhs._ip.get() == rhs._ip.get());
 }
 bool operator!= (const interrupt_source& lhs, const interrupt_source& rhs) {
@@ -212,7 +212,7 @@ bool interrupt_source::interrupt()
 {
   std::cout<<std::this_thread::get_id()<<": Interrupting "<<std::endl;
   //std::cout.put('I').flush();
-  if (!is_interruptible()) return false;
+  if (!is_valid()) return false;
   auto wasInterrupted = _ip->interrupted.exchange(true);
   if (!wasInterrupted) {
       _ip->interruptingThreadID = std::this_thread::get_id();

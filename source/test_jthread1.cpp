@@ -54,7 +54,7 @@ void testThreadWithToken()
 
   std::interrupt_source isource;
   std::interrupt_source origsource;
-  assert(isource.is_interruptible());
+  assert(isource.is_valid());
   assert(!isource.is_interrupted());
   {
     std::jthread::id t1ID{std::this_thread::get_id()};
@@ -110,7 +110,7 @@ void testJoin()
   std::cout << "\n*** start testJoin()" << std::endl;
 
   std::interrupt_source isource;
-  assert(isource.is_interruptible());
+  assert(isource.is_valid());
   {
     std::jthread t1([](std::interrupt_token itoken) {
                       // wait until interrupt is signaled (due to calling interrupt() for the token):
@@ -149,7 +149,7 @@ void testDetach()
   std::cout << "\n*** start testDetach()" << std::endl;
 
   std::interrupt_source isource;
-  assert(isource.is_interruptible());
+  assert(isource.is_valid());
   std::atomic<bool> t1FinallyInterrupted{false};
   {
     std::jthread t0;
@@ -345,7 +345,7 @@ void testJThreadAPI()
 
   assert(std::jthread::hardware_concurrency() == std::thread::hardware_concurrency()); 
   std::interrupt_source isource;
-  assert(isource.is_interruptible());
+  assert(isource.is_valid());
   assert(isource.get_token().is_interruptible());
   std::interrupt_token itoken;
   assert(!itoken.is_interruptible());
@@ -356,7 +356,7 @@ void testJThreadAPI()
   assert((std::is_same_v<decltype(nh), std::thread::native_handle_type>)); 
   assert(!t0.joinable());
   std::interrupt_source isourceStolen{std::move(isource)};
-  assert(!isource.is_interruptible());
+  assert(!isource.is_valid());
   assert(isource == t0.get_original_interrupt_source());
 
   {
