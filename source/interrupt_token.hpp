@@ -80,12 +80,15 @@ class interrupt_token {
   }
 
   // interrupt handling:
-  bool is_interruptible() const {
-    // also false if no more interrupt_source exists
-    return _sp != nullptr && _sp->numSources > 0;
-  }
   bool is_interrupted() const noexcept {
     return _sp && _sp->interrupted.load();
+  }
+  bool is_interruptible() const {
+    // signals if callback could be called (immediately or later).
+    // if not interruptible we remain to be so
+    // if interruptible we can only become not interruptible if
+    //  not interrupted yet
+    return _sp && (is_interrupted() || _sp->numSources > 0);
   }
 
   friend bool operator== (const interrupt_token& lhs, const interrupt_token& rhs);

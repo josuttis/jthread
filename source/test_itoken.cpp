@@ -55,13 +55,25 @@ void testInterruptTokenAPI()
   //***** source and token:
 
   // tokens without an source are no longer interruptible:
-  std::interrupt_source* isp = new std::interrupt_source;
-  std::interrupt_source& isr = *isp;
-  std::interrupt_token it{isr.get_token()};
-  assert(isr.is_valid());
-  assert(it.is_interruptible());
-  delete isp;
-  assert(!it.is_interruptible());
+  {
+    std::interrupt_source* isp = new std::interrupt_source;
+    std::interrupt_source& isr = *isp;
+    std::interrupt_token it{isr.get_token()};
+    assert(isr.is_valid());
+    assert(it.is_interruptible());
+    delete isp;  // not interrupted and losing last source
+    assert(!it.is_interruptible());
+  }
+  {
+    std::interrupt_source* isp = new std::interrupt_source;
+    std::interrupt_source& isr = *isp;
+    std::interrupt_token it{isr.get_token()};
+    assert(isr.is_valid());
+    assert(it.is_interruptible());
+    isr.interrupt();
+    //delete isp;  // interrupted and losing last source
+    //assert(it.is_interruptible());
+  }
 
   //***** is_valid()/is_interruptible, is_interrupted(), and interrupt():
   {
