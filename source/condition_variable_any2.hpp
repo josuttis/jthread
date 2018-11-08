@@ -45,7 +45,7 @@ class condition_variable_any2
     //***************************************** 
 
     condition_variable_any2()
-     : cv{}, mut{} {
+        : cv{}, mut{std::make_shared<std::mutex>()} {
     }
     ~condition_variable_any2() {
     }
@@ -53,24 +53,26 @@ class condition_variable_any2
     condition_variable_any2& operator=(const condition_variable_any2&) = delete;
 
     void notify_one() noexcept {
-        std::lock_guard<std::mutex> guard(mut);
+        std::lock_guard<std::mutex> guard(*mut);
       cv.notify_one();
     }
     void notify_all() noexcept {      
-        std::lock_guard<std::mutex> guard(mut);
+        std::lock_guard<std::mutex> guard(*mut);
       cv.notify_all();
     }
 
     template<typename Lockable>
     void wait(Lockable& lock) {
-        std::unique_lock<std::mutex> first_internal_lock(mut);
+        auto local_mut=mut;
+        std::unique_lock<std::mutex> first_internal_lock(*local_mut);
         unlock_guard<Lockable> unlocker(lock);
         std::unique_lock<std::mutex> second_internal_lock(std::move(first_internal_lock));
       cv.wait(second_internal_lock);
     }
     template<class Lockable,class Predicate>
      void wait(Lockable& lock, Predicate pred) {
-        std::unique_lock<std::mutex> first_internal_lock(mut);
+        auto local_mut=mut;
+        std::unique_lock<std::mutex> first_internal_lock(*local_mut);
         unlock_guard<Lockable> unlocker(lock);
         std::unique_lock<std::mutex> second_internal_lock(std::move(first_internal_lock));
       cv.wait(second_internal_lock,pred);
@@ -78,7 +80,8 @@ class condition_variable_any2
     template<class Lockable, class Clock, class Duration>
      cv_status wait_until(Lockable& lock,
                           const chrono::time_point<Clock, Duration>& abs_time) {
-        std::unique_lock<std::mutex> first_internal_lock(mut);
+        auto local_mut=mut;
+        std::unique_lock<std::mutex> first_internal_lock(*local_mut);
         unlock_guard<Lockable> unlocker(lock);
         std::unique_lock<std::mutex> second_internal_lock(std::move(first_internal_lock));
       return cv.wait_until(second_internal_lock, abs_time);
@@ -87,7 +90,8 @@ class condition_variable_any2
      bool wait_until(Lockable& lock,
                      const chrono::time_point<Clock, Duration>& abs_time,
                      Predicate pred) {
-        std::unique_lock<std::mutex> first_internal_lock(mut);
+        auto local_mut=mut;
+        std::unique_lock<std::mutex> first_internal_lock(*local_mut);
         unlock_guard<Lockable> unlocker(lock);
         std::unique_lock<std::mutex> second_internal_lock(std::move(first_internal_lock));
       return cv.wait_until(second_internal_lock, abs_time, pred);
@@ -95,7 +99,8 @@ class condition_variable_any2
     template<class Lockable,class Rep, class Period>
      cv_status wait_for(Lockable& lock,
                         const chrono::duration<Rep, Period>& rel_time) {
-        std::unique_lock<std::mutex> first_internal_lock(mut);
+        auto local_mut=mut;
+        std::unique_lock<std::mutex> first_internal_lock(*local_mut);
         unlock_guard<Lockable> unlocker(lock);
         std::unique_lock<std::mutex> second_internal_lock(std::move(first_internal_lock));
       return cv.wait_for(second_internal_lock, rel_time);
@@ -104,7 +109,8 @@ class condition_variable_any2
      bool wait_for(Lockable& lock,
                    const chrono::duration<Rep, Period>& rel_time,
                    Predicate pred) {
-        std::unique_lock<std::mutex> first_internal_lock(mut);
+        auto local_mut=mut;
+        std::unique_lock<std::mutex> first_internal_lock(*local_mut);
         unlock_guard<Lockable> unlocker(lock);
         std::unique_lock<std::mutex> second_internal_lock(std::move(first_internal_lock));
       return cv.wait_for(second_internal_lock, rel_time, pred);
@@ -148,7 +154,23 @@ class condition_variable_any2
   private:
     //*** API for the starting thread:
     condition_variable cv;
-    std::mutex mut;
+    std::shared_ptr<std::mutex> mut;
+     // NOTE (as Howard Hinnant pointed out): 
+     // std::~condition_variable_any() says:
+     //   Requires: There shall be no thread blocked on *this. [Note: That is, all threads shall have been notified;
+     //             they may subsequently block on the lock specified in the wait.
+     //             This relaxes the usual rules, which would have required all wait calls to happen before destruction.
+     //             Only the notification to unblock the wait needs to happen before destruction.
+     //             The user should take care to ensure that no threads wait on *this once the destructor has been started,
+     //             especially when the waiting threads are calling the wait functions in a loop or using the overloads of
+     //             wait, wait_for, or wait_until that take a predicate.  ]
+     // That big long note means ~condition_variable_any() can execute before a signaled thread returns from a wait.
+     // If this happens with condition_variable_any2, that waiting thread will attempt to lock the destructed mutex mut.
+     // To fix this, there must be shared ownership of the data member mut between the condition_variable_any object and the member functions wait (wait_for, etc.).
+     // (libc++'s implementation gets this right: https://github.com/llvm-mirror/libcxx/blob/master/include/condition_variable
+     //  It holds the data member mutex with a shared_ptr<mutex> instead of mutex directly, and the wait functions create 
+     //  a local shared_ptr<mutex> copy on entry so that if *this destructs out from under the thread executing the wait function,
+     //  the mutex stays alive until the wait function returns.)
 };
 
 
@@ -170,10 +192,11 @@ inline bool condition_variable_any2::wait_until(Lockable& lock,
     if (itoken.is_interrupted()) {
       return pred();
     }
+    auto local_mut=mut;
     interrupt_callback cb(itoken, [this] { this->notify_all(); });
     //register_guard rg{itoken, this};
     while(!pred()) {
-        std::unique_lock<std::mutex> first_internal_lock(mut);
+        std::unique_lock<std::mutex> first_internal_lock(*local_mut);
         if(itoken.is_interrupted())
             break;
         unlock_guard<Lockable> unlocker(lock);
@@ -197,10 +220,11 @@ inline bool condition_variable_any2::wait_until(Lockable& lock,
     if (itoken.is_interrupted()) {
       return pred();
     }
+    auto local_mut=mut;
     interrupt_callback cb(itoken, [this] { this->notify_all(); });
     //register_guard rg{itoken, this};
     while(!pred()  && Clock::now() < abs_time) {
-        std::unique_lock<std::mutex> first_internal_lock(mut);
+        std::unique_lock<std::mutex> first_internal_lock(*local_mut);
         if(itoken.is_interrupted())
             break;
         unlock_guard<Lockable> unlocker(lock);
