@@ -188,6 +188,7 @@ bool operator!= (const interrupt_source& lhs, const interrupt_source& rhs) {
 //***************************************** 
 // interrupt_callback
 //***************************************** 
+// with concepts: template <Invocable Callback>
 template <typename Callback>
 struct interrupt_callback : interrupt_callback_base
 {

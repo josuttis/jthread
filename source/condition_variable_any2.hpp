@@ -1,4 +1,3 @@
-// -----------------------------------------------------
 // extended standard condition_variable to deal with
 // interrupt tokens and jthread
 // -----------------------------------------------------
@@ -166,7 +165,8 @@ class condition_variable_any2
      //             wait, wait_for, or wait_until that take a predicate.  ]
      // That big long note means ~condition_variable_any() can execute before a signaled thread returns from a wait.
      // If this happens with condition_variable_any2, that waiting thread will attempt to lock the destructed mutex mut.
-     // To fix this, there must be shared ownership of the data member mut between the condition_variable_any object and the member functions wait (wait_for, etc.).
+     // To fix this, there must be shared ownership of the data member mut between the condition_variable_any object
+     // and the member functions wait (wait_for, etc.).
      // (libc++'s implementation gets this right: https://github.com/llvm-mirror/libcxx/blob/master/include/condition_variable
      //  It holds the data member mutex with a shared_ptr<mutex> instead of mutex directly, and the wait functions create 
      //  a local shared_ptr<mutex> copy on entry so that if *this destructs out from under the thread executing the wait function,
