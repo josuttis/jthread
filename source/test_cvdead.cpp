@@ -32,30 +32,30 @@ void testCVDeadlock()
 //  - block and try to notify cv1
   
   {
-    std::jthread t1([&ready, &readyMutex, &readyCV] (std::interrupt_token it) {
+    std::jthread t1([&ready, &readyMutex, &readyCV] (std::stop_token it) {
                         std::cout << "\n" <<std::this_thread::get_id()<<": t1: lock "<<&readyMutex << std::endl;
                       std::unique_lock<std::mutex> lg{readyMutex};
                       std::cout << "\n" <<std::this_thread::get_id()<<": t1: wait" << std::endl;
                       readyCV.wait_until(lg,
                                          [&ready] { return ready; },
                                          it);
-                      if (it.is_interrupted()) {
-                        std::cout << "\n" <<std::this_thread::get_id()<<": t1: interrupted" << std::endl;
+                      if (it.stop_signaled()) {
+                        std::cout << "\n" <<std::this_thread::get_id()<<": t1: signal stop" << std::endl;
                       }
                       else {
                         std::cout << "\n" <<std::this_thread::get_id()<<": t1: ready" << std::endl;
                       }
                     });
 
-    auto t1InterruptSource = t1.get_interrupt_source();
+    auto t1StopSource = t1.get_stop_source();
 
     std::this_thread::sleep_for(1s);
-    std::jthread t2([&ready, &readyMutex, &readyCV, &t1InterruptSource] (std::interrupt_token /*t2_interrupt_token_not_used*/) {
+    std::jthread t2([&ready, &readyMutex, &readyCV, &t1StopSource] (std::stop_token /*t2_stop_token_not_used*/) {
                         std::cout << "\n" <<std::this_thread::get_id()<<": t2: lock " <<&readyMutex << std::endl;
                       std::unique_lock<std::mutex> lg{readyMutex};
-                      std::cout << "\n" <<std::this_thread::get_id()<<": t2: interrupt" << std::endl;
-		      t1InterruptSource.interrupt();
-                      std::cout << "\n" <<std::this_thread::get_id()<<": t2: interrupt done" << std::endl;
+                      std::cout << "\n" <<std::this_thread::get_id()<<": t2: signal stop" << std::endl;
+		      t1StopSource.signal_stop();
+                      std::cout << "\n" <<std::this_thread::get_id()<<": t2: signal-stop done" << std::endl;
                     });
 
     std::this_thread::sleep_for(1s);

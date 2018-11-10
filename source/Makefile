@@ -10,6 +10,7 @@ all::
 	@echo "  test_jthread1"
 	@echo "  test_jthread2"
 	@echo "  test_cv"
+	@echo "  test_cvcb"
 	@echo "  test_cvdead"
 	@echo "  test_cvprodcons"
 
@@ -39,6 +40,12 @@ test_jthread2: stop_token.hpp condition_variable_any2.hpp jthread.hpp test_jthre
 
 test_cv: stop_token.hpp jthread.hpp condition_variable_any2.hpp test_cv.cpp Makefile
 	$(CXX17) $(CXXFLAGS17) $(INCLUDES) test_cv.cpp $(LDFLAGS17) -o $@17raw.exe
+	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@17.exe
+	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@.exe
+	echo "- OK:  $@ and $@17  call  $@17raw.exe"
+
+test_cvcb: stop_token.hpp jthread.hpp condition_variable_any2.hpp test_cvcb.cpp Makefile
+	$(CXX17) $(CXXFLAGS17) $(INCLUDES) test_cvcb.cpp $(LDFLAGS17) -o $@17raw.exe
 	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@17.exe
 	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@.exe
 	echo "- OK:  $@ and $@17  call  $@17raw.exe"

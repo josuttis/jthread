@@ -7,7 +7,7 @@
 //*****************************************************************************
 // forward declarations are in separate header due to cyclic type dependencies:
 //*****************************************************************************
-#include "interrupt_token.hpp"
+#include "stop_token.hpp"
 #include <condition_variable>
 #include <iostream>
 
@@ -127,7 +127,7 @@ class condition_variable_any2
     template <class Lockable,class Predicate>
       bool wait_until(Lockable& lock,
                       Predicate pred,
-                      interrupt_token itoken);
+                      stop_token stoken);
 
     // return:
     // - true if pred() yields true
@@ -136,7 +136,7 @@ class condition_variable_any2
       bool wait_until(Lockable& lock,
                       const chrono::time_point<Clock, Duration>& abs_time,
                       Predicate pred,
-                      interrupt_token itoken);
+                      stop_token stoken);
     // return:
     // - true if pred() yields true
     // - false otherwise (i.e. on timeout or interrupt)
@@ -144,7 +144,7 @@ class condition_variable_any2
       bool wait_for(Lockable& lock,
                     const chrono::duration<Rep, Period>& rel_time,
                     Predicate pred,
-                    interrupt_token itoken);
+                    stop_token stoken);
 
   //***************************************** 
   //* implementation:
@@ -187,17 +187,17 @@ class condition_variable_any2
 template <class Lockable, class Predicate>
 inline bool condition_variable_any2::wait_until(Lockable& lock,
                                             Predicate pred,
-                                            interrupt_token itoken)
+                                            stop_token stoken)
 {
-    if (itoken.is_interrupted()) {
+    if (stoken.stop_signaled()) {
       return pred();
     }
     auto local_mut=mut;
-    interrupt_callback cb(itoken, [this] { this->notify_all(); });
-    //register_guard rg{itoken, this};
+    stop_callback cb(stoken, [this] { this->notify_all(); });
+    //register_guard rg{stoken, this};
     while(!pred()) {
         std::unique_lock<std::mutex> first_internal_lock(*local_mut);
-        if(itoken.is_interrupted())
+        if(stoken.stop_signaled())
             break;
         unlock_guard<Lockable> unlocker(lock);
         std::unique_lock<std::mutex> second_internal_lock(std::move(first_internal_lock));
@@ -215,17 +215,17 @@ template <class Lockable, class Clock, class Duration, class Predicate>
 inline bool condition_variable_any2::wait_until(Lockable& lock,
                                             const chrono::time_point<Clock, Duration>& abs_time,
                                             Predicate pred,
-                                            interrupt_token itoken)
+                                            stop_token stoken)
 {
-    if (itoken.is_interrupted()) {
+    if (stoken.stop_signaled()) {
       return pred();
     }
     auto local_mut=mut;
-    interrupt_callback cb(itoken, [this] { this->notify_all(); });
-    //register_guard rg{itoken, this};
+    stop_callback cb(stoken, [this] { this->notify_all(); });
+    //register_guard rg{stoken, this};
     while(!pred()  && Clock::now() < abs_time) {
         std::unique_lock<std::mutex> first_internal_lock(*local_mut);
-        if(itoken.is_interrupted())
+        if(stoken.stop_signaled())
             break;
         unlock_guard<Lockable> unlocker(lock);
         std::unique_lock<std::mutex> second_internal_lock(std::move(first_internal_lock));
@@ -243,13 +243,13 @@ template <class Lockable,class Rep, class Period, class Predicate>
 inline bool condition_variable_any2::wait_for(Lockable& lock,
                                           const chrono::duration<Rep, Period>& rel_time,
                                           Predicate pred,
-                                          interrupt_token itoken)
+                                          stop_token stoken)
 {
   auto abs_time = std::chrono::steady_clock::now() + rel_time;
   return wait_until(lock,
                     abs_time,
                     std::move(pred),
-                    std::move(itoken));
+                    std::move(stoken));
 }
 
 

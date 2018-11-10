@@ -24,20 +24,20 @@ void testCVCallback()
 
   bool cbCalled{false};
   {
-    std::jthread t1{[&] (std::interrupt_token itoken) {
+    std::jthread t1{[&] (std::stop_token stoken) {
                        std::cout << "\nt1 started" << std::endl;
-                       std::interrupt_callback cb(itoken,
-                                               [&] {
-                                                 std::cout << "\nt1 cb called (1sec)" << std::endl;
-                                                 std::this_thread::sleep_for(1s);
-                                                 cbCalled = true;
-                                                 std::cout << "\nend t1 cb" << std::endl;
-                                               });
+                       std::stop_callback cb(stoken,
+                                             [&] {
+                                               std::cout << "\nt1 cb called (1sec)" << std::endl;
+                                               std::this_thread::sleep_for(1s);
+                                               cbCalled = true;
+                                               std::cout << "\nend t1 cb" << std::endl;
+                                             });
                        std::cout << "\nt1 cb registered" << std::endl;
                        std::unique_lock<std::mutex> lg{readyMutex};
                        readyCV.wait_until(lg,
                                           [&ready] { return ready; },
-                                          itoken);
+                                          stoken);
                        std::cout << "\nend t1" << std::endl;
                 }};
 

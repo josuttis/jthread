@@ -10,7 +10,7 @@
 using namespace::std::literals;
 
 // helper to call iwait() and check some assertions
-void cvIWait (std::interrupt_token iToken, int id,
+void cvIWait (std::stop_token sToken, int id,
               bool& ready, std::mutex& readyMutex, std::condition_variable_any2& readyCV,
               bool notifyCalled) {
   std::ostringstream strm;
@@ -25,13 +25,13 @@ void cvIWait (std::interrupt_token iToken, int id,
       //readyCV.iwait(lg, [&ready] { return ready; });
       readyCV.wait_until(lg,
                          [&ready] { return ready; },
-                         iToken);
-      if (iToken.is_interrupted()) {
+                         sToken);
+      if (sToken.stop_signaled()) {
         throw "interrupted";
       }
 
     }
-    if (iToken.is_interrupted()) {
+    if (sToken.stop_signaled()) {
       std::string msg = "\ncvIWait(" + std::to_string(id) + "): interrupted";
       std::cout << msg << std::endl;
       assert(false);
@@ -73,21 +73,21 @@ void testStdCV(bool callNotify)
   std::condition_variable_any2 readyCV;
   
   {
-    std::jthread t1([&ready, &readyMutex, &readyCV, callNotify] (std::interrupt_token it) {
+    std::jthread t1([&ready, &readyMutex, &readyCV, callNotify] (std::stop_token it) {
                       {
                         std::unique_lock lg{readyMutex};
-                        while (!it.is_interrupted() && !ready) {
+                        while (!it.stop_signaled() && !ready) {
                           readyCV.wait_for(lg, 100ms);
                           std::cout.put('.').flush();
                         }
                       }
-                      if (it.is_interrupted()) {
+                      if (it.stop_signaled()) {
                         std::cout << "t1: interrupted" << std::endl;
                       }
                       else {
                         std::cout << "t1: ready" << std::endl;
                       }
-                      assert(callNotify != it.is_interrupted());
+                      assert(callNotify != it.stop_signaled());
                     });
     
     std::this_thread::sleep_for(1s);
@@ -116,14 +116,14 @@ void testCVPred(bool callNotify)
   std::condition_variable_any2 readyCV;
   
   {
-    std::jthread t1([&ready, &readyMutex, &readyCV, callNotify] (std::interrupt_token it) {
+    std::jthread t1([&ready, &readyMutex, &readyCV, callNotify] (std::stop_token it) {
                       try {
                         std::unique_lock lg{readyMutex};
                         //readyCV.iwait(lg, [&ready] { return ready; });
                         readyCV.wait_until(lg,
                                            [&ready] { return ready; },
                                            it);
-                        if (it.is_interrupted()) {
+                        if (it.stop_signaled()) {
                           throw "interrupted";
                         }
                         assert(callNotify);
@@ -137,13 +137,13 @@ void testCVPred(bool callNotify)
                       catch (...) {
                         assert(false);
                       }
-                      if (it.is_interrupted()) {
+                      if (it.stop_signaled()) {
                         std::cout << "t1: interrupted" << std::endl;
                       }
                       else {
                         std::cout << "t1: ready" << std::endl;
                       }
-                      assert(callNotify != it.is_interrupted());
+                      assert(callNotify != it.stop_signaled());
                     });
     
     std::this_thread::sleep_for(1s);
@@ -171,7 +171,7 @@ void testCVStdThreadNoPred(bool callNotify)
   std::mutex readyMutex;
   std::condition_variable_any2 readyCV;
   
-  std::interrupt_source is;
+  std::stop_source is;
   {
     std::thread t1([&ready, &readyMutex, &readyCV, it=is.get_token(), callNotify] {
                       {
@@ -181,10 +181,10 @@ void testCVStdThreadNoPred(bool callNotify)
                                                       it);
                         if (ret) {
                             std::cout << "t1: ready" << std::endl;
-                            assert(!it.is_interrupted());
+                            assert(!it.stop_signaled());
                             assert(callNotify);
                         }
-                        else if (it.is_interrupted()) {
+                        else if (it.stop_signaled()) {
                             std::cout << "t1: interrupted" << std::endl;
                             assert(!callNotify);
                         }
@@ -192,7 +192,7 @@ void testCVStdThreadNoPred(bool callNotify)
                     });
     
     std::this_thread::sleep_for(0.5s);
-    assert(!is.is_interrupted());
+    assert(!is.stop_signaled());
     std::this_thread::sleep_for(0.5s);
     if (callNotify) {
       {
@@ -204,7 +204,7 @@ void testCVStdThreadNoPred(bool callNotify)
     }
     else {
       std::cout << "- signal interrupt" << std::endl;
-      is.interrupt();
+      is.signal_stop();
     }
     t1.join();
   } // leave scope of t1 without join() or detach() (signals cancellation)
@@ -222,7 +222,7 @@ void testCVStdThreadPred(bool callNotify)
   std::mutex readyMutex;
   std::condition_variable_any2 readyCV;
   
-  std::interrupt_source is;
+  std::stop_source is;
   {
     std::thread t1([&ready, &readyMutex, &readyCV, it=is.get_token(), callNotify] {
                       bool ret;
@@ -233,18 +233,18 @@ void testCVStdThreadPred(bool callNotify)
                                                  it);
                         if (ret) {
                           std::cout << "t1: ready" << std::endl;
-                          assert(!it.is_interrupted());
+                          assert(!it.stop_signaled());
                         }
                         else {
                           std::cout << "t1: interrupted" << std::endl;
-                          assert(it.is_interrupted());
+                          assert(it.stop_signaled());
                         }
                       }
-                      assert(callNotify != it.is_interrupted());
+                      assert(callNotify != it.stop_signaled());
                     });
     
     std::this_thread::sleep_for(0.5s);
-    assert(!is.is_interrupted());
+    assert(!is.stop_signaled());
     std::this_thread::sleep_for(0.5s);
     if (callNotify) {
       {
@@ -256,7 +256,7 @@ void testCVStdThreadPred(bool callNotify)
     }
     else {
       std::cout << "- signal interrupt" << std::endl;
-      is.interrupt();
+      is.signal_stop();
     }
     t1.join();
   } // leave scope of t1 without join() or detach() (signals cancellation)
@@ -276,7 +276,7 @@ void testMinimalWait(int sec)
     std::mutex readyMutex;
     std::condition_variable_any2 readyCV;
     {
-      std::jthread t1([&ready, &readyMutex, &readyCV, dur] (std::interrupt_token it) {
+      std::jthread t1([&ready, &readyMutex, &readyCV, dur] (std::stop_token it) {
                         try {
                           std::cout << "\n- start t1" << std::endl;
                           auto t0 = std::chrono::steady_clock::now();
@@ -327,7 +327,7 @@ void testMinimalWaitFor(int sec1, int sec2)
   std::mutex readyMutex;
   std::condition_variable_any2 readyCV;
   {
-    std::jthread t1([&ready, &readyMutex, &readyCV, durInt, durWait] (std::interrupt_token it) {
+    std::jthread t1([&ready, &readyMutex, &readyCV, durInt, durWait] (std::stop_token it) {
                       try {
                       std::cout << "\n- start t1" << std::endl;
                       auto t0 = std::chrono::steady_clock::now();
@@ -381,7 +381,7 @@ void testTimedCV(bool callNotify, bool callInterrupt, Dur dur)
   std::condition_variable_any2 readyCV;
   
   {
-    std::jthread t1([&ready, &readyMutex, &readyCV, callNotify, dur] (std::interrupt_token it) {
+    std::jthread t1([&ready, &readyMutex, &readyCV, callNotify, dur] (std::stop_token it) {
                       std::cout << "\n- start t1" << std::endl;
                       auto t0 = std::chrono::steady_clock::now();
                       int timesDone{0};
@@ -400,11 +400,11 @@ void testTimedCV(bool callNotify, bool callInterrupt, Dur dur)
                             //std::cout << "t1: ready" << std::endl;
                             std::cout.put('r').flush();
                             assert(ready);
-                            assert(!it.is_interrupted());
+                            assert(!it.stop_signaled());
                             assert(callNotify);
                             ++timesDone;
                           }
-                          else if (it.is_interrupted()) {
+                          else if (it.stop_signaled()) {
                             //std::cout << "t1: interrupted" << std::endl;
                             std::cout.put('i').flush();
                             assert(!ready);
@@ -421,7 +421,7 @@ void testTimedCV(bool callNotify, bool callInterrupt, Dur dur)
                     });
     
     std::this_thread::sleep_for(0.5s);
-    assert(!t1.get_interrupt_source().is_interrupted());
+    assert(!t1.get_stop_source().stop_signaled());
     std::this_thread::sleep_for(0.5s);
     if (callNotify) {
       std::cout << "\n- set ready" << std::endl;
@@ -435,11 +435,11 @@ void testTimedCV(bool callNotify, bool callInterrupt, Dur dur)
     }
     else if (callInterrupt) {
       std::cout << "\n- signal interrupt" << std::endl;
-      t1.interrupt();
+      t1.signal_stop();
     }
     else {
       std::cout << "-  interrupt" << std::endl;
-      t1.interrupt();
+      t1.signal_stop();
     }
     std::this_thread::sleep_for(1.5s);
     std::cout << "- leave scope (should at latest signal interrupt)" << std::endl;
@@ -466,7 +466,7 @@ void testTimedIWait(bool callNotify, bool callInterrupt, Dur dur)
   enum class State { loop, ready, interrupted };
   State t1Feedback{State::loop};
   {
-    std::jthread t1([&ready, &readyMutex, &readyCV, callNotify, dur, &t1Feedback] (std::interrupt_token it) {
+    std::jthread t1([&ready, &readyMutex, &readyCV, callNotify, dur, &t1Feedback] (std::stop_token it) {
                       std::cout << "\n- start t1" << std::endl;
                       auto t0 = std::chrono::steady_clock::now();
                       int timesDone{0};
@@ -478,7 +478,7 @@ void testTimedIWait(bool callNotify, bool callInterrupt, Dur dur)
                           auto ret = readyCV.wait_for(lg, dur,
                                                       [&ready] { return ready; },
                                                       it);
-                          if (it.is_interrupted()) {
+                          if (it.stop_signaled()) {
                             throw "interrupted";
                           }
                           if (dur > 5s) {
@@ -489,14 +489,14 @@ void testTimedIWait(bool callNotify, bool callInterrupt, Dur dur)
                             std::cout.put('r').flush();
                             t1Feedback = State::ready;
                             assert(ready);
-                            assert(!it.is_interrupted());
+                            assert(!it.stop_signaled());
                             assert(callNotify);
                             ++timesDone;
                           }
                           else {
                             // note: might also be interrupted already!
                             //std::cout << "t1: timeout" << std::endl;
-                            std::cout.put(it.is_interrupted() ? 'T' : 't').flush();
+                            std::cout.put(it.stop_signaled() ? 'T' : 't').flush();
                           }
                         }
                         catch (const char* e) {
@@ -525,7 +525,7 @@ void testTimedIWait(bool callNotify, bool callInterrupt, Dur dur)
                     });
     
     std::this_thread::sleep_for(0.5s);
-    assert(!t1.get_interrupt_source().is_interrupted());
+    assert(!t1.get_stop_source().stop_signaled());
     std::this_thread::sleep_for(0.5s);
     if (callNotify) {
       std::cout << "\n- set ready" << std::endl;
@@ -545,7 +545,7 @@ void testTimedIWait(bool callNotify, bool callInterrupt, Dur dur)
     else if (callInterrupt) {
       std::cout << "\n- signal interrupt" << std::endl;
       auto t0 = std::chrono::steady_clock::now();
-      t1.interrupt();
+      t1.signal_stop();
       while (t1Feedback != State::interrupted) {
         std::this_thread::sleep_for(200ms);
         assert(std::chrono::steady_clock::now() < t0 + 5s);
@@ -585,10 +585,10 @@ void testManyCV(bool callNotify, bool callInterrupt)
                              std::ref(ready), std::ref(readyMutex), std::ref(readyCV),
                              callNotify);
     {  
-      auto t0isource = t0.get_interrupt_source();
+      auto t0ssource = t0.get_stop_source();
       std::this_thread::sleep_for(0.5s);
 
-      // starts thread concurrently calling interrupt() for the same token:
+      // starts thread concurrently calling signal_stop() for the same token:
       std::cout << "\n- loop to start " << numExtraCV << " threads sharing the token and waiting concurently" << std::endl;
       std::array<bool,numExtraCV> arrReady{};  // don't forget to initialize with {} here !!!
       std::array<std::mutex,numExtraCV> arrReadyMutex{};
@@ -597,10 +597,10 @@ void testManyCV(bool callNotify, bool callInterrupt)
       std::vector<std::jthread> vThreads;
       for (int idx = 0; idx < numExtraCV; ++idx) {
         std::this_thread::sleep_for(0.1ms);
-        std::jthread t([idx, t0itoken=t0isource.get_token(), &arrReady, &arrReadyMutex, &arrReadyCV, callNotify] {
+        std::jthread t([idx, t0stoken=t0ssource.get_token(), &arrReady, &arrReadyMutex, &arrReadyCV, callNotify] {
                          // use interrupt token of t0 instead
                          // NOTE: disables signaling interrupts directly to the thread
-                         cvIWait(t0itoken, idx+1,
+                         cvIWait(t0stoken, idx+1,
                                  arrReady[idx], arrReadyMutex[idx], arrReadyCV[idx],
                                  callNotify);
                        });
@@ -630,7 +630,7 @@ void testManyCV(bool callNotify, bool callInterrupt)
       }
       else if (callInterrupt) {
         std::cout << "\n- signal interrupt" << std::endl;
-        t0.interrupt();
+        t0.signal_stop();
       }
       else {
         // without detach the destructors of the thgreads will block
@@ -702,37 +702,37 @@ int main()
   testCVStdThreadPred(true);   // call notify()
 
   std::cout << "\n\n**************************\n";
-  testTimedCV(true, false, 200ms);  // call notify(), don't call interrupt()
+  testTimedCV(true, false, 200ms);  // call notify(), don't call signal_stop()
   std::cout << "\n\n**************************\n";
-  testTimedCV(false, true, 200ms);   // don't call notify, call interrupt()
+  testTimedCV(false, true, 200ms);   // don't call notify, call signal_stop()
   std::cout << "\n\n**************************\n";
-  testTimedCV(false, false, 200ms);   // don't call notify, don't call interrupt()
+  testTimedCV(false, false, 200ms);   // don't call notify, don't call signal_stop()
   std::cout << "\n\n**************************\n";
-  testTimedCV(true, false, 60s);  // call notify(), don't call interrupt()
+  testTimedCV(true, false, 60s);  // call notify(), don't call signal_stop()
   std::cout << "\n\n**************************\n";
-  testTimedCV(false, true, 60s);   // don't call notify, call interrupt()
+  testTimedCV(false, true, 60s);   // don't call notify, call signal_stop()
   std::cout << "\n\n**************************\n";
-  testTimedCV(false, false, 60s);   // don't call notify, don't call interrupt()
+  testTimedCV(false, false, 60s);   // don't call notify, don't call signal_stop()
 
   std::cout << "\n\n**************************\n";
-  testTimedIWait(true, false, 200ms);  // call notify(), don't call interrupt()
+  testTimedIWait(true, false, 200ms);  // call notify(), don't call signal_stop()
   std::cout << "\n\n**************************\n";
-  testTimedIWait(false, true, 200ms);   // don't call notify, call interrupt()
+  testTimedIWait(false, true, 200ms);   // don't call notify, call signal_stop()
   std::cout << "\n\n**************************\n";
-  testTimedIWait(false, false, 200ms);   // don't call notify, don't call interrupt()
+  testTimedIWait(false, false, 200ms);   // don't call notify, don't call signal_stop()
   std::cout << "\n\n**************************\n";
-  testTimedIWait(true, false, 60s);  // call notify(), don't call interrupt()
+  testTimedIWait(true, false, 60s);  // call notify(), don't call signal_stop()
   std::cout << "\n\n**************************\n";
-  testTimedIWait(false, true, 60s);   // don't call notify, call interrupt()
+  testTimedIWait(false, true, 60s);   // don't call notify, call signal_stop()
   std::cout << "\n\n**************************\n";
-  testTimedIWait(false, false, 60s);   // don't call notify, don't call interrupt()
+  testTimedIWait(false, false, 60s);   // don't call notify, don't call signal_stop()
 
   std::cout << "\n\n**************************\n";
-  testManyCV<9>(true, false);  // call notify(), don't call interrupt()
+  testManyCV<9>(true, false);  // call notify(), don't call signal_stop()
   std::cout << "\n\n**************************\n";
-  testManyCV<9>(false, true);  // don't call notify, call interrupt()
+  testManyCV<9>(false, true);  // don't call notify, call signal_stop()
   std::cout << "\n\n**************************\n";
-  testManyCV<9>(false, false); // don't call notify, don't call interrupt() (implicit interrupt)
+  testManyCV<9>(false, false); // don't call notify, don't call signal_stop() (implicit interrupt)
  }
  catch (const std::exception& e) {
    std::cerr << "EXCEPTION: " << e.what() << std::endl;

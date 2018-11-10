@@ -52,10 +52,10 @@ void testThreadWithToken()
   // test the basic thread API (taking stop_token arg)
   std::cout << "*** start testThreadWithToken()" << std::endl;
 
-  std::stop_source isource;
+  std::stop_source ssource;
   std::stop_source origsource;
-  assert(isource.is_valid());
-  assert(!isource.stop_signaled());
+  assert(ssource.is_valid());
+  assert(!ssource.stop_signaled());
   {
     std::jthread::id t1ID{std::this_thread::get_id()};
     std::atomic<bool> t1AllSet{false};
@@ -72,7 +72,7 @@ void testThreadWithToken()
                        t1done.store(true);
                        std::cout << "END t1" << std::endl;
                      },
-                     isource.get_token());
+                     ssource.get_token());
     // wait until t1 has set all initial values:
     for (int i=0; !t1AllSet.load(); ++i) {
       std::this_thread::sleep_for(10ms);
@@ -83,14 +83,14 @@ void testThreadWithToken()
     assert(t1ID == t1.get_id());
 
     std::this_thread::sleep_for(470ms);
-    origsource = std::move(isource);
-    isource = t1.get_stop_source();
-    assert(!isource.stop_signaled());
-    auto ret = isource.signal_stop();
+    origsource = std::move(ssource);
+    ssource = t1.get_stop_source();
+    assert(!ssource.stop_signaled());
+    auto ret = ssource.signal_stop();
     assert(!ret);
-    ret = isource.signal_stop();
+    ret = ssource.signal_stop();
     assert(ret);
-    assert(isource.stop_signaled());
+    assert(ssource.stop_signaled());
     assert(!t1done.load());
     assert(!origsource.stop_signaled());
 
@@ -98,7 +98,7 @@ void testThreadWithToken()
     origsource.signal_stop();
   } // leave scope of t1 without join() or detach() (signals cancellation)
   assert(origsource.stop_signaled());
-  assert(isource.stop_signaled());
+  assert(ssource.stop_signaled());
   std::cout << "\n*** OK" << std::endl;
 }
 
@@ -109,8 +109,8 @@ void testJoin()
   // test jthread join()
   std::cout << "\n*** start testJoin()" << std::endl;
 
-  std::stop_source isource;
-  assert(isource.is_valid());
+  std::stop_source ssource;
+  assert(ssource.is_valid());
   {
     std::jthread t1([](std::stop_token stoken) {
                       // wait until interrupt is signaled (due to calling signal_stop() for the token):
@@ -120,15 +120,15 @@ void testJoin()
                       }
                       std::cout << "END t1" << std::endl;
                  });
-    isource = t1.get_stop_source();
+    ssource = t1.get_stop_source();
     // let nother thread signal cancellation after some time:
-    std::jthread t2([isource] () mutable {
+    std::jthread t2([ssource] () mutable {
                      for (int i=0; i < 10; ++i) {
                        std::this_thread::sleep_for(70ms);
                        std::cout.put('x').flush();
                      }
                      // signal interrupt to other thread:
-                     isource.signal_stop();
+                     ssource.signal_stop();
                      std::cout << "END t2" << std::endl;
                    });
     // wait for all thread to finish:
@@ -148,8 +148,8 @@ void testDetach()
   // test jthread detach()
   std::cout << "\n*** start testDetach()" << std::endl;
 
-  std::stop_source isource;
-  assert(isource.is_valid());
+  std::stop_source ssource;
+  assert(ssource.is_valid());
   std::atomic<bool> t1FinallyInterrupted{false};
   {
     std::jthread t0;
@@ -186,7 +186,7 @@ void testDetach()
     assert(t1ID == t1.get_id());
     assert(t1IsInterrupted == false);
     assert(t1InterruptToken == t1.get_stop_source().get_token());
-    isource = t1.get_stop_source();
+    ssource = t1.get_stop_source();
     assert(t1InterruptToken.stop_done_or_possible());
     assert(!t1InterruptToken.stop_signaled());
     // test detach():
@@ -196,9 +196,9 @@ void testDetach()
 
   // finally signal cancellation:
   assert(!t1FinallyInterrupted.load());
-  isource.signal_stop();
+  ssource.signal_stop();
   // and check consequences:
-  assert(isource.stop_signaled());
+  assert(ssource.stop_signaled());
   for (int i=0; !t1FinallyInterrupted.load() && i < 100; ++i) {
     std::this_thread::sleep_for(100ms);
     std::cout.put('o').flush();
@@ -344,9 +344,9 @@ void testJThreadAPI()
   std::cout << "*** start testJThreadAPI()" << std::endl;
 
   assert(std::jthread::hardware_concurrency() == std::thread::hardware_concurrency()); 
-  std::stop_source isource;
-  assert(isource.is_valid());
-  assert(isource.get_token().stop_done_or_possible());
+  std::stop_source ssource;
+  assert(ssource.is_valid());
+  assert(ssource.get_token().stop_done_or_possible());
   std::stop_token stoken;
   assert(!stoken.stop_done_or_possible());
 
@@ -355,9 +355,9 @@ void testJThreadAPI()
   std::jthread::native_handle_type nh = t0.native_handle();
   assert((std::is_same_v<decltype(nh), std::thread::native_handle_type>)); 
   assert(!t0.joinable());
-  std::stop_source isourceStolen{std::move(isource)};
-  assert(!isource.is_valid());
-  assert(isource == t0.get_stop_source());
+  std::stop_source ssourceStolen{std::move(ssource)};
+  assert(!ssource.is_valid());
+  assert(ssource == t0.get_stop_source());
 
   {
     std::jthread::id t1ID{std::this_thread::get_id()};
