@@ -1,7 +1,7 @@
 include Makefile.h
 
 default: all
-all:: test_stoken test_stokencb test_jthread1 test_jthread2 test_cv test_cvdead test_cvprodcons
+all:: test_stoken test_stokencb test_jthread1 test_jthread2 test_cv test_cvrace test_cvprodcons
 all::
 	@echo ""
 	@echo "Testcases:"
@@ -11,7 +11,7 @@ all::
 	@echo "  test_jthread2"
 	@echo "  test_cv"
 	@echo "  test_cvcb"
-	@echo "  test_cvdead"
+	@echo "  test_cvrace"
 	@echo "  test_cvprodcons"
 
 test_stoken: stop_token.hpp condition_variable_any2.hpp test_stoken.cpp Makefile
@@ -50,8 +50,8 @@ test_cvcb: stop_token.hpp jthread.hpp condition_variable_any2.hpp test_cvcb.cpp 
 	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@.exe
 	echo "- OK:  $@ and $@17  call  $@17raw.exe"
 
-test_cvdead: stop_token.hpp jthread.hpp condition_variable_any2.hpp test_cvdead.cpp Makefile
-	$(CXX17) $(CXXFLAGS17) $(INCLUDES) test_cvdead.cpp $(LDFLAGS17) -o $@17raw.exe
+test_cvrace: stop_token.hpp jthread.hpp condition_variable_any2.hpp test_cvrace.cpp Makefile
+	$(CXX17) $(CXXFLAGS17) $(INCLUDES) test_cvrace.cpp $(LDFLAGS17) -o $@17raw.exe
 	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@17.exe
 	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@.exe
 	echo "- OK:  $@ and $@17  call  $@17raw.exe"
