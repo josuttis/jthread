@@ -186,7 +186,6 @@ void basicAPIWithFunc()
   std::cout << "\n*** OK" << std::endl;
 }
 
-#ifdef QQQ
 //------------------------------------------------------
 
 void testExchangeToken()
@@ -215,16 +214,16 @@ void testExchangeToken()
                             }
 		            // print character according to current interrupt token state:
 		            // - '.' if valid and not interrupted,
-		            // - 'i' if valid and interrupted
+		            // - 's' if valid and stop signaled
 		            // - '-' if no valid
 		            if (actToken.stop_signaled()) {
-                              if (c != 'i') {
-                                c = 'i';
+                              if (c != 's') {
+                                c = 's';
                                 ++numInterrupts;
                               }
 		            }
 		            else {
-		              c = actToken.is_interruptible() ?  '.' : '-';
+		              c = actToken.stop_done_or_possible() ?  '.' : '-';
                             }
                             std::cout.put(c).flush();
                             std::this_thread::sleep_for(0.1ms);
@@ -253,7 +252,7 @@ void testExchangeToken()
 
    std::this_thread::sleep_for(interval);
    std::cout << "\n- signal interrupt again" << std::endl;
-   it.signal_stop();
+   isTmp.signal_stop();
 
    std::this_thread::sleep_for(interval);
    std::cout << "\n- destruct jthread t1" << std::endl;
@@ -267,26 +266,26 @@ void testConcurrentInterrupt()
 {
   std::cout << "\n*** start testConcurrentInterrupt()" << std::endl;
   int numThreads = 30;
-  std::stop_token it{false};
+  std::stop_source is;
   {
     std::atomic<int> numInterrupts{0};
     std::cout << "\n- start jthread t1" << std::endl;
-    std::jthread t1([it](std::stop_token stoken){
+    std::jthread t1([it=is.get_token()](std::stop_token stoken){
               printID("t1 STARTED (id: ", ") printing . or - or i");
               try {
                 char c = ' ';
                 for (int i=0; !it.stop_signaled(); ++i) {
 		    // print character according to current interrupt token state:
 		    // - '.' if valid and not interrupted,
-		    // - 'i' if valid and interrupted
+		    // - 's' if valid and stop signaled
 		    // - '-' if no valid
 		    if (stoken.stop_signaled()) {
-                      c = 'i';
+                      c = 's';
 		    }
 		    else {
 		      // should never switch back to not interrupted:
-                      assert(c != 'i');
-		      c = stoken.valid() ?  '.' : '-';
+                      assert(c != 's');
+		      c = stoken.stop_done_or_possible() ?  '.' : '-';
                     }
                     std::cout.put(c).flush();
                     std::this_thread::sleep_for(0.1ms);
@@ -320,8 +319,44 @@ void testConcurrentInterrupt()
        t.join();
    }
    std::cout << "\n- signal end" << std::endl;
-   it.signal_stop();
+   is.signal_stop();
    std::cout << "\n- destruct jthread t1" << std::endl;
+  }
+  std::cout << "\n*** OK" << std::endl;
+}
+
+//------------------------------------------------------
+
+void testJthreadMove()
+{
+  std::cout << "\n*** start testJthreadMove()" << std::endl;
+  {
+    bool interruptSignaled = false;
+    std::jthread t1{[&interruptSignaled] (std::stop_token st) {
+                      while (!st.stop_signaled()) {
+                        std::this_thread::sleep_for(0.1s);
+                      }
+                      if(st.stop_signaled()) {
+                        interruptSignaled = true;
+                      }
+                    }};
+    std::jthread t2{std::move(t1)};  // should compile
+
+    auto ssource = t1.get_stop_source();
+    assert(!ssource.is_valid());
+    assert(!ssource.stop_signaled());
+    //assert(ssource == std::stop_source{}); 
+    ssource = t2.get_stop_source();
+    assert(ssource != std::stop_source{}); 
+    assert(ssource.is_valid());
+    assert(!ssource.stop_signaled());
+
+    assert(!interruptSignaled);
+    t1.signal_stop();
+    assert(!interruptSignaled);
+    t2.signal_stop();
+    t2.join();
+    assert(interruptSignaled);
   }
   std::cout << "\n*** OK" << std::endl;
 }
@@ -334,12 +369,10 @@ void testEnabledIfForCopyConstructor_CompileTimeOnly()
   {
     std::jthread t1;
     //std::jthread t2{t1};  // should not compile
-    //std::jthread t2{std::move(t1)};  // should not compile
   }
   std::cout << "\n*** OK" << std::endl;
 }
 
-#endif
 
 //------------------------------------------------------
 
@@ -359,10 +392,13 @@ int main()
   std::cout << "\n**************************\n\n";
   basicAPIWithFunc();
   std::cout << "\n**************************\n\n";
-  //testExchangeToken();
+  testExchangeToken();
   std::cout << "\n**************************\n\n";
-  //testConcurrentInterrupt();
-  //std::cout << "\n**************************\n\n";
-  //testEnabledIfForCopyConstructor_CompileTimeOnly();
+  testConcurrentInterrupt();
+  std::cout << "\n**************************\n\n";
+  testJthreadMove();
+  std::cout << "\n**************************\n\n";
+  testEnabledIfForCopyConstructor_CompileTimeOnly();
+  std::cout << "\n**************************\n\n";
 }
 
