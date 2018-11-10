@@ -4,7 +4,7 @@
 #ifndef JTHREAD_HPP
 #define JTHREAD_HPP
 
-#include "interrupt_token.hpp"
+#include "stop_token.hpp"
 #include <thread>
 #include <future>
 #include <type_traits>
@@ -15,7 +15,7 @@ namespace std {
 
 //***************************************** 
 //* class jthread
-//* - joining std::thread with interrupt support 
+//* - joining std::thread with signaling stop/end support 
 //***************************************** 
 class jthread
 {
@@ -62,9 +62,9 @@ class jthread
     //***************************************** 
     // - supplementary API:
     //   - for the calling thread:
-    interrupt_source get_interrupt_source() const noexcept;
-    bool interrupt() noexcept {
-      return get_interrupt_source().interrupt();
+    stop_source get_stop_source() const noexcept;
+    bool signal_stop() noexcept {
+      return get_stop_source().signal_stop();
     }
 
 
@@ -74,7 +74,7 @@ class jthread
 
   private:
     //*** API for the starting thread:
-    interrupt_source _thread_is;               // interrupt token for started thread
+    stop_source _stopSource;                   // stop_source for started thread
     ::std::thread _thread{::std::thread{}};    // started thread (if any)
 };
 
@@ -87,7 +87,7 @@ class jthread
 
 // default constructor:
 inline jthread::jthread() noexcept
- : _thread_is{nullptr} {
+ : _stopSource{nullptr} {
 }
 
 // THE constructor that starts the thread:
@@ -95,22 +95,22 @@ inline jthread::jthread() noexcept
 template <typename Callable, typename... Args,
           typename >
 inline jthread::jthread(Callable&& cb, Args&&... args)
- : _thread_is{},                             // initialize interrupt token
-   _thread{[] (interrupt_token it, auto&& cb, auto&&... args) {   // called lambda in the thread
+ : _stopSource{},                             // initialize stop_source
+   _thread{[] (stop_token st, auto&& cb, auto&&... args) {   // called lambda in the thread
                  // perform tasks of the thread:
-                 if constexpr(std::is_invocable_v<Callable, interrupt_token, Args...>) {
-                   // pass the interrupt_token as first argument to the started thread:
+                 if constexpr(std::is_invocable_v<Callable, stop_token, Args...>) {
+                   // pass the stop_token as first argument to the started thread:
                    ::std::invoke(::std::forward<decltype(cb)>(cb),
-                                 std::move(it),
+                                 std::move(st),
                                  ::std::forward<decltype(args)>(args)...);
                  }
                  else {
-                   // started thread does not expect an interrupt token:
+                   // started thread does not expect a stop token:
                    ::std::invoke(::std::forward<decltype(cb)>(cb),
                                  ::std::forward<decltype(args)>(args)...);
                  }
                },
-               _thread_is.get_token(),   // not captured due to possible races if immediately set
+               _stopSource.get_token(),   // not captured due to possible races if immediately set
                ::std::forward<Callable>(cb),  // pass callable
                ::std::forward<Args>(args)...  // pass arguments for callable
            }
@@ -119,8 +119,8 @@ inline jthread::jthread(Callable&& cb, Args&&... args)
 
 // destructor:
 jthread::~jthread() {
-  if (joinable()) {   // if not joined/detached, interrupt and wait for end:
-    interrupt();
+  if (joinable()) {   // if not joined/detached, signal stop and wait for end:
+    signal_stop();
     join();
   }
 }
@@ -143,12 +143,12 @@ inline typename jthread::native_handle_type jthread::native_handle() {
   return _thread.native_handle();
 }
 
-inline interrupt_source jthread::get_interrupt_source() const noexcept {
-  return _thread_is;
+inline stop_source jthread::get_stop_source() const noexcept {
+  return _stopSource;
 }
 
 void jthread::swap(jthread& t) noexcept {
-    std::swap(_thread_is, t._thread_is);
+    std::swap(_stopSource, t._stopSource);
     std::swap(_thread, t._thread);
 }
 
