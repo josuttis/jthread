@@ -54,7 +54,7 @@ void testThreadWithToken()
 
   std::stop_source ssource;
   std::stop_source origsource;
-  assert(ssource.is_valid());
+  assert(ssource.valid());
   assert(!ssource.stop_signaled());
   {
     std::jthread::id t1ID{std::this_thread::get_id()};
@@ -110,7 +110,7 @@ void testJoin()
   std::cout << "\n*** start testJoin()" << std::endl;
 
   std::stop_source ssource;
-  assert(ssource.is_valid());
+  assert(ssource.valid());
   {
     std::jthread t1([](std::stop_token stoken) {
                       // wait until interrupt is signaled (due to calling signal_stop() for the token):
@@ -149,7 +149,7 @@ void testDetach()
   std::cout << "\n*** start testDetach()" << std::endl;
 
   std::stop_source ssource;
-  assert(ssource.is_valid());
+  assert(ssource.valid());
   std::atomic<bool> t1FinallyInterrupted{false};
   {
     std::jthread t0;
@@ -345,7 +345,7 @@ void testJThreadAPI()
 
   assert(std::jthread::hardware_concurrency() == std::thread::hardware_concurrency()); 
   std::stop_source ssource;
-  assert(ssource.is_valid());
+  assert(ssource.valid());
   assert(ssource.get_token().stop_done_or_possible());
   std::stop_token stoken;
   assert(!stoken.stop_done_or_possible());
@@ -356,7 +356,7 @@ void testJThreadAPI()
   assert((std::is_same_v<decltype(nh), std::thread::native_handle_type>)); 
   assert(!t0.joinable());
   std::stop_source ssourceStolen{std::move(ssource)};
-  assert(!ssource.is_valid());
+  assert(!ssource.valid());
   assert(ssource == t0.get_stop_source());
 
   {

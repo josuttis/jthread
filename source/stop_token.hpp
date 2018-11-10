@@ -175,7 +175,7 @@ class stop_source {
   }
   
   // stop handling:
-  bool is_valid() const {
+  bool valid() const {
     return _sp != nullptr;
   }
   bool stop_signaled() const noexcept {
@@ -186,7 +186,7 @@ class stop_source {
   
   friend bool operator== (const stop_source& lhs, const stop_source& rhs) {
     // TODO: just comparing _sp is enough?
-    //return (!lhs.is_valid() && !rhs.is_valid())
+    //return (!lhs.valid() && !rhs.valid())
     //       || (lhs._sp.get() == rhs._sp.get());
     return lhs._sp.get() == rhs._sp.get();
   }
@@ -239,7 +239,7 @@ bool stop_source::signal_stop()
 {
   std::cout<<std::this_thread::get_id()<<": signalstop "<<std::endl;
   //std::cout.put('I').flush();
-  if (!is_valid()) return false;
+  if (!valid()) return false;
   auto wasStopSignaled = _sp->stopSignaled.exchange(true);
   if (!wasStopSignaled) {
       _sp->stoppingThreadID = std::this_thread::get_id();

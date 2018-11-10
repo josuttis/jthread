@@ -18,20 +18,20 @@ void testStopTokenAPI()
     std::stop_source is2{is1};
     std::stop_source is3 = is1;
     std::stop_source is4{std::move(is1)};
-    assert(!is1.is_valid());
-    assert(is2.is_valid());
-    assert(is3.is_valid());
-    assert(is4.is_valid());
+    assert(!is1.valid());
+    assert(is2.valid());
+    assert(is3.valid());
+    assert(is4.valid());
     is1 = is2;
-    assert(is1.is_valid());
+    assert(is1.valid());
     is1 = std::move(is2);
-    assert(!is2.is_valid());
+    assert(!is2.valid());
     std::swap(is1,is2);
-    assert(!is1.is_valid());
-    assert(is2.is_valid());
+    assert(!is1.valid());
+    assert(is2.valid());
     is1.swap(is2);
-    assert(is1.is_valid());
-    assert(!is2.is_valid());
+    assert(is1.valid());
+    assert(!is2.valid());
   }
 
   //***** stop_token:
@@ -59,7 +59,7 @@ void testStopTokenAPI()
     std::stop_source* isp = new std::stop_source;
     std::stop_source& isr = *isp;
     std::stop_token it{isr.get_token()};
-    assert(isr.is_valid());
+    assert(isr.valid());
     assert(it.stop_done_or_possible());
     delete isp;  // not interrupted and losing last source
     assert(!it.stop_done_or_possible());
@@ -68,14 +68,14 @@ void testStopTokenAPI()
     std::stop_source* isp = new std::stop_source;
     std::stop_source& isr = *isp;
     std::stop_token it{isr.get_token()};
-    assert(isr.is_valid());
+    assert(isr.valid());
     assert(it.stop_done_or_possible());
     isr.signal_stop();
     //delete isp;  // interrupted and losing last source
     //assert(it.stop_done_or_possible());
   }
 
-  //***** is_valid()/stop_done_or_possible(), stop_signaled(), and signal_stop():
+  //***** valid()/stop_done_or_possible(), stop_signaled(), and signal_stop():
   {
     std::stop_source isNotValid;
     std::stop_source isNotStopped{std::move(isNotValid)};
@@ -85,10 +85,10 @@ void testStopTokenAPI()
     std::stop_token itNotStopped{isNotStopped.get_token()};
     std::stop_token itStopped{isStopped.get_token()};
 
-    // is_valid() and stop_signaled():
-    assert(!isNotValid.is_valid());
-    assert(isNotStopped.is_valid());
-    assert(isStopped.is_valid());
+    // valid() and stop_signaled():
+    assert(!isNotValid.valid());
+    assert(isNotStopped.valid());
+    assert(isStopped.valid());
     assert(!isNotValid.stop_signaled());
     assert(!isNotStopped.stop_signaled());
     assert(isStopped.stop_signaled());
@@ -126,7 +126,7 @@ void testStopTokenAPI()
     assert(!itStopped.stop_done_or_possible());
     assert(!itStopped.stop_signaled());
     isStopped = std::stop_source{};
-    assert(isStopped.is_valid());
+    assert(isStopped.valid());
     assert(!isStopped.stop_signaled());
 
     std::swap(itStopped, itNotValid);
@@ -137,22 +137,22 @@ void testStopTokenAPI()
     assert(!itNotValid.stop_done_or_possible());
 
     std::swap(isStopped, isNotValid);
-    assert(!isStopped.is_valid());
-    assert(isNotValid.is_valid());
+    assert(!isStopped.valid());
+    assert(isNotValid.valid());
     assert(!isNotValid.stop_signaled());
     std::stop_source isnew = std::move(isNotValid);
-    assert(!isNotValid.is_valid());
+    assert(!isNotValid.valid());
   }
 
   // shared ownership semantics:
   std::stop_source is;
   std::stop_token it1{is.get_token()};
   std::stop_token it2{it1};
-  assert(is.is_valid() && !is.stop_signaled());
+  assert(is.valid() && !is.stop_signaled());
   assert(it1.stop_done_or_possible() && !it1.stop_signaled());
   assert(it2.stop_done_or_possible() && !it2.stop_signaled());
   is.signal_stop();
-  assert(is.is_valid() && is.stop_signaled());
+  assert(is.valid() && is.stop_signaled());
   assert(it1.stop_done_or_possible() && it1.stop_signaled());
   assert(it2.stop_done_or_possible() && it2.stop_signaled());
 

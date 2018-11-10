@@ -169,19 +169,19 @@ void basicAPIWithFunc()
 {
   std::cout << "\n*** start basicAPIWithFunc(): " << std::endl;
   std::stop_source is;
-  assert(is.is_valid());
+  assert(is.valid());
   assert(!is.stop_signaled());
   {
     std::cout << "\n- start jthread t1" << std::endl;
     std::jthread t(&foo, "foo() called in thread with id: ");
     is = t.get_stop_source();
     std::cout << is.stop_signaled() << std::endl;
-    assert(is.is_valid());
+    assert(is.valid());
     assert(!is.stop_signaled());
     std::this_thread::sleep_for(0.5s);
     std::cout << "\n- destruct jthread it" << std::endl;
   }
-  assert(is.is_valid());
+  assert(is.valid());
   assert(is.stop_signaled());
   std::cout << "\n*** OK" << std::endl;
 }
@@ -343,12 +343,12 @@ void testJthreadMove()
     std::jthread t2{std::move(t1)};  // should compile
 
     auto ssource = t1.get_stop_source();
-    assert(!ssource.is_valid());
+    assert(!ssource.valid());
     assert(!ssource.stop_signaled());
     //assert(ssource == std::stop_source{}); 
     ssource = t2.get_stop_source();
     assert(ssource != std::stop_source{}); 
-    assert(ssource.is_valid());
+    assert(ssource.valid());
     assert(!ssource.stop_signaled());
 
     assert(!interruptSignaled);
