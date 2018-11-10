@@ -346,30 +346,27 @@ TEST_SUITE_END();
 #endif
 
 
-#include "interrupt_token.hpp"
+#include "stop_token.hpp"
 #include <iostream>
 #include <cassert>
 
 void testCBRegistering()
 {
-  std::interrupt_source it;
+  std::stop_source it;
 
   bool callbackExecuted = false;
   {
-    std::interrupt_callback callbackRegistration(it.get_token(),
-                                                 [&] { callbackExecuted = true; });
+    std::stop_callback callbackRegistration(it.get_token(),
+                                            [&] { callbackExecuted = true; });
   }
-
   assert(!callbackExecuted);
 
   {
-    std::interrupt_callback callbackRegistration(it.get_token(),
-                                                 [&] { callbackExecuted = true; });
-
+    std::stop_callback callbackRegistration(it.get_token(),
+                                            [&] { callbackExecuted = true; });
     assert(!callbackExecuted);
 
-    it.interrupt();
-
+    it.signal_stop();
     assert(callbackExecuted);
   }
 }
