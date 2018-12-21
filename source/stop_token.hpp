@@ -1,327 +1,480 @@
-#ifndef STOP_TOKEN_HPP
-#define STOP_TOKEN_HPP
+#pragma once
+// <stop_token> header
 
-#include <memory>
 #include <atomic>
-#include <mutex>
-#include <list>
 #include <thread>
-#include <cassert>
+#include <type_traits>
+#include <utility>
 
-// for debugging
-#include <iostream> // in case we enable the debug output
-
+#if defined(__x86_64__) || defined(_M_X64)
+#include <xmmintrin.h>
+#endif
 
 namespace std {
+inline void __spin_yield() noexcept {
+  // TODO: Platform-specific code here
+#if defined(__x86_64__) || defined(_M_X64)
+  _mm_pause();
+#endif
+}
 
-//***************************************** 
-//* new classes for signaling stops
-//* - stop_source to signal stops
-//* - stop_token to receive signaled stops
-//* - stop_callback to to register callbacks
-//***************************************** 
+struct __stop_callback_base {
+  __stop_callback_base* __next_ = nullptr;
+  __stop_callback_base** __prev_ = nullptr;
+  bool* __isRemoved_ = nullptr;
+  std::atomic<bool> __callbackFinishedExecuting_{false};
 
-// type-erased base class for all stop callbacks
-struct stop_callback_base {
-  std::atomic<bool> finishedExecuting{false};
-  bool* destructorHasRunInsideCallback{nullptr};
-  virtual void run() noexcept = 0;
-  virtual ~stop_callback_base() = default;
+  virtual void __execute() noexcept = 0;
 };
 
-// shared state to signal stops
-struct SharedData {
-    // the callbacks to be called on a signaled stop:
-    ::std::list<stop_callback_base*> cbData{};  // list of currently registered callbacks
-    ::std::mutex cbDataMutex{};                 // which is concurrently used/modified
+struct __stop_state {
+ public:
+  void __add_token_reference() noexcept {
+    __state_.fetch_add(__token_ref_increment, std::memory_order_relaxed);
+  }
 
-    // state flags for (tricky) races:
-    ::std::atomic<bool> stopSignaled;           // true if stop was signaled
-    ::std::atomic<std::size_t> numSources;      // number of stop_sources (for stop_done_or_possile())
-    std::thread::id stoppingThreadID{};         // temporary ID of stopping thread
-    
-    // make polymorphic class for future binary-compatible stop_token extensions:
-    // TODO: probably no loner necessary as we ave callbacks now, which
-    //       allow any future extensions on what to do an stops
-    SharedData(bool initial_state)
-     : stopSignaled{initial_state}, numSources{1} {
+  void __remove_token_reference() noexcept {
+    auto __oldState =
+        __state_.fetch_sub(__token_ref_increment, std::memory_order_acq_rel);
+    if (__oldState < (__token_ref_increment + __token_ref_increment)) {
+      delete this;
     }
-    virtual ~SharedData() = default;  // make polymorphic
-    SharedData(const SharedData&) = delete;
-    SharedData(SharedData&&) = delete;
-    SharedData& operator= (const SharedData&) = delete;
-    SharedData& operator= (SharedData&&) = delete;
+  }
+
+  void __add_source_reference() noexcept {
+    __state_.fetch_add(__source_ref_increment, std::memory_order_relaxed);
+  }
+
+  void __remove_source_reference() noexcept {
+    auto __oldState =
+        __state_.fetch_sub(__source_ref_increment, std::memory_order_acq_rel);
+    if (__oldState < (__token_ref_increment + __source_ref_increment)) {
+      delete this;
+    }
+  }
+
+  bool __request_stop() noexcept {
+
+    if (!__try_lock_and_signal_until_signalled()) {
+      // Stop has already been requested.
+      return true;
+    }
+
+    // Set the 'stop_requested' signal and acquired the lock.
+
+    __signallingThread_ = std::this_thread::get_id();
+
+    while (__head_ != nullptr) {
+      // Dequeue the head of the queue
+      auto* __cb = __head_;
+      __head_ = __cb->__next_;
+      const bool anyMore = __head_ != nullptr;
+      if (anyMore) {
+        __head_->__prev_ = &__head_;
+      }
+      // Mark this item as removed from the list.
+      __cb->__prev_ = nullptr;
+
+      // Don't hold lock while executing callback
+      // so we don't block other threads from deregistering callbacks.
+      __unlock();
+
+      // TRICKY: Need to store a flag on the stack here that the callback
+      // can use to signal that the destructor was executed inline
+      // during the call. If the destructor was executed inline then
+      // it's not safe to dereference __cb after __execute() returns.
+      // If the destructor runs on some other thread then the other
+      // thread will block waiting for this thread to signal that the
+      // callback has finished executing.
+      bool __isRemoved = false;
+      __cb->__isRemoved_ = &__isRemoved;
+
+      __cb->__execute();
+
+      if (!__isRemoved) {
+        __cb->__isRemoved_ = nullptr;
+        __cb->__callbackFinishedExecuting_.store(
+            true, std::memory_order_release);
+      }
+
+      if (!anyMore) {
+        // This was the last item in the queue when we dequeued it.
+        // No more items should be added to the queue after we have
+        // marked the state as interrupted, only removed from the queue.
+        // Avoid acquring/releasing the lock in this case.
+        return false;
+      }
+
+      __lock();
+    }
+
+    __unlock();
+
+    return false;
+  }
+
+  bool __is_stop_requested() noexcept {
+    return __is_stop_requested(__state_.load(std::memory_order_acquire));
+  }
+
+  bool __is_stop_requestable() noexcept {
+    return __is_stop_requestable(__state_.load(std::memory_order_acquire));
+  }
+
+  bool __try_add_callback(
+      __stop_callback_base* __cb,
+      bool __incrementRefCountIfSuccessful) noexcept {
+    std::uint64_t __oldState;
+    goto load_state;
+    do {
+      goto check_state;
+      do {
+        __spin_yield();
+      load_state:
+        __oldState = __state_.load(std::memory_order_acquire);
+      check_state:
+        if (__is_stop_requested(__oldState)) {
+          __cb->__execute();
+          return false;
+        } else if (!__is_stop_requestable(__oldState)) {
+          return false;
+        }
+      } while (__is_locked(__oldState));
+    } while (!__state_.compare_exchange_weak(
+        __oldState, __oldState | __locked_flag, std::memory_order_acquire));
+
+    // Push callback onto callback list.
+    __cb->__next_ = __head_;
+    if (__cb->__next_ != nullptr) {
+      __cb->__next_->__prev_ = &__cb->__next_;
+    }
+    __cb->__prev_ = &__head_;
+    __head_ = __cb;
+
+    if (__incrementRefCountIfSuccessful) {
+      __unlock_and_increment_token_ref_count();
+    } else {
+      __unlock();
+    }
+
+    // Successfully added the callback.
+    return true;
+  }
+
+  void __remove_callback(__stop_callback_base* __cb) noexcept {
+    __lock();
+
+    if (__cb->__prev_ != nullptr) {
+      // Still registered, not yet executed
+      // Just remove from the list.
+      *__cb->__prev_ = __cb->__next_;
+      if (__cb->__next_ != nullptr) {
+        __cb->__next_->__prev_ = __cb->__prev_;
+      }
+
+      __unlock_and_decrement_token_ref_count();
+
+      return;
+    }
+
+    __unlock();
+
+    // Callback has either already executed or is executing
+    // concurrently on another thread.
+
+    if (__signallingThread_ == std::this_thread::get_id()) {
+      // Callback executed on this thread or is still currently executing
+      // and is deregistering itself from within the callback.
+      if (__cb->__isRemoved_ != nullptr) {
+        // Currently inside the callback, let the __request_stop() method
+        // know the object is about to be destructed and that it should
+        // not try to access the object when the callback returns.
+        *__cb->__isRemoved_ = true;
+      }
+    } else {
+      // Callback is currently executing on another thread,
+      // block until it finishes executing.
+      while (
+          !__cb->__callbackFinishedExecuting_.load(std::memory_order_acquire)) {
+        __spin_yield();
+      }
+    }
+
+    __remove_token_reference();
+  }
+
+ private:
+  static bool __is_locked(std::uint64_t __state) noexcept {
+    return (__state & __locked_flag) != 0;
+  }
+
+  static bool __is_stop_requested(std::uint64_t __state) noexcept {
+    return (__state & __stop_requested_flag) != 0;
+  }
+
+  static bool __is_stop_requestable(std::uint64_t __state) noexcept {
+    // Interruptible if it has already been interrupted or if there are
+    // still interrupt_source instances in existence.
+    return __is_stop_requested(__state) || (__state >= __source_ref_increment);
+  }
+
+  bool __try_lock_and_signal_until_signalled() noexcept {
+    std::uint64_t __oldState = __state_.load(std::memory_order_acquire);
+    do {
+      if (__is_stop_requested(__oldState))
+        return false;
+      while (__is_locked(__oldState)) {
+        __spin_yield();
+        __oldState = __state_.load(std::memory_order_acquire);
+        if (__is_stop_requested(__oldState))
+          return false;
+      }
+    } while (!__state_.compare_exchange_weak(
+        __oldState,
+        __oldState | __stop_requested_flag | __locked_flag,
+        std::memory_order_acq_rel,
+        std::memory_order_acquire));
+    return true;
+  }
+
+  void __lock() noexcept {
+    auto __oldState = __state_.load(std::memory_order_relaxed);
+    do {
+      while (__is_locked(__oldState)) {
+        __spin_yield();
+        __oldState = __state_.load(std::memory_order_relaxed);
+      }
+    } while (!__state_.compare_exchange_weak(
+        __oldState,
+        __oldState | __locked_flag,
+        std::memory_order_acquire,
+        std::memory_order_relaxed));
+  }
+
+  void __unlock() noexcept {
+    __state_.fetch_sub(__locked_flag, std::memory_order_release);
+  }
+
+  void __unlock_and_increment_token_ref_count() noexcept {
+    __state_.fetch_sub(
+        __locked_flag - __token_ref_increment, std::memory_order_release);
+  }
+
+  void __unlock_and_decrement_token_ref_count() noexcept {
+    auto __oldState = __state_.fetch_sub(
+        __locked_flag + __token_ref_increment, std::memory_order_acq_rel);
+    // Check if new state is less than __token_ref_increment which would
+    // indicate that this was the last reference.
+    if (__oldState <
+        (__locked_flag + __token_ref_increment + __token_ref_increment)) {
+      delete this;
+    }
+  }
+
+  static constexpr std::uint64_t __stop_requested_flag = 1u;
+  static constexpr std::uint64_t __locked_flag = 2u;
+  static constexpr std::uint64_t __token_ref_increment = 4u;
+  static constexpr std::uint64_t __source_ref_increment =
+      static_cast<std::uint64_t>(1u) << 33u;
+
+  // bit 0 - stop-requested
+  // bit 1 - locked
+  // bits 2-32 - token ref count (31 bits)
+  // bits 33-63 - source ref count (31 bits)
+  std::atomic<std::uint64_t> __state_{__source_ref_increment};
+  __stop_callback_base* __head_ = nullptr;
+  std::thread::id __signallingThread_;
 };
 
-
-// forward declarations:
-template <typename Callback> class stop_callback;
 class stop_source;
+template <typename _Callback>
+class stop_callback;
 
-
-//***************************************** 
-// stop_token
-//***************************************** 
 class stop_token {
- private:
-  ::std::shared_ptr<SharedData> _sp{nullptr};
-
  public:
-  // default constructor is cheap:
-  // TODO: constexpr ??
-  explicit stop_token() noexcept = default;
+  stop_token() noexcept : __state_(nullptr) {}
 
-  // special members (all defaults are OK):
-  //stop_token(const stop_token&) noexcept = default;
-  //stop_token(stop_token&&) noexcept = default;
-  //stop_token& operator=(const stop_token&) noexcept = default;
-  //stop_token& operator=(stop_token&&) noexcept = default;
-  //~stop_token() noexcept = default;
-  void swap(stop_token& it) noexcept {
-    _sp.swap(it._sp);
+  stop_token(const stop_token& __it) noexcept : __state_(__it.__state_) {
+    if (__state_ != nullptr) {
+      __state_->__add_token_reference();
+    }
   }
 
-  // stop handling:
-  bool stop_signaled() const noexcept {
-    return _sp && _sp->stopSignaled.load();
-  }
-  bool stop_done_or_possible() const {
-    // yields if new callbacks could be called (immediately or later).
-    // - true if already stopped or still sources exist that can stop it 
-    // - thus:
-    //   - true => false
-    //      if not stopped yet and the last source is deleted
-    //      if we swap/move/assign away the state 
-    //   - false => true
-    //      if we swap/assign away the state 
-    return _sp && (stop_signaled() || _sp->numSources > 0);
+  stop_token(stop_token&& __it) noexcept
+      : __state_(std::exchange(__it.__state_, nullptr)) {}
+
+  ~stop_token() {
+    if (__state_ != nullptr) {
+      __state_->__remove_token_reference();
+    }
   }
 
-  friend bool operator== (const stop_token& lhs, const stop_token& rhs) {
-    // TODO: just comparing _sp is enough?
-    //return (!lhs.is_interruptible() && !rhs.is_interruptible())
-    //       || (lhs._sp.get() == rhs._sp.get());
-    return lhs._sp == rhs._sp;
-  }
-  friend bool operator!= (const stop_token& lhs, const stop_token& rhs) {
-    return !(lhs==rhs);
-  }
- 
- private:
-  // allow stop_source to create and return a token:
-  friend class stop_source;
-  explicit stop_token(::std::shared_ptr<SharedData> ip)
-   : _sp{std::move(ip)} {
-  }
-
-  // allow stop_callback to register callbacks:
-  // TODO: make only the base class a friend
-  template <typename T>
-  friend class ::std::stop_callback;
-  void registerCB(stop_callback_base* cvPtr);
-  void unregisterCB(stop_callback_base* cvPtr);
-};
-
-
-
-//***************************************** 
-// stop_source
-//***************************************** 
-class stop_source {
- private:
-  ::std::shared_ptr<SharedData> _sp{nullptr};
-
- public:
-  // default constructor creates shared state
-  // TODO: could/should probably be delayed until get_token()
-  explicit stop_source() noexcept 
-   : _sp{new SharedData{false}} {
-  }
-  // cheap constructor in case we need it:
-  // - see e.g. class jthread
-  // - same as moved_from state
-  // TODO: not necessary wen get_token creates shared state
-  explicit stop_source(std::nullptr_t) noexcept 
-   : _sp{nullptr} {
-  }
-
-  // special members (default OK):
-  stop_source(const stop_source& is) noexcept
-   : _sp{is._sp} {
-       if (_sp) {
-         ++(_sp->numSources);
-       }
-  }
-  stop_source(stop_source&&) noexcept = default;
-  // pass by value to do the increments/decrements right:
-  stop_source& operator=(stop_source is) noexcept {
-    swap(is);
+  stop_token& operator=(const stop_token& __it) noexcept {
+    if (__state_ != __it.__state_) {
+      stop_token __tmp{__it};
+      swap(__tmp);
+    }
     return *this;
   }
-  ~stop_source () {
-     if (_sp) {
-       --(_sp->numSources);
-     }
+
+  stop_token& operator=(stop_token&& __it) noexcept {
+    stop_token __tmp{std::move(__it)};
+    swap(__tmp);
+    return *this;
   }
 
-  void swap(stop_source& it) noexcept {
-    _sp.swap(it._sp);
+  [[nodiscard]] bool stop_signaled() const noexcept {
+    return __state_ != nullptr && __state_->__is_stop_requested();
   }
 
-  // get_token()
-  // TODO: non-const wen get_token creates shared state
-  stop_token get_token() const noexcept {
-    return stop_token{_sp};  // using private constructor of stop_token
-  }
-  
-  // stop handling:
-  bool valid() const {
-    return _sp != nullptr;
-  }
-  bool stop_signaled() const noexcept {
-    return _sp && _sp->stopSignaled.load();
+  [[nodiscard]] bool stop_done_or_possible() const noexcept {
+    return __state_ != nullptr && __state_->__is_stop_requestable();
   }
 
-  bool signal_stop();
-  
-  friend bool operator== (const stop_source& lhs, const stop_source& rhs) {
-    // TODO: just comparing _sp is enough?
-    //return (!lhs.valid() && !rhs.valid())
-    //       || (lhs._sp.get() == rhs._sp.get());
-    return lhs._sp.get() == rhs._sp.get();
+  void swap(stop_token& __it) noexcept {
+    std::swap(__state_, __it.__state_);
   }
-  friend bool operator!= (const stop_source& lhs, const stop_source& rhs) {
-    return !(lhs==rhs);
+
+  friend bool operator==(
+      const stop_token& __a,
+      const stop_token& __b) noexcept {
+    return __a.__state_ == __b.__state_;
   }
+  friend bool operator!=(
+      const stop_token& __a,
+      const stop_token& __b) noexcept {
+    return __a.__state_ != __b.__state_;
+  }
+
+ private:
+  friend class stop_source;
+  template <typename _Callback>
+  friend class stop_callback;
+
+  explicit stop_token(__stop_state* __state) noexcept : __state_(__state) {
+    if (__state_ != nullptr) {
+      __state_->__add_token_reference();
+    }
+  }
+
+  __stop_state* __state_;
 };
 
+class stop_source {
+ public:
+  stop_source() : __state_(new __stop_state()) {}
 
-//***************************************** 
-// stop_callback
-//***************************************** 
-// TODO: with concepts: template <Invocable Callback>
-template <typename Callback>
-struct stop_callback : stop_callback_base
-{
-  private:
-    stop_token stoken;
-    Callback callback;
-  public:
-    stop_callback(stop_token it, Callback&& cb)
-     : stoken{std::move(it)}, callback{std::forward<Callback>(cb)} {
-        if (stoken.stop_done_or_possible()) {
-          stoken.registerCB(this);
-        }
+  explicit stop_source(std::nullptr_t) noexcept : __state_(nullptr) {}
+
+  ~stop_source() {
+    if (__state_ != nullptr) {
+      __state_->__remove_source_reference();
     }
-    ~stop_callback() {
-        if (stoken.stop_done_or_possible()) { // TODO: OK not to unregister if possible when registering?
-          stoken.unregisterCB(this);
-        }
+  }
+
+  stop_source(const stop_source& __other) noexcept
+      : __state_(__other.__state_) {
+    if (__state_ != nullptr) {
+      __state_->__add_source_reference();
     }
-    stop_callback(const stop_callback&) = delete;
-    stop_callback(stop_callback&&) = delete;
-    stop_callback& operator=(const stop_callback&) = delete;
-    stop_callback& operator=(stop_callback&&) = delete;
-  private:
-    virtual void run() noexcept override {
-      callback();  //or: std::invoke(callback);
-      finishedExecuting.store(true);
+  }
+
+  stop_source(stop_source&& __other) noexcept
+      : __state_(std::exchange(__other.__state_, nullptr)) {}
+
+  stop_source& operator=(stop_source&& __other) noexcept {
+    stop_source __tmp{std::move(__other)};
+    swap(__tmp);
+    return *this;
+  }
+
+  stop_source& operator=(const stop_source& __other) noexcept {
+    if (__state_ != __other.__state_) {
+      stop_source __tmp{__other};
+      swap(__tmp);
     }
+    return *this;
+  }
+
+  [[nodiscard]] bool stop_signaled() const noexcept {
+    return __state_ != nullptr && __state_->__is_stop_requested();
+  }
+
+  [[nodiscard]] bool valid() const noexcept {
+    return __state_ != nullptr;
+  }
+
+  bool signal_stop() const noexcept {
+    if (__state_ != nullptr) {
+      return __state_->__request_stop();
+    }
+    return false;
+  }
+
+  [[nodiscard]] stop_token get_token() const noexcept {
+    return stop_token{__state_};
+  }
+
+  void swap(stop_source& __other) noexcept {
+    std::swap(__state_, __other.__state_);
+  }
+
+  friend bool operator==(
+      const stop_source& __a,
+      const stop_source& __b) noexcept {
+    return __a.__state_ == __b.__state_;
+  }
+  friend bool operator!=(
+      const stop_source& __a,
+      const stop_source& __b) noexcept {
+    return __a.__state_ != __b.__state_;
+  }
+
+ private:
+  __stop_state* __state_;
 };
 
-
-
-//***************************************** 
-// key member function for registering and calling callbacks
-//***************************************** 
-
-bool stop_source::signal_stop()
-{
-  std::cout<<std::this_thread::get_id()<<": signalstop "<<std::endl;
-  //std::cout.put('I').flush();
-  if (!valid()) return false;
-  auto wasStopSignaled = _sp->stopSignaled.exchange(true);
-  if (!wasStopSignaled) {
-      _sp->stoppingThreadID = std::this_thread::get_id();
-      ::std::unique_lock lg{_sp->cbDataMutex};  // might throw
-      // note, we no longer accept new callbacks here in the list
-      // but other callbacks might be unregistered
-      while(!_sp->cbData.empty()) {
-        std::cout<<std::this_thread::get_id()<<": Notifying "<<std::endl;
-        auto elem = _sp->cbData.front();
-        _sp->cbData.pop_front();
-        lg.unlock();
-        bool destructorHasRunInsideCallback{false};
-        elem->destructorHasRunInsideCallback = &destructorHasRunInsideCallback;
-        std::cout<<std::this_thread::get_id()<<": call callback "<<std::endl;
-        elem->run();  // don't call the callback locked
-        if (!destructorHasRunInsideCallback) {
-          elem->destructorHasRunInsideCallback = nullptr;
-          elem->finishedExecuting.store(true);
-        }
-        lg.lock();
-      }
-  }
-  //std::cout.put('i').flush();
-  return wasStopSignaled;
-}
-
-void stop_token::registerCB(stop_callback_base* cbPtr) {
-  std::cout.put('R').flush();
-  if (!stop_done_or_possible()) return;
-
-  std::unique_lock lg{_sp->cbDataMutex};
-  if (_sp->stopSignaled.load()) {
-    // if stop already signaled, make sure the callback is durectly called
-    // - but not blocking others
-    lg.unlock();
-    cbPtr->run();
-  }
-  else {
-    _sp->cbData.emplace_front(cbPtr);  // might throw
-  }
-  std::cout.put('r').flush();
-}
-
-void stop_token::unregisterCB(stop_callback_base* cbPtr) {
-  //std::cout.put('U').flush();
-  if (!stop_done_or_possible()) return;
-
-  {
-    std::scoped_lock lg{_sp->cbDataMutex};
-    // remove the matching CB
-    for (auto pos = _sp->cbData.begin(); pos != _sp->cbData.end(); ++pos) {
-      if (*pos == cbPtr) {
-        _sp->cbData.erase(pos);
-        return;
-      }
+template <typename _Callback>
+// requires MoveConstructible<_Callback> && Invocable<_Callback>
+class [[nodiscard]] stop_callback : private __stop_callback_base {
+ public:
+  stop_callback(const stop_token& __token, _Callback&& __cb) noexcept(
+      std::is_nothrow_move_constructible_v<_Callback>)
+      : __state_(nullptr), __cb_(static_cast<_Callback&&>(__cb)) {
+    if (__token.__state_ != nullptr &&
+        __token.__state_->__try_add_callback(this, true)) {
+      __state_ = __token.__state_;
     }
   }
-  // If we come here, the callback either has executed or is being executed
-  // So we have to find out whether we are inside the callback
-  // - for that we compare thread IDs 
-  if (std::this_thread::get_id() == _sp->stoppingThreadID) {
-    if (cbPtr->destructorHasRunInsideCallback) {
-      // we are inside callback of cpPtr
-      *(cbPtr->destructorHasRunInsideCallback) = true;
-    }
-    else {
-      // callback had run before, so:
-      assert(cbPtr->finishedExecuting.load());
+
+  stop_callback(stop_token&& __token, _Callback&& __cb) noexcept(
+      std::is_nothrow_move_constructible_v<_Callback>)
+      : __state_(nullptr), __cb_(static_cast<_Callback&&>(__cb)) {
+    if (__token.__state_ != nullptr &&
+        __token.__state_->__try_add_callback(this, false)) {
+      __state_ = std::exchange(__token.__state_, nullptr);
     }
   }
-  else {
-    // different thread than where stop was called:
-    // => wait for the end:
-    // TODO: busy waiting, better use a binary semaphore or a futex
-    while (!cbPtr->finishedExecuting.load()) {
-      std::this_thread::yield();
+
+  ~stop_callback() {
+    if (__state_ != nullptr) {
+      __state_->__remove_callback(this);
     }
   }
-  //std::cout.put('u').flush();
-}
 
+  stop_callback& operator=(const stop_callback&) = delete;
+  stop_callback& operator=(stop_callback&&) = delete;
+  stop_callback(const stop_callback&) = delete;
+  stop_callback(stop_callback&&) = delete;
 
+ private:
+  void __execute() noexcept override {
+    // Executed in a noexcept context
+    // If it throws then we call std::terminate().
+    __cb_();
+  }
+
+  __stop_state* __state_;
+  _Callback __cb_;
+};
 } // namespace std
-
-#endif // STOP_TOKEN_HPP
