@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cassert>
 #include <atomic>
+#include <vector>
 using namespace::std::literals;
 
 //------------------------------------------------------
