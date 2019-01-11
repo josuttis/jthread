@@ -8,6 +8,7 @@
 #include <atomic>
 #include <cassert>
 #include <sstream>
+#include <vector>
 using namespace::std::literals;
 
 
@@ -39,10 +40,10 @@ void exampleProducerConsumer(double prodSec, double consSec, bool interrupt)
       std::unique_lock lock{itemsMx};
       while (!stoken.stop_signaled()) {
         ////std::cout << "\nP: wait " << std::endl;
-        //if (!itemsCV.wait_until(lock, [&] { return items.size() < maxQueueSize; }, stoken)) {
-        //  //std::cout << "\nP: wait returned false " << std::endl;
-        //  return;
-        //}
+        if (!itemsCV.wait_until(lock, [&] { return items.size() < maxQueueSize; }, stoken)) {
+         //std::cout << "\nP: wait returned false " << std::endl;
+         return;
+        }
         //// OOPS: NOTE: true does NOT necessarily meant that we have no interrupt !!!
         ////std::cout << "\nP: wait returned true " << std::endl;
 
