@@ -50,10 +50,10 @@ between threads, as summarized in \tref{thread.lib.summary}.
 asynchonously signal an interrupt.
 The interrupt can only be signaled exactly once
 by one of multiple \tcode{interrupt_source}s to one or multiple \tcode{interrupt_token}s.
-Callbacks can be registered as \tcode{interrupt_token}s to be called when the interrupt is signaled.
+Callbacks can be registered as \tcode{interrupt_callback}s to be called when the interrupt is signaled.
 
-For this, classes \tcode{interrupt_source} and \tcode{interrupt_token} implement semantics of shared ownership of an
-associated atomic interrupt state (an atomic token to signal an interrupt).
+For this, classes \tcode{interrupt_source}, \tcode{interrupt_token} and \tcode{interrupt_callback} implement
+semantics of shared ownership of an associated atomic interrupt state (an atomic token to signal an interrupt).
 The last remaining owner of the interrupt state automatically 
 releases the resources associated with the interrupt state.
 
@@ -92,34 +92,62 @@ namespace std {
 
 \begin{codeblock}
 namespace std {
-  template <typename Callback>
+  template <Invocable Callback>
+    requires MoveConstructible<Callback>
   class interrupt_callback {
   public:
-    // \ref{interrupt_callback.constr} create, copy, destroy:
-    interrupt_callback(interrupt_token it, Callback&& cb);
+    // \ref{interrupt_callback.constr} create, destroy:
+    explicit interrupt_callback(const interrupt_token& it, Callback&& cb)
+        noexcept(std::is_nothrow_move_constructible_v<Callback>);
+    explicit interrupt_callback(interrupt_token&& it, Callback&& cb)
+        noexcept(std::is_nothrow_move_constructible_v<Callback>);
     ~interrupt_callback();
 
     interrupt_callback(const interrupt_callback&) = delete;
     interrupt_callback(interrupt_callback&&) = delete;
     interrupt_callback& operator=(const interrupt_callback&) = delete;
     interrupt_callback& operator=(interrupt_callback&&) = delete;
-  }
+
+  private:
+    // \expos
+    Callback callback; 
+  };
 }
 \end{codeblock}
 
 %*****
-\rSec3[interrupt_callback.constr]{\tcode{interrupt_callback} constructors}
+\rSec3[interrupt_callback.constr]{\tcode{interrupt_callback} constructors and destructor}
 
 \indexlibrary{\idxcode{interrupt_callback}!constructor}%
 \begin{itemdecl}
-interrupt_callback(interrupt_token it, Callback&& cb) noexcept;
+explicit interrupt_callback(const interrupt_token& it, Callback&& cb)
+  noexcept(std::is_nothrow_move_constructible_v<Callback>);
+explicit interrupt_callback(interrupt_token&& it, Callback&& cb)
+  noexcept(std::is_nothrow_move_constructible_v<Callback>);
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\requires \tcode{cb} is a callable object taking no parameters.
+  \pnum\effects Initialises \tcode{callback} with \tcode{static_cast<Callback\&\&>(cb)}.
+                If \tcode{it.interrupted()} is true then immediately invokes \tcode{static_cast<Callback\&\&>(callback)}
+                with zero arguments on the current thread before the constructor returns.
+                Otherwise, the callback is registered with the shared interrupt state of \tcode{it}
+                such that \tcode{static_cast<Callback\&\&>(callback)} is invoked by first call to \tcode{isrc.interrupt()}
+                on an \tcode{interrupt_source} instance, \tcode{isrc}, that references the same shared interrupt
+                state as \tcode{it}.
+                If invoking the callback throws an unhandled exception then \tcode{std::terminate()} is called.
+\end{itemdescr}
 
-  \pnum\effects Constructs a new \tcode{interrupt_callback} object that can be used to be called when an interrupt
-                is signaled at \tcode{it}.
-                If \tcode{it.interrupted()} \tcode{cb} is immediatelly called.
+\indexlibrary{\idxcode{interrupt_callback}!destructor}%
+\begin{itemdecl}
+~interrupt_callback();
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\effects Deregisters the callback from the associated interrupt state.
+                If this callback is concurrently executing on another thread then the destructor shall
+                block until the callback returns before calling \tcode{callback}'s destructor.
+                The destructor shall not block waiting for the execution of another callback registered
+                with the same shared interrupt state to finish.
+                A subsequent call to \tcode{isrc.interrupt()} on an \tcode{interrupt_source}, \tcode{isrc}, with the same
+                associated interrupt state shall not invoke the callback once the destructor has returned.
 \end{itemdescr}
 
 %**************************
@@ -133,7 +161,7 @@ interrupt_callback(interrupt_token it, Callback&& cb) noexcept;
 The class \tcode{interrupt_source} implements semantics of signaling interrupts
 to \tcode{interrupt_token}s (\ref{interrupt_token}).
 All owners can signal an interrupt, provided the token is valid.
-An interrupt can only be signaled once.
+An interrupt can only be signaled once. Subsequent attempts to signal an interrupt are no-ops.
 All owners can check whether an interrupt was signaled.
 
 \begin{codeblock}
@@ -141,8 +169,8 @@ namespace std {
   class interrupt_source {
   public:
     // \ref{interrupt_source.constr} create, copy, destroy:
-    explicit interrupt_source() noexcept;
-    explicit interrupt_source(nullptr_t);
+    interrupt_source();
+    explicit interrupt_source(nullptr_t) noexcept;
 
     interrupt_source(const interrupt_source&) noexcept;
     interrupt_source(interrupt_source&&) noexcept;
@@ -155,7 +183,7 @@ namespace std {
     interrupt_token get_token() const noexcept;
     bool valid() const noexcept;
     bool interrupted() const noexcept;
-    bool interrupt();
+    bool interrupt() const noexcept;
 
     friend bool operator== (const interrupt_source& lhs, const interrupt_source& rhs);
     friend bool operator!= (const interrupt_source& lhs, const interrupt_source& rhs);
@@ -163,30 +191,24 @@ namespace std {
 }
 \end{codeblock}
 
-
-{\color{diffcolor}
-\begin{note} Implementations are expected to implement interruption in terms of a
-             type-erased facility that allows any destructible and invocable object
-             to be called by \tcode{interruption_source::interrupt()} in a future version of C++.
-             \end{note}
-}
-
 %***** constructors
 \rSec3[interrupt_source.constr]{\tcode{interrupt_source} constructors}
 
 \indexlibrary{\idxcode{interrupt_source}!constructor}%
 \begin{itemdecl}
-interrupt_source() noexcept;
+interrupt_source();
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Constructs a new \tcode{interrupt_source} object that can signal interrupts.
-
+  \pnum\effects Constructs a new \tcode{interrupt_source} object that can be used to signal interrupts.
+  
   \pnum\postconditions \tcode{valid() == true} and \tcode{interrupted() == false}.
+
+  \pnum\throws \tcode{bad_alloc} If memory could not be allocated for the shared interrupt state.
 \end{itemdescr}
 
 \indexlibrary{\idxcode{interrupt_source}!constructor}%
 \begin{itemdecl}
-interrupt_source(nullptr_t) noexcept;
+explicit interrupt_source(nullptr_t) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\effects Constructs a new \tcode{interrupt_source} object that can't be used to signal interrupts.
@@ -312,7 +334,7 @@ bool interrupted() const noexcept;
 
 \indexlibrarymember{interrupt}{interrupt_source}%
 \begin{itemdecl}
-bool interrupt();
+bool interrupt() const noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   %\pnum\requires \tcode{valid() == true}
@@ -367,7 +389,7 @@ bool operator!= (const interrupt_source& lhs, const interrupt_source& rhs);
 
 \pnum
 \indexlibrary{\idxcode{interrupt_token}}%
-The class \tcode{interrupt_token} implements semantics getting interrupts signaled from
+The class \tcode{interrupt_token} provides an interface for responding to interrupts signaled from
 the \tcode{interrupt_source} object they were created from.
 All tokens can check whether an interrupt was signaled.
 When an interrupt is signaled, which is possible only once,
@@ -410,7 +432,8 @@ interrupt_token() noexcept;
   \pnum\effects Constructs a new \tcode{interrupt_token} object that can't be used to signal interrupts.
                 \begin{note} Therefore, no resources have to be associated for the state.  \end{note}
 
-  \pnum\postconditions \tcode{interruptible() == false}.
+  \pnum\postconditions \tcode{interruptible() == false} and 
+                       \tcode{interrupted() == false}.
 \end{itemdescr}
 
 %***** special members:
@@ -420,12 +443,12 @@ interrupt_token() noexcept;
 interrupt_token(const interrupt_token& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects If \tcode{rhs} is not valid, constructs an \tcode{interrupt_token} object
-                that is not valid;
+  \pnum\effects If \tcode{rhs} is not interruptible, constructs an \tcode{interrupt_token} object
+                that is not interruptible;
                 otherwise, constructs an \tcode{interrupt_token}
                 that shares the ownership of the interrupt state with \tcode{rhs}.
 
-  \pnum\postconditions \tcode{valid() == rhs.valid()}
+  \pnum\postconditions \tcode{interruptible() == rhs.interruptible()}
                 and \tcode{interrupted() == rhs.interrupted()}
                 and \tcode{*this == rhs}.
 \end{itemdescr}
@@ -438,7 +461,7 @@ interrupt_token(interrupt_token&& rhs) noexcept;
   \pnum\effects Move constructs an object of type \tcode{interrupt_token} from \tcode{rhs}.
 
   \pnum\postconditions \tcode{*this} shall contain the old value of \tcode{rhs} and
-                        \tcode{rhs.valid() == false}.
+                        \tcode{rhs.interruptible() == false}.
 \end{itemdescr}
 
 %*****
@@ -450,7 +473,7 @@ interrupt_token(interrupt_token&& rhs) noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
- \pnum\effects If \tcode{valid()} and \tcode{*this} is the last owner of the interrupt state,
+ \pnum\effects If \tcode{*this} is the last owner of the interrupt state,
                 releases the resources associated with the interrupt state.
 \end{itemdescr}
 
@@ -499,11 +522,11 @@ void swap(interrupt_token& rhs) noexcept;
 bool interrupted() const noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\returns \tcode{true} if \tcode{true}
-                or initialized with \tcode{false} and \tcode{interrupt()} was called
-                by one of the owners.
-  \pnum\returns \tcode{true} if \tcode{valid()} 
-                and \tcode{interrupt()} was called by one of the owners.
+  \pnum\returns \tcode{true} if \tcode{interruptible()} 
+                and \tcode{interrupt()} was called by one of the owners,
+                otherwise \tcode{false}.
+  \pnum\sync If \tcode{true} is returned then synchronizes with the
+             first call to \tcode{interrupt()} by one of the owners.
 \end{itemdescr}
 
 \indexlibrarymember{interruptible}{interrupt_token}%
@@ -511,14 +534,12 @@ bool interrupted() const noexcept;
 bool interruptible() const noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\returns \tcode{true} if the interrupt token did or still can receive an interrupt signal
-                so that registered callbacks can be called (immediately or later).
-                \begin{note} Returns \tcode{false} if registering a callback
-                                doesn't make any sense because it can't be called (anymore).
-                                (e.g., because it is not interrupted yet
-                                 and there is no more associated \tcode{interrupt_source}
-                                 (\ref{interrupt_source})).
-                             \end{note}
+  \pnum\returns \tcode{false} if the interrupt token will never return \tcode{true} from \tcode{interrupted()}.
+                \begin{note}To be interruptible, an \tcode{interrupt_token} must either already be in the interrupted
+                  state or have been initialized from a valid \tcode{interrupt_source} and there must still be an instance
+                  of \tcode{interrupt_source} that references the same shared interrupt state that can potentially
+                  be used to call \tcode{interrupt()}.
+                \end{note}
 \end{itemdescr}
 
 
@@ -530,10 +551,10 @@ bool interruptible() const noexcept;
 bool operator== (const interrupt_token& lhs, const interrupt_token& rhs);
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\returns \tcode{!lhs.valid() \&\& !rhs.valid()} or
+  \pnum\returns \tcode{!lhs.interruptible() \&\& !rhs.interruptible()} or
                 whether \tcode{lhs} and \tcode{rhs} refer to the
                 same interrupt state
-                (copied or moved from the same initial \tcode{interrupt_token} object).
+                (copied or moved from the same initial \tcode{interrupt_source} object).
 \end{itemdescr}
 
 \indexlibrarymember{operator!=}{interrupt_token}%
