@@ -60,7 +60,7 @@ void interruptByDestructor()
                      catch (std::exception&) { // interrupted not derived from std::exception
                        assert(false);
                      }
-                     catch (const char* e) {
+                     catch ([[maybe_unused]] const char* e) {
                        assert(stoken.stop_requested());
                        t1WasInterrupted = true;
                        //throw;
