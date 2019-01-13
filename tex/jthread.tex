@@ -184,8 +184,8 @@ namespace std {
     [[nodiscard]] bool stop_requested() const noexcept;
     [[nodiscard]] bool request_stop() const noexcept;
 
-    friend bool operator== (const stop_source& lhs, const stop_source& rhs);
-    friend bool operator!= (const stop_source& lhs, const stop_source& rhs);
+    friend bool operator== (const stop_source& lhs, const stop_source& rhs) noexcept;
+    friend bool operator!= (const stop_source& lhs, const stop_source& rhs) noexcept;
   };
 }
 \end{codeblock}
@@ -361,7 +361,7 @@ void swap(stop_source& rhs) noexcept;
 
 \indexlibrarymember{operator==}{stop_source}%
 \begin{itemdecl}
-bool operator== (const stop_source& lhs, const stop_source& rhs);
+bool operator== (const stop_source& lhs, const stop_source& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\returns \tcode{!lhs.stoppable() \&\& !rhs.stoppable()} or
@@ -372,7 +372,7 @@ bool operator== (const stop_source& lhs, const stop_source& rhs);
 
 \indexlibrarymember{operator!=}{stop_source}%
 \begin{itemdecl}
-bool operator!= (const stop_source& lhs, const stop_source& rhs);
+bool operator!= (const stop_source& lhs, const stop_source& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\returns \tcode{!(lhs==rhs)}.
