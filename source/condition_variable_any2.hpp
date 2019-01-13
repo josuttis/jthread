@@ -189,7 +189,7 @@ inline bool condition_variable_any2::wait_until(Lockable& lock,
                                             Predicate pred,
                                             stop_token stoken)
 {
-    if (stoken.stop_signaled()) {
+    if (stoken.stop_requested()) {
       return pred();
     }
     auto local_mut=mut;
@@ -197,7 +197,7 @@ inline bool condition_variable_any2::wait_until(Lockable& lock,
     //register_guard rg{stoken, this};
     while(!pred()) {
         std::unique_lock<std::mutex> first_internal_lock(*local_mut);
-        if(stoken.stop_signaled())
+        if(stoken.stop_requested())
             break;
         unlock_guard<Lockable> unlocker(lock);
         std::unique_lock<std::mutex> second_internal_lock(std::move(first_internal_lock));
@@ -217,7 +217,7 @@ inline bool condition_variable_any2::wait_until(Lockable& lock,
                                             Predicate pred,
                                             stop_token stoken)
 {
-    if (stoken.stop_signaled()) {
+    if (stoken.stop_requested()) {
       return pred();
     }
     auto local_mut=mut;
@@ -225,7 +225,7 @@ inline bool condition_variable_any2::wait_until(Lockable& lock,
     //register_guard rg{stoken, this};
     while(!pred()  && Clock::now() < abs_time) {
         std::unique_lock<std::mutex> first_internal_lock(*local_mut);
-        if(stoken.stop_signaled())
+        if(stoken.stop_requested())
             break;
         unlock_guard<Lockable> unlocker(lock);
         std::unique_lock<std::mutex> second_internal_lock(std::move(first_internal_lock));

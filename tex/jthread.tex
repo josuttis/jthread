@@ -15,9 +15,9 @@ between threads, as summarized in \tref{thread.lib.summary}.
 \ref{thread.req}      & Requirements          &                               \\ \rowsep
 \ref{thread.threads}  & Threads               & \tcode{<thread>}              \\ \rowsep
 \color{insertcolor}
-\ref{thread.interrupt_token} &
-        \color{insertcolor} Interrupt Tokens       &
-                \color{insertcolor} \tcode{<interrupt_token>}              \\ \rowsep
+\ref{thread.stop_token} &
+        \color{insertcolor} Stop Tokens       &
+                \color{insertcolor} \tcode{<stop_token>}              \\ \rowsep
 \color{insertcolor}
 \ref{thread.jthreads} &
         \color{insertcolor} Joining Threads       &
@@ -43,70 +43,70 @@ between threads, as summarized in \tref{thread.lib.summary}.
 {\color{insertcolor}
 
 %******************************************************************
-\rSec1[thread.interrupt_token]{Interrupt Tokens}
+\rSec1[thread.stop_token]{Stop Tokens}
 
 \pnum
-\ref{thread.interrupt_token} describes components that can be used to
-asynchonously signal an interrupt.
-The interrupt can only be signaled exactly once
-by one of multiple \tcode{interrupt_source}s to one or multiple \tcode{interrupt_token}s.
-Callbacks can be registered as \tcode{interrupt_callback}s to be called when the interrupt is signaled.
+\ref{thread.stop_token} describes components that can be used to
+asynchonously request an end ("stop") of a running execution.
+The stop can only be requested exactly once
+by one of multiple \tcode{stop_source}s to one or multiple \tcode{stop_token}s.
+Callbacks can be registered as \tcode{stop_callback}s to be called when the stop is requested.
 
-For this, classes \tcode{interrupt_source}, \tcode{interrupt_token} and \tcode{interrupt_callback} implement
-semantics of shared ownership of an associated atomic interrupt state (an atomic token to signal an interrupt).
-The last remaining owner of the interrupt state automatically 
-releases the resources associated with the interrupt state.
+For this, classes \tcode{stop_source}, \tcode{stop_token} and \tcode{stop_callback} implement
+semantics of shared ownership of an associated atomic stop state (an atomic token to signal a stop request).
+The last remaining owner of the stop state automatically 
+releases the resources associated with the stop state.
 
 \pnum
-Calls to \tcode{interrupt()}, \tcode{interrupted()},
-\tcode{valid()}, and \tcode{interruptible()}
+Calls to \tcode{request_stop()}, \tcode{stop_requested()},
+\tcode{stoppable()}, and \tcode{callbacks_ignored()}
 are atomic operations (6.8.2.1p3 \ref{intro.races})
-on the interrupt state contained in the interrupt state object.
+on the stop state contained in the stop state object.
 Hence concurrent calls to these functions do not introduce data races. 
-A call to \tcode{interrupt()} synchronizes with any call to \tcode{interrupt()} and
-\tcode{interrupted()} that observes the interrupt.
+A call to \tcode{request_stop()} synchronizes with any call to \tcode{request_stop()} and
+\tcode{stop_requested()} that observes the stop.
 %(and hence returns \tcode{true} or throws).
 
 %**************************
-\rSec2[thread.interrupt_token.syn]{Header \tcode{<interrupt_token>} synopsis}
-\indexhdr{interrupt_token}%
+\rSec2[thread.stop_token.syn]{Header \tcode{<stop_token>} synopsis}
+\indexhdr{stop_token}%
 
 \begin{codeblock}
 namespace std {
-  // \ref{interrupt_token} class \tcode{interrupt_token}
-  template <typename Callback> class interrupt_callback;
-  class interrupt_source;
-  class interrupt_token;
+  // \ref{stop_token} class \tcode{stop_token}
+  template <typename Callback> class stop_callback;
+  class stop_source;
+  class stop_token;
 }
 \end{codeblock}
 
 
 %**************************
-% interrupt_callback
+% stop_callback
 %**************************
-\indexlibrary{\idxcode{interrupt_callback}}%
-\rSec2[interrupt_callback]{Class \tcode{interrupt_callback}}
+\indexlibrary{\idxcode{stop_callback}}%
+\rSec2[stop_callback]{Class \tcode{stop_callback}}
 
 \pnum
-\indexlibrary{\idxcode{interrupt_callback}}%
+\indexlibrary{\idxcode{stop_callback}}%
 
 \begin{codeblock}
 namespace std {
   template <Invocable Callback>
     requires MoveConstructible<Callback>
-  class interrupt_callback {
+  class stop_callback {
   public:
-    // \ref{interrupt_callback.constr} create, destroy:
-    explicit interrupt_callback(const interrupt_token& it, Callback&& cb)
+    // \ref{stop_callback.constr} create, destroy:
+    explicit stop_callback(const stop_token& it, Callback&& cb)
         noexcept(std::is_nothrow_move_constructible_v<Callback>);
-    explicit interrupt_callback(interrupt_token&& it, Callback&& cb)
+    explicit stop_callback(stop_token&& it, Callback&& cb)
         noexcept(std::is_nothrow_move_constructible_v<Callback>);
-    ~interrupt_callback();
+    ~stop_callback();
 
-    interrupt_callback(const interrupt_callback&) = delete;
-    interrupt_callback(interrupt_callback&&) = delete;
-    interrupt_callback& operator=(const interrupt_callback&) = delete;
-    interrupt_callback& operator=(interrupt_callback&&) = delete;
+    stop_callback(const stop_callback&) = delete;
+    stop_callback(stop_callback&&) = delete;
+    stop_callback& operator=(const stop_callback&) = delete;
+    stop_callback& operator=(stop_callback&&) = delete;
 
   private:
     // \expos
@@ -116,177 +116,175 @@ namespace std {
 \end{codeblock}
 
 %*****
-\rSec3[interrupt_callback.constr]{\tcode{interrupt_callback} constructors and destructor}
+\rSec3[stop_callback.constr]{\tcode{stop_callback} constructors and destructor}
 
-\indexlibrary{\idxcode{interrupt_callback}!constructor}%
+\indexlibrary{\idxcode{stop_callback}!constructor}%
 \begin{itemdecl}
-explicit interrupt_callback(const interrupt_token& it, Callback&& cb)
+explicit stop_callback(const stop_token& it, Callback&& cb)
   noexcept(std::is_nothrow_move_constructible_v<Callback>);
-explicit interrupt_callback(interrupt_token&& it, Callback&& cb)
+explicit stop_callback(stop_token&& it, Callback&& cb)
   noexcept(std::is_nothrow_move_constructible_v<Callback>);
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\effects Initialises \tcode{callback} with \tcode{static_cast<Callback\&\&>(cb)}.
-                If \tcode{it.interrupted()} is true then immediately invokes \tcode{static_cast<Callback\&\&>(callback)}
+                If \tcode{it.stop_requested()} is true then immediately invokes \tcode{static_cast<Callback\&\&>(callback)}
                 with zero arguments on the current thread before the constructor returns.
-                Otherwise, the callback is registered with the shared interrupt state of \tcode{it}
-                such that \tcode{static_cast<Callback\&\&>(callback)} is invoked by first call to \tcode{isrc.interrupt()}
-                on an \tcode{interrupt_source} instance, \tcode{isrc}, that references the same shared interrupt
+                Otherwise, the callback is registered with the shared stop state of \tcode{it}
+                such that \tcode{static_cast<Callback\&\&>(callback)} is invoked by first call to \tcode{isrc.request_stop()}
+                on an \tcode{stop_source} instance \tcode{isrc} that references the same shared stop
                 state as \tcode{it}.
                 If invoking the callback throws an unhandled exception then \tcode{std::terminate()} is called.
 \end{itemdescr}
 
-\indexlibrary{\idxcode{interrupt_callback}!destructor}%
+\indexlibrary{\idxcode{stop_callback}!destructor}%
 \begin{itemdecl}
-~interrupt_callback();
+~stop_callback();
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Deregisters the callback from the associated interrupt state.
+  \pnum\effects Deregisters the callback from the associated stop state.
                 If this callback is concurrently executing on another thread then the destructor shall
                 block until the callback returns before calling \tcode{callback}'s destructor.
                 The destructor shall not block waiting for the execution of another callback registered
-                with the same shared interrupt state to finish.
-                A subsequent call to \tcode{isrc.interrupt()} on an \tcode{interrupt_source}, \tcode{isrc}, with the same
-                associated interrupt state shall not invoke the callback once the destructor has returned.
+                with the same shared stop state to finish.
+                A subsequent call to \tcode{isrc.request_stop()} on an \tcode{stop_source}, \tcode{isrc}, with the same
+                associated stop state shall not invoke the callback once the destructor has returned.
 \end{itemdescr}
 
 %**************************
-% interrupt_source
+% stop_source
 %**************************
-\indexlibrary{\idxcode{interrupt_source}}%
-\rSec2[interrupt_source]{Class \tcode{interrupt_source}}
+\indexlibrary{\idxcode{stop_source}}%
+\rSec2[stop_source]{Class \tcode{stop_source}}
 
 \pnum
-\indexlibrary{\idxcode{interrupt_token}}%
-The class \tcode{interrupt_source} implements semantics of signaling interrupts
-to \tcode{interrupt_token}s (\ref{interrupt_token}).
-All owners can signal an interrupt, provided the token is valid.
-An interrupt can only be signaled once. Subsequent attempts to signal an interrupt are no-ops.
-All owners can check whether an interrupt was signaled.
+\indexlibrary{\idxcode{stop_token}}%
+The class \tcode{stop_source} implements semantics of signaling stop requests
+to \tcode{stop_token}s (\ref{stop_token}) sharing the same associated stop state.
+All \tcode{stop_source}s sharing the same stop state can request a stop.
+An stop can only be requested once. Subsequent attempts to request a stop are no-ops.
 
 \begin{codeblock}
 namespace std {
-  class interrupt_source {
+  class stop_source {
   public:
-    // \ref{interrupt_source.constr} create, copy, destroy:
-    interrupt_source();
-    explicit interrupt_source(nullptr_t) noexcept;
+    // \ref{stop_source.constr} create, copy, destroy:
+    stop_source();
+    explicit stop_source(nullptr_t) noexcept;
 
-    interrupt_source(const interrupt_source&) noexcept;
-    interrupt_source(interrupt_source&&) noexcept;
-    interrupt_source& operator=(const interrupt_source&) noexcept;
-    interrupt_source& operator=(interrupt_source&&) noexcept;
-    ~interrupt_source();
-    void swap(interrupt_source&) noexcept;
+    stop_source(const stop_source&) noexcept;
+    stop_source(stop_source&&) noexcept;
+    stop_source& operator=(const stop_source&) noexcept;
+    stop_source& operator=(stop_source&&) noexcept;
+    ~stop_source();
+    void swap(stop_source&) noexcept;
 
-    // \ref{interrupt_source.mem} interrupt handling:
-    interrupt_token get_token() const noexcept;
-    bool valid() const noexcept;
-    bool interrupted() const noexcept;
-    bool interrupt() const noexcept;
+    // \ref{stop_source.mem} stop handling:
+    [[nodiscard]] stop_token get_token() const noexcept;
+    [[nodiscard]] bool stoppable() const noexcept;
+    [[nodiscard]] bool stop_requested() const noexcept;
+    [[nodiscard]] bool request_stop() const noexcept;
 
-    friend bool operator== (const interrupt_source& lhs, const interrupt_source& rhs);
-    friend bool operator!= (const interrupt_source& lhs, const interrupt_source& rhs);
+    friend bool operator== (const stop_source& lhs, const stop_source& rhs);
+    friend bool operator!= (const stop_source& lhs, const stop_source& rhs);
   };
 }
 \end{codeblock}
 
 %***** constructors
-\rSec3[interrupt_source.constr]{\tcode{interrupt_source} constructors}
+\rSec3[stop_source.constr]{\tcode{stop_source} constructors}
 
-\indexlibrary{\idxcode{interrupt_source}!constructor}%
+\indexlibrary{\idxcode{stop_source}!constructor}%
 \begin{itemdecl}
-interrupt_source();
+stop_source();
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Constructs a new \tcode{interrupt_source} object that can be used to signal interrupts.
+  \pnum\effects Constructs a new \tcode{stop_source} object that can be used to request stops.
   
-  \pnum\postconditions \tcode{valid() == true} and \tcode{interrupted() == false}.
+  \pnum\postconditions \tcode{stoppable() == true} and \tcode{stop_requested() == false}.
 
-  \pnum\throws \tcode{bad_alloc} If memory could not be allocated for the shared interrupt state.
+  \pnum\throws \tcode{bad_alloc} If memory could not be allocated for the shared stop state.
 \end{itemdescr}
 
-\indexlibrary{\idxcode{interrupt_source}!constructor}%
+\indexlibrary{\idxcode{stop_source}!constructor}%
 \begin{itemdecl}
-explicit interrupt_source(nullptr_t) noexcept;
+explicit stop_source(nullptr_t) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Constructs a new \tcode{interrupt_source} object that can't be used to signal interrupts.
+  \pnum\effects Constructs a new \tcode{stop_source} object that can't be used to request stops.
                 \begin{note} Therefore, no resources have to be associated for the state.  \end{note}
 
-  \pnum\postconditions \tcode{valid() == false}.
+  \pnum\postconditions \tcode{stoppable() == false}.
 \end{itemdescr}
 
 %*** special members:
 
-\indexlibrary{\idxcode{interrupt_source}!constructor}%
+\indexlibrary{\idxcode{stop_source}!constructor}%
 \begin{itemdecl}
-interrupt_source(const interrupt_source& rhs) noexcept;
+stop_source(const stop_source& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects If \tcode{rhs} is not valid, constructs an \tcode{interrupt_source} object
-                that is not valid;
-                otherwise, constructs an \tcode{interrupt_source}
-                that shares the ownership of the interrupt state with \tcode{rhs}.
+  \pnum\effects If \tcode{rhs.stoppable() == true},
+                constructs an \tcode{stop_source}
+                that shares the ownership of the stop state with \tcode{rhs}.
 
-  \pnum\postconditions \tcode{valid() == rhs.valid()}
-                and \tcode{interrupted() == rhs.interrupted()}
+  \pnum\postconditions \tcode{stoppable() == rhs.stoppable()}
+                and \tcode{stop_requested() == rhs.stop_requested()}
                 and \tcode{*this == rhs}.
 \end{itemdescr}
 
-\indexlibrary{\idxcode{interrupt_source}!constructor}%
+\indexlibrary{\idxcode{stop_source}!constructor}%
 \begin{itemdecl}
-interrupt_source(interrupt_source&& rhs) noexcept;
+stop_source(stop_source&& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Move constructs an object of type \tcode{interrupt_source} from \tcode{rhs}.
+  \pnum\effects Move constructs an object of type \tcode{stop_source} from \tcode{rhs}.
 
   \pnum\postconditions \tcode{*this} shall contain the old value of \tcode{rhs} and
-                        \tcode{rhs.valid() == false}.
+                        \tcode{rhs.stoppable() == false}.
 \end{itemdescr}
 
 %*****
-\rSec3[interrupt_source.destr]{\tcode{interrupt_source} destructor}
+\rSec3[stop_source.destr]{\tcode{stop_source} destructor}
 
-\indexlibrary{\idxcode{interrupt_source}!destructor}%
+\indexlibrary{\idxcode{stop_source}!destructor}%
 \begin{itemdecl}
-~interrupt_source();
+~stop_source();
 \end{itemdecl}
 
 \begin{itemdescr}
- \pnum\effects If \tcode{valid()} and \tcode{*this} is the last owner of the interrupt state,
-                releases the resources associated with the interrupt state.
+ \pnum\effects If \tcode{stoppable()} and \tcode{*this} is the last owner of the stop state,
+                releases the resources associated with the stop state.
 \end{itemdescr}
 
 %*****
-\rSec3[interrupt_source.assign]{\tcode{interrupt_source} assignment}
+\rSec3[stop_source.assign]{\tcode{stop_source} assignment}
 
-\indexlibrarymember{operator=}{interrupt_source}%
+\indexlibrarymember{operator=}{stop_source}%
 \begin{itemdecl}
-interrupt_source& operator=(const interrupt_source& rhs) noexcept;
+stop_source& operator=(const stop_source& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Equivalent to: \tcode{interrupt_source(rhs).swap(*this);}
+  \pnum\effects Equivalent to: \tcode{stop_source(rhs).swap(*this);}
 
   \pnum\returns \tcode{*this}.
 \end{itemdescr}
 
-\indexlibrarymember{operator=}{interrupt_source}%
+\indexlibrarymember{operator=}{stop_source}%
 \begin{itemdecl}
-interrupt_source& operator=(interrupt_source&& rhs) noexcept;
+stop_source& operator=(stop_source&& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Equivalent to: \tcode{interrupt_source(std::move(rhs)).swap(*this);}
+  \pnum\effects Equivalent to: \tcode{stop_source(std::move(rhs)).swap(*this);}
 
   \pnum\returns \tcode{*this}.
 \end{itemdescr}
 
 %*****
-\rSec3[interrupt_source.swap]{\tcode{interrupt_source} swap}
+\rSec3[stop_source.swap]{\tcode{stop_source} swap}
 
-\indexlibrarymember{swap}{interrupt_source}%
+\indexlibrarymember{swap}{stop_source}%
 \begin{itemdecl}
-void swap(interrupt_source& rhs) noexcept;
+void swap(stop_source& rhs) noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -295,86 +293,86 @@ void swap(interrupt_source& rhs) noexcept;
 
 
 %***** get_token()
-\rSec3[interrupt_source.mem]{\tcode{interrupt_source} members}
+\rSec3[stop_source.mem]{\tcode{stop_source} members}
 
-\indexlibrarymember{get_token}{interrupt_source}%
+\indexlibrarymember{get_token}{stop_source}%
 \begin{itemdecl}
-interrupt_token get_token() const noexcept;
+[[nodiscard]] stop_token get_token() const noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects If \tcode{!valid()}, constructs an \tcode{interrupt_token} object
-                that is not valid;
-                otherwise, constructs an \tcode{interrupt_token} object \tcode{it}
-                that shares the ownership of the interrupt state with \tcode{*this}.
+  \pnum\effects If \tcode{!stoppable()}, constructs an \tcode{stop_token} object
+                that does not share a stop state.
+                Otherwise, constructs an \tcode{stop_token} object \tcode{it}
+                that shares the ownership of the stop state with \tcode{*this}.
 
-  \pnum\postconditions \tcode{valid() == it.valid()}
-                and \tcode{interrupted() == it.interrupted()}.
+  \pnum\postconditions \tcode{stoppable() != it.callbacks_ignored()}
+                and \tcode{stop_requested() == it.stop_requested()}.
 \end{itemdescr}
 
 
-\indexlibrarymember{valid}{interrupt_source}%
+\indexlibrarymember{stoppable}{stop_source}%
 \begin{itemdecl}
-bool valid() const noexcept;
+[[nodiscard]] bool stoppable() const noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\returns \tcode{true} if the interrupt source can be used to signal interrupts.
+  \pnum\returns \tcode{true} if the stop source can be used to request stops.
                 \begin{note} Returns \tcode{false} if the object was created with the \tcode{nullptr}
-                             fro the values was moved away.
+                             or the values were moved away.
                              \end{note}
 \end{itemdescr}
 
-\indexlibrarymember{interrupted}{interrupt_source}%
+\indexlibrarymember{stop_requested}{stop_source}%
 \begin{itemdecl}
-bool interrupted() const noexcept;
+[[nodiscard]] bool stop_requested() const noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\returns \tcode{true} if \tcode{valid()} 
-                and \tcode{interrupt()} was called by one of the owners.
+  \pnum\returns \tcode{true} if \tcode{stoppable()} 
+                and \tcode{request_stop()} was called by one of the owners.
 \end{itemdescr}
 
-\indexlibrarymember{interrupt}{interrupt_source}%
+\indexlibrarymember{request_stop}{stop_source}%
 \begin{itemdecl}
-bool interrupt() const noexcept;
+[[nodiscard]] bool request_stop() const noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  %\pnum\requires \tcode{valid() == true}
+  %\pnum\requires \tcode{stoppable() == true}
   %Hans:
-  %Did we discuss whether interrupt() on an invalid (e.g. default constructed) interrupt token should be a no-op,
-  %rather than undefined? I would expect that to be convenient if we start passing interrupt_tokens around explicitly.
-  %Presumably a lot of short-lived tasks don't care about interruption, but might be used in a context in which an
-  %interrupt token is expected. With the change, you could just pass a default-constructed one.
+  %Did we discuss whether interrupt() on an invalid (e.g. default constructed) stop/interrupt token should be a no-op,
+  %rather than undefined? I would expect that to be convenient if we start passing stop_tokens around explicitly.
+  %Presumably a lot of short-lived tasks don't care about stopping/interruption, but might be used in a context in which an
+  %stop/interrupt token is expected. With the change, you could just pass a default-constructed one.
 
-  \pnum\effects If \tcode{!valid()} or \tcode{interrupted()} the call has no effect. 
-                Otherwise, signals an interrupt so that \tcode{interrupted() == true}
+  \pnum\effects If \tcode{!stoppable()} or \tcode{stop_requested()} the call has no effect. 
+                Otherwise, requests a stop so that \tcode{stop_requested() == true}
                 and all registered callbacks are synchronously called.
-                \begin{note} Signaling an interrupt includes notifying all condition variables
+                \begin{note} Requesting a stop includes notifying all condition variables
                              of type \tcode{condition_variable_any}
-                             temporarily registered during an interruptable wait (\ref{thread.condition.interrupt_source})
+                             temporarily registered during an interruptable wait (\ref{thread.condition.stop_source})
                              \end{note}
 
-  \pnum\postconditions \tcode{!valid() || interrupted()}
+  \pnum\postconditions \tcode{!stoppable() || stop_requested()}
 
-  \pnum\returns The value of \tcode{interrupted()} prior to the call.
+  \pnum\returns The value of \tcode{stop_requested()} prior to the call.
 \end{itemdescr}
 
 
 %*****
-\rSec3[interrupt_source.cmp]{\tcode{interrupt_source} comparisons}
+\rSec3[stop_source.cmp]{\tcode{stop_source} comparisons}
 
-\indexlibrarymember{operator==}{interrupt_source}%
+\indexlibrarymember{operator==}{stop_source}%
 \begin{itemdecl}
-bool operator== (const interrupt_source& lhs, const interrupt_source& rhs);
+bool operator== (const stop_source& lhs, const stop_source& rhs);
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\returns \tcode{!lhs.valid() \&\& !rhs.valid()} or
+  \pnum\returns \tcode{!lhs.stoppable() \&\& !rhs.stoppable()} or
                 whether \tcode{lhs} and \tcode{rhs} refer to the
-                same interrupt state
-                (copied or moved from the same initial \tcode{interrupt_source} object).
+                same stop state
+                (copied or moved from the same initial \tcode{stop_source} object).
 \end{itemdescr}
 
-\indexlibrarymember{operator!=}{interrupt_source}%
+\indexlibrarymember{operator!=}{stop_source}%
 \begin{itemdecl}
-bool operator!= (const interrupt_source& lhs, const interrupt_source& rhs);
+bool operator!= (const stop_source& lhs, const stop_source& rhs);
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\returns \tcode{!(lhs==rhs)}.
@@ -382,130 +380,130 @@ bool operator!= (const interrupt_source& lhs, const interrupt_source& rhs);
 
 
 %**************************
-% interrupt_token
+% stop_token
 %**************************
-\indexlibrary{\idxcode{interrupt_token}}%
-\rSec2[interrupt_token]{Class \tcode{interrupt_token}}
+\indexlibrary{\idxcode{stop_token}}%
+\rSec2[stop_token]{Class \tcode{stop_token}}
 
 \pnum
-\indexlibrary{\idxcode{interrupt_token}}%
-The class \tcode{interrupt_token} provides an interface for responding to interrupts signaled from
-the \tcode{interrupt_source} object they were created from.
-All tokens can check whether an interrupt was signaled.
-When an interrupt is signaled, which is possible only once,
-any registered \tcode{interrupt_callback} (\ref{interrupt_callback}) is called.
-Registering a callback after an interrupt was already signaled calls the callback immediately.
+\indexlibrary{\idxcode{stop_token}}%
+The class \tcode{stop_token} provides an interface for responding to stops requested from
+the \tcode{stop_source} object they were created from.
+All tokens can check whether an stop was requested.
+When an stop is requested, which is possible only once,
+any registered \tcode{stop_callback} (\ref{stop_callback}) is called.
+Registering a callback after an stop was already requested calls the callback immediately.
 
 \begin{codeblock}
 namespace std {
-  class interrupt_token {
+  class stop_token {
   public:
-    // \ref{interrupt_token.constr} create, copy, destroy:
-    explicit interrupt_token() noexcept;
+    // \ref{stop_token.constr} create, copy, destroy:
+    explicit stop_token() noexcept;
 
-    interrupt_token(const interrupt_token&) noexcept;
-    interrupt_token(interrupt_token&&) noexcept;
-    interrupt_token& operator=(const interrupt_token&) noexcept;
-    interrupt_token& operator=(interrupt_token&&) noexcept;
-    ~interrupt_token();
-    void swap(interrupt_token&) noexcept;
+    stop_token(const stop_token&) noexcept;
+    stop_token(stop_token&&) noexcept;
+    stop_token& operator=(const stop_token&) noexcept;
+    stop_token& operator=(stop_token&&) noexcept;
+    ~stop_token();
+    void swap(stop_token&) noexcept;
 
-    // \ref{interrupt_token.mem} interrupt handling:
-    bool interrupted() const noexcept;
-    bool interruptible() const noexcept;
+    // \ref{stop_token.mem} stop handling:
+    [[nodiscard]] bool stop_requested() const noexcept;
+    [[nodiscard]] bool callbacks_ignored() const noexcept;
 
-    friend bool operator== (const interrupt_token& lhs, const interrupt_token& rhs);
-    friend bool operator!= (const interrupt_token& lhs, const interrupt_token& rhs);
+    friend bool operator== (const stop_token& lhs, const stop_token& rhs) noexcept;
+    friend bool operator!= (const stop_token& lhs, const stop_token& rhs) noexcept;
   };
 }
 \end{codeblock}
 
 
 %*****
-\rSec3[interrupt_token.constr]{\tcode{interrupt_token} constructors}
+\rSec3[stop_token.constr]{\tcode{stop_token} constructors}
 
-\indexlibrary{\idxcode{interrupt_token}!constructor}%
+\indexlibrary{\idxcode{stop_token}!constructor}%
 \begin{itemdecl}
-interrupt_token() noexcept;
+stop_token() noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Constructs a new \tcode{interrupt_token} object that can't be used to signal interrupts.
+  \pnum\effects Constructs a new \tcode{stop_token} object that can't be used to request stops.
                 \begin{note} Therefore, no resources have to be associated for the state.  \end{note}
 
-  \pnum\postconditions \tcode{interruptible() == false} and 
-                       \tcode{interrupted() == false}.
+  \pnum\postconditions \tcode{callbacks_ignored() == true} and 
+                       \tcode{stop_requested() == false}.
 \end{itemdescr}
 
 %***** special members:
 
-\indexlibrary{\idxcode{interrupt_token}!constructor}%
+\indexlibrary{\idxcode{stop_token}!constructor}%
 \begin{itemdecl}
-interrupt_token(const interrupt_token& rhs) noexcept;
+stop_token(const stop_token& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects If \tcode{rhs} is not interruptible, constructs an \tcode{interrupt_token} object
-                that is not interruptible;
-                otherwise, constructs an \tcode{interrupt_token}
-                that shares the ownership of the interrupt state with \tcode{rhs}.
+  \pnum\effects If \tcode{rhs.callbacks_ignored() == true}, constructs an \tcode{stop_token} object
+                that can't be used to request stops.
+                Otherwise, constructs an \tcode{stop_token}
+                that shares the ownership of the stop state with \tcode{rhs}.
 
-  \pnum\postconditions \tcode{interruptible() == rhs.interruptible()}
-                and \tcode{interrupted() == rhs.interrupted()}
+  \pnum\postconditions \tcode{callbacks_ignored() == rhs.callbacks_ignored()}
+                and \tcode{stop_requested() == rhs.stop_requested()}
                 and \tcode{*this == rhs}.
 \end{itemdescr}
 
-\indexlibrary{\idxcode{interrupt_token}!constructor}%
+\indexlibrary{\idxcode{stop_token}!constructor}%
 \begin{itemdecl}
-interrupt_token(interrupt_token&& rhs) noexcept;
+stop_token(stop_token&& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Move constructs an object of type \tcode{interrupt_token} from \tcode{rhs}.
+  \pnum\effects Move constructs an object of type \tcode{stop_token} from \tcode{rhs}.
 
   \pnum\postconditions \tcode{*this} shall contain the old value of \tcode{rhs} and
-                        \tcode{rhs.interruptible() == false}.
+                        \tcode{rhs.callbacks_ignored() == true}.
 \end{itemdescr}
 
 %*****
-\rSec3[interrupt_token.destr]{\tcode{interrupt_token} destructor}
+\rSec3[stop_token.destr]{\tcode{stop_token} destructor}
 
-\indexlibrary{\idxcode{interrupt_token}!destructor}%
+\indexlibrary{\idxcode{stop_token}!destructor}%
 \begin{itemdecl}
-~interrupt_token();
+~stop_token();
 \end{itemdecl}
 
 \begin{itemdescr}
- \pnum\effects If \tcode{*this} is the last owner of the interrupt state,
-                releases the resources associated with the interrupt state.
+ \pnum\effects If \tcode{*this} is the last owner of the stop state,
+                releases the resources associated with the stop state.
 \end{itemdescr}
 
 %*****
-\rSec3[interrupt_token.assign]{\tcode{interrupt_token} assignment}
+\rSec3[stop_token.assign]{\tcode{stop_token} assignment}
 
-\indexlibrarymember{operator=}{interrupt_token}%
+\indexlibrarymember{operator=}{stop_token}%
 \begin{itemdecl}
-interrupt_token& operator=(const interrupt_token& rhs) noexcept;
+stop_token& operator=(const stop_token& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Equivalent to: \tcode{interrupt_token(rhs).swap(*this);}
+  \pnum\effects Equivalent to: \tcode{stop_token(rhs).swap(*this);}
 
   \pnum\returns \tcode{*this}.
 \end{itemdescr}
 
-\indexlibrarymember{operator=}{interrupt_token}%
+\indexlibrarymember{operator=}{stop_token}%
 \begin{itemdecl}
-interrupt_token& operator=(interrupt_token&& rhs) noexcept;
+stop_token& operator=(stop_token&& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Equivalent to: \tcode{interrupt_token(std::move(rhs)).swap(*this);}
+  \pnum\effects Equivalent to: \tcode{stop_token(std::move(rhs)).swap(*this);}
 
   \pnum\returns \tcode{*this}.
 \end{itemdescr}
 
 %*****
-\rSec3[interrupt_token.swap]{\tcode{interrupt_token} swap}
+\rSec3[stop_token.swap]{\tcode{stop_token} swap}
 
-\indexlibrarymember{swap}{interrupt_token}%
+\indexlibrarymember{swap}{stop_token}%
 \begin{itemdecl}
-void swap(interrupt_token& rhs) noexcept;
+void swap(stop_token& rhs) noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -515,51 +513,52 @@ void swap(interrupt_token& rhs) noexcept;
 
 
 %*****
-\rSec3[interrupt_token.mem]{\tcode{interrupt_token} members}
+\rSec3[stop_token.mem]{\tcode{stop_token} members}
 
-\indexlibrarymember{interrupted}{interrupt_token}%
+\indexlibrarymember{stop_requested}{stop_token}%
 \begin{itemdecl}
-bool interrupted() const noexcept;
+[[nodiscard]] bool stop_requested() const noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\returns \tcode{true} if \tcode{interruptible()} 
-                and \tcode{interrupt()} was called by one of the owners,
+  \pnum\returns \tcode{true} if \tcode{callbacks_ignored() == false()} 
+                and \tcode{request_stop()} was called by one of the owners,
                 otherwise \tcode{false}.
   \pnum\sync If \tcode{true} is returned then synchronizes with the
-             first call to \tcode{interrupt()} by one of the owners.
+             first call to \tcode{request_stop()} by one of the owners.
 \end{itemdescr}
 
-\indexlibrarymember{interruptible}{interrupt_token}%
+\indexlibrarymember{callbacks_ignored}{stop_token}%
 \begin{itemdecl}
-bool interruptible() const noexcept;
+[[nodiscard]] bool callbacks_ignored() const noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\returns \tcode{false} if the interrupt token will never return \tcode{true} from \tcode{interrupted()}.
-                \begin{note}To be interruptible, an \tcode{interrupt_token} must either already be in the interrupted
-                  state or have been initialized from a valid \tcode{interrupt_source} and there must still be an instance
-                  of \tcode{interrupt_source} that references the same shared interrupt state that can potentially
-                  be used to call \tcode{interrupt()}.
+  \pnum\returns \tcode{true} if the stop token will never call any (newly) registered callbacks.
+                \begin{note}To return \tcode{false} (i.e., to be able to call (new) callbacks), 
+                  a \tcode{stop_token} must share a stop state, for which either a stop already was requested
+                  or still a \tcode{stop_source} exists that can potentially
+                  be used to call \tcode{request_stop()}.
+                  Thus, if it returns \tcode{true}, it makes no sense to register a callback.
                 \end{note}
 \end{itemdescr}
 
 
 %*****
-\rSec3[interrupt_token.cmp]{\tcode{interrupt_token} comparisons}
+\rSec3[stop_token.cmp]{\tcode{stop_token} comparisons}
 
-\indexlibrarymember{operator==}{interrupt_token}%
+\indexlibrarymember{operator==}{stop_token}%
 \begin{itemdecl}
-bool operator== (const interrupt_token& lhs, const interrupt_token& rhs);
+bool operator== (const stop_token& lhs, const stop_token& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\returns \tcode{!lhs.interruptible() \&\& !rhs.interruptible()} or
+  \pnum\returns \tcode{lhs.callbacks_ignored() \&\& rhs.callbacks_ignored()} or
                 whether \tcode{lhs} and \tcode{rhs} refer to the
-                same interrupt state
-                (copied or moved from the same initial \tcode{interrupt_source} object).
+                same stop state
+                (copied or moved from the same initial \tcode{stop_source} object).
 \end{itemdescr}
 
-\indexlibrarymember{operator!=}{interrupt_token}%
+\indexlibrarymember{operator!=}{stop_token}%
 \begin{itemdecl}
-bool operator!= (const interrupt_token& lhs, const interrupt_token& rhs);
+bool operator!= (const stop_token& lhs, const stop_token& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\returns \tcode{!(lhs==rhs)}.
@@ -574,14 +573,14 @@ bool operator!= (const interrupt_token& lhs, const interrupt_token& rhs);
 
 \pnum
 \ref{thread.jthreads} describes components that can be used to create and manage threads
-with the ability to signal interrupts to cooperatively cancel the running thread.
+with the ability to request stops to cooperatively cancel the running thread.
 
 %**************************
 \rSec2[thread.jthread.syn]{Header \tcode{<jthread>} synopsis}
 \indexhdr{jthread}%
 
 \begin{codeblock}
-#include <interrupt_token>
+#include <stop_token>
 
 namespace std {
   // \ref{thread.jthread.class} class \tcode{jthread}
@@ -599,7 +598,7 @@ namespace std {
 The class \tcode{jthread} provides a mechanism
 to create a new thread of execution.
 The functionality is the same as for class \tcode{thread} (\ref{thread.thread.class})
-with the additional ability to signal an interrupt and to
+with the additional ability to request a stop and to
 automatically \tcode{join()} the started thread.
 
 {\color{blue}
@@ -629,25 +628,25 @@ namespace std {
     bool joinable() const noexcept;
     void join();
     void detach();
-    id get_id() const noexcept;
-    native_handle_type native_handle();     // see~\ref{thread.req.native}
+    [[nodiscard]] id get_id() const noexcept;
+    [[nodiscard]] native_handle_type native_handle();     // see~\ref{thread.req.native}
 \end{codeblock}
 {\color{diffcolor}
 \begin{codeblock}
-    // interrupt token handling
-    interrupt_token get_interrupt_source() const noexcept;
-    bool interrupt() noexcept;
+    // stop token handling
+    [[nodiscard]] stop_token get_stop_source() const noexcept;
+    [[nodiscard]] bool request_stop() noexcept;
 \end{codeblock}
 }%\color{diffcolor}
 \begin{codeblock}
     // static members
-    static unsigned int hardware_concurrency() noexcept;
+    [[nodiscard]] static unsigned int hardware_concurrency() noexcept;
   
 \end{codeblock}
 {\color{diffcolor}
 \begin{codeblock}
   private:
-    interrupt_token isource;                 // \expos
+    stop_token isource;                 // \expos
   };
 \end{codeblock}
 }%\color{diffcolor}
@@ -666,7 +665,7 @@ jthread() noexcept;
   \pnum\effects Constructs a \tcode{jthread} object that does not represent a thread of execution.
 
   \pnum\postconditions \tcode{get_id() == id()}
-        {\color{diffcolor} and \tcode{isource.valid() == false}}.
+        {\color{diffcolor} and \tcode{isource.stoppable() == false}}.
 \end{itemdescr}
 
 \indexlibrary{\idxcode{jthread}!constructor}%
@@ -742,12 +741,12 @@ synchronizes with the beginning of the invocation of the copy of \tcode{f}.
 
 \pnum\postconditions \tcode{get_id() != id()}.
 {\color{diffcolor}
-                     \tcode{isource.valid() == true}.
+                     \tcode{isource.stoppable() == true}.
 }
                      \tcode{*this} represents the newly started thread.
 {\color{diffcolor}
-\begin{note} Note that the calling thread can signal an interrupt only once,
-                because it can't replace this interrupt token.  \end{note}
+\begin{note} Note that the calling thread can request a stop only once,
+                because it can't replace this stop token.  \end{note}
 }%\color{diffcolor}
 
 \pnum\throws \tcode{system_error} if unable to start the new thread.
@@ -775,7 +774,7 @@ jthread(jthread&& x) noexcept;
 value of \tcode{x.get_id()} prior to the start of construction.
 {\color{diffcolor}
 \tcode{isource} yields the value of \tcode{x.isource} prior to the start of construction
-and \tcode{x.isource.valid() == false}.
+and \tcode{x.isource.stoppable() == false}.
 }%\color{diffcolor}
 
 \end{itemdescr}
@@ -790,7 +789,7 @@ and \tcode{x.isource.valid() == false}.
 {\color{diffcolor}
 \begin{itemdescr}
 \pnum
-If \tcode{joinable()}, calls \tcode{interrupt()} and \tcode{join()}.
+If \tcode{joinable()}, calls \tcode{request_stop()} and \tcode{join()}.
 Otherwise, has no effects.
 \begin{note} Operations on \tcode{*this} are not synchronized. \end{note}
 \end{itemdescr}
@@ -805,7 +804,7 @@ jthread& operator=(jthread&& x) noexcept;
 
 \begin{itemdescr}
 \pnum
-\effects If \tcode{joinable()}, calls \tcode{interrupt()} and \tcode{join()}.
+\effects If \tcode{joinable()}, calls \tcode{request_stop()} and \tcode{join()}.
 Assigns the
 state of \tcode{x} to \tcode{*this} and sets \tcode{x} to a default constructed state.
 
@@ -814,7 +813,7 @@ state of \tcode{x} to \tcode{*this} and sets \tcode{x} to a default constructed 
 \postconditions \tcode{x.get_id() == id()} and \tcode{get_id()} returns the value of
 \tcode{x.get_id()} prior to the assignment.
 \tcode{isource} yields the value of \tcode{x.isource} prior to the assignment
-and \tcode{x.isource.valid() == false}.
+and \tcode{x.isource.stoppable() == false}.
 }%\color{diffcolor}
 
 \pnum
@@ -822,23 +821,23 @@ and \tcode{x.isource.valid() == false}.
 \end{itemdescr}
 
 
-\rSec3[thread.jthread.interrupt]{\tcode{jthread} interrupt members}
+\rSec3[thread.jthread.stop]{\tcode{jthread} stop members}
 
 {\color{diffcolor}
-\indexlibrarymember{get_interrupt_source}{jthread}%
+\indexlibrarymember{get_stop_source}{jthread}%
 \begin{itemdecl}
-interrupt_token get_interrupt_source() const noexcept
+[[nodiscard]] stop_token get_stop_source() const noexcept
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\effects Equivalent to: \tcode{return isource;}
 \end{itemdescr}
 
-\indexlibrarymember{interrupt}{jthread}%
+\indexlibrarymember{request_stop}{jthread}%
 \begin{itemdecl}
-bool interrupt() noexcept;
+[[nodiscard]] bool request_stop() noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Equivalent to: \tcode{return isource.interrupt();}
+  \pnum\effects Equivalent to: \tcode{return isource.request_stop();}
 \end{itemdescr}
 }%\color{diffcolor}
 
@@ -932,21 +931,21 @@ namespace std {
 \end{codeblock}
 {\color{insertcolor}
 \begin{codeblock}
-    // \ref{thread.condvarany.interruptwait} \tcode{interrupt_token} waits:
+    // \ref{thread.condvarany.interruptwait} \tcode{stop_token} waits:
     template <class Lock, class Predicate>
       bool wait_until(Lock& lock,
                       Predicate pred,
-                      interrupt_token itoken);
+                      stop_token stoken);
     template <class Lock, class Clock, class Duration, class Predicate>
       bool wait_until(Lock& lock,
                       const chrono::time_point<Clock, Duration>& abs_time
                       Predicate pred,
-                      interrupt_token itoken);
+                      stop_token stoken);
     template <class Lock, class Rep, class Period, class Predicate>
       bool wait_for(Lock& lock,
                     const chrono::duration<Rep, Period>& rel_time,
                     Predicate pred,
-                    interrupt_token itoken);
+                    stop_token stoken);
 \end{codeblock}
 }
 \begin{codeblock}
@@ -1038,7 +1037,7 @@ template<class Lock>
 \begin{itemize}
 \item Atomically calls \tcode{lock.unlock()} and blocks on \tcode{*this}.
 \item When unblocked, calls \tcode{lock.lock()} (possibly blocking on the lock) and returns.
-\item The function will unblock when signaled by a call to \tcode{notify_one()},
+\item The function will unblock when requested by a call to \tcode{notify_one()},
 a call to \tcode{notify_all()}, or spuriously.
 \end{itemize}
 
@@ -1090,7 +1089,7 @@ Atomically calls \tcode{lock.unlock()} and blocks on \tcode{*this}.
 When unblocked, calls \tcode{lock.lock()} (possibly blocking on the lock) and returns.
 
 \item
-The function will unblock when signaled by a call to \tcode{notify_one()}, a call to \tcode{notify_all()},
+The function will unblock when requested by a call to \tcode{notify_one()}, a call to \tcode{notify_all()},
 expiration of the absolute timeout\iref{thread.req.timing} specified by \tcode{abs_time},
 or spuriously.
 
@@ -1205,61 +1204,62 @@ return wait_until(lock, chrono::steady_clock::now() + rel_time, std::move(pred))
 %    template <class Lock, class Predicate>
 %      bool wait_until(Lock& lock,
 %                      Predicate pred,
-%                      interrupt_token itoken);
+%                      stop_token stoken);
 %    template <class Lock, class Clock, class Duration, class Predicate>
 %      bool wait_until(Lock& lock,
 %                      const chrono::time_point<Clock, Duration>& abs_time
 %                      Predicate pred,
-%                      interrupt_token itoken);
+%                      stop_token stoken);
 %    template <class Lock, class Rep, class Period, class Predicate>
 %      bool wait_for(Lock& lock,
 %                    const chrono::duration<Rep, Period>& rel_time,
 %                    Predicate pred,
-%                    interrupt_token itoken);
+%                    stop_token stoken);
 
 %**************************************
 \rSec3[thread.condvarany.interruptwait]{Interruptable waits}
 
 The following functions ensure to get notified
-if an interrupt is signaled for the passed \tcode{interrupt_token}.
+if a stop is requested for the passed \tcode{stop_token}.
 In that case they return
 (returning \tcode{false} if the predicate evaluates to \tcode{false}). 
 \begin{note} 
         Because all signatures here call
-        \tcode{interrupted()}, their calls synchronize with \tcode{interrupt()}.
+        \tcode{stop_requested()}, their calls synchronize with \tcode{request_stop()}.
       \end{note}
 
 % Hans Boehm:
-%We then also need some statement for the waiting functions that if they return with an interrupted status, their synchronization behavior is as though they called interrupted().
+%We then also need some statement for the waiting functions that if they return with an stopped/interrupted status,
+% their synchronization behavior is as though they called stop_requested().
 %{\color{blue}
 %[{\itshape{}Editorial note:} Because all signatures here in the effects clause call
-%        \tcode{interrupted()}, we don't need wording
-%        that the calls synchronize with \tcode{interrupt()}. ]
+%        \tcode{stop_requested()}, we don't need wording
+%        that the calls synchronize with \tcode{interrupt()/request_stop()}. ]
 %}
 
 
 %**** untimed wait_until (with pred)
-% return false if itoken.interrupted():
+% return false if stoken.stop_requested():
 
 \begin{itemdecl}
 template <class Lock, class Predicate>
   bool wait_until(Lock& lock,
                   Predicate pred,
-                  interrupt_token itoken);
+                  stop_token stoken);
 \end{itemdecl}
 %{\color{blue}
-%[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait()} function without the interrupt token parameter.} ]
+%[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait()} function without the stop token parameter.} ]
 %}
 
 \begin{itemdescr}
 
 %{\color{diffcolor}
- \pnum\effects Registers \tcode{*this} to get notified when an interrupt is signaled on \tcode{itoken}
+ \pnum\effects Registers \tcode{*this} to get notified when a stop is requested on \tcode{stoken}
                 during this call and then equivalent to:
 \begin{codeblock}
-while(!pred() && !itoken.interrupted()) {
-  wait(lock, [&pred, &itoken] {
-                return pred() || itoken.interrupted();
+while(!pred() && !stoken.stop_requested()) {
+  wait(lock, [&pred, &stoken] {
+                return pred() || stoken.stop_requested();
              });
 }
 return pred();
@@ -1267,7 +1267,7 @@ return pred();
 
  \pnum \begin{note} The returned value indicates whether the predicate evaluated to
         \tcode{true} regardless of whether
-        an interrupt was signaled. \end{note}
+        a stop was requested. \end{note}
 
  \pnum \postconditions Exception or \tcode{lock} is locked by the calling thread.
 
@@ -1287,37 +1287,37 @@ return pred();
 
 
 %**** wait_until (with pred)
-% return false if itoken.interrupted():
+% return false if stoken.stop_requested():
 
 \begin{itemdecl}
 template <class Lock, class Clock, class Duration, class Predicate>
   bool wait_until(Lock& lock,
                   const chrono::time_point<Clock, Duration>& abs_time
                   Predicate pred,
-                  interrupt_token itoken);
+                  stop_token stoken);
 \end{itemdecl}
 %{\color{blue}
-%[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait_until()} function without the interrupt token parameter.} ]
+%[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait_until()} function without the stop token parameter.} ]
 %}
 
 \begin{itemdescr}
- \pnum\effects Registers \tcode{*this} to get notified when an interrupt is signaled on \tcode{itoken}
+ \pnum\effects Registers \tcode{*this} to get notified when a stop is requested on \tcode{stoken}
                 during this call and then equivalent to:
 \begin{codeblock}
-while(!pred() && !itoken.interrupted() && Clock::now() < abs_time) {
+while(!pred() && !stoken.stop_requested() && Clock::now() < abs_time) {
   cv.wait_until(lock,
                 abs_time,
-                [&pred, &itoken] {
-                  return pred() || itoken.interrupted();
+                [&pred, &stoken] {
+                  return pred() || stoken.stop_requested();
                 });
 }
 return pred();
 \end{codeblock}
 
 \pnum
-\begin{note} There is no blocking if \tcode{pred()} is initially \tcode{true}, 
-itoken is not valid or already interrupted, or
-if the timeout has already expired. \end{note}
+\begin{note} There is no blocking, if \tcode{pred()} is initially \tcode{true}, 
+stoken is not stoppable, a stop was already requested, or
+the timeout has already expired. \end{note}
 
 \pnum
 \begin{note} The returned value indicates whether the predicate evaluates to \tcode{true}
@@ -1325,7 +1325,7 @@ regardless of whether the timeout was triggered. \end{note}
 
  \pnum \begin{note} The returned value indicates whether the predicate evaluated to
         \tcode{true} regardless of whether the timeout was triggered
-        or an interrupt was signaled. \end{note}
+        or a stop was requested. \end{note}
 
  \pnum \postconditions Exception or \tcode{lock} is locked by the calling thread.
 
@@ -1340,29 +1340,29 @@ regardless of whether the timeout was triggered. \end{note}
         or any exception thrown by \tcode{pred}.
 
 %{\color{diffcolor}
-% \pnum\sync If the function returns with an interrupted status, 
-%                their synchronization behavior is as though it called \tcode{interrupted()}.
+% \pnum\sync If the function returns with an stopped/interrupted status, 
+%                their synchronization behavior is as though it called \tcode{stop_requested()}.
 %}%diffcolor
 \end{itemdescr}
 
 
 %**** wait_for (with pred)
-% return false if itoken.interrupted():
+% return false if stoken.stop_requested():
 
 \begin{itemdecl}
 template <class Lock, class Rep, class Period, class Predicate>
   bool wait_for(Lock& lock,
                 const chrono::duration<Rep, Period>& rel_time,
                 Predicate pred,
-                interrupt_token itoken);
+                stop_token stoken);
 \end{itemdecl}
 %{\color{blue}
-%[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait_for()} function without the interrupt token parameter.} ]
+%[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait_for()} function without the stop token parameter.} ]
 %}
 \begin{itemdescr}
  \pnum \effects Equivalent to:
 \begin{codeblock}
-return wait_until(lock, chrono::steady_clock::now() + rel_time, std::move(pred), std::move(itoken));
+return wait_until(lock, chrono::steady_clock::now() + rel_time, std::move(pred), std::move(stoken));
 \end{codeblock}
 \end{itemdescr}
 

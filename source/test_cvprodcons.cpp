@@ -38,7 +38,7 @@ void exampleProducerConsumer(double prodSec, double consSec, bool interrupt)
 
       //std::cout << "\nP: lock " << std::endl;
       std::unique_lock lock{itemsMx};
-      while (!stoken.stop_signaled()) {
+      while (!stoken.stop_requested()) {
         ////std::cout << "\nP: wait " << std::endl;
         if (!itemsCV.wait_until(lock, [&] { return items.size() < maxQueueSize; }, stoken)) {
          //std::cout << "\nP: wait returned false " << std::endl;
@@ -47,7 +47,7 @@ void exampleProducerConsumer(double prodSec, double consSec, bool interrupt)
         //// OOPS: NOTE: true does NOT necessarily meant that we have no interrupt !!!
         ////std::cout << "\nP: wait returned true " << std::endl;
 
-        while (items.size() < maxQueueSize && !stoken.stop_signaled()) {
+        while (items.size() < maxQueueSize && !stoken.stop_requested()) {
           // Ok to produce a value.
 
           // Don't hold mutex while working to allow consumer to run.
@@ -101,7 +101,7 @@ void exampleProducerConsumer(double prodSec, double consSec, bool interrupt)
             // Found the item I'm looking for. Cancel producer.
             // Whoops, this is being called while holding a lock on mutex 'itemMx'!
             strm << " INTERRUPT";
-            ssource.signal_stop();
+            ssource.request_stop();
             return;
           }
         }
@@ -118,7 +118,7 @@ void exampleProducerConsumer(double prodSec, double consSec, bool interrupt)
 
   if (interrupt) {
     std::this_thread::sleep_for(prodSleep*10);
-    ssource.signal_stop();
+    ssource.request_stop();
   }
 #ifdef QQQ
   {

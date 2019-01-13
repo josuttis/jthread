@@ -45,11 +45,11 @@ void interruptByDestructor()
    std::cout << "\n- start jthread t1" << std::endl;
    std::jthread t1([interval, &t1WasInterrupted] (std::stop_token stoken) {
                      printID("t1 STARTED with interval " + asString(interval) + " with id");
-                     assert(!stoken.stop_signaled());
+                     assert(!stoken.stop_requested());
                      try {
                        // loop until interrupted (at most 40 times the interval)
                        for (int i=0; i < 40; ++i) {
-                          if (stoken.stop_signaled()) {
+                          if (stoken.stop_requested()) {
                             throw "interrupted";
                           }
                           std::this_thread::sleep_for(interval);
@@ -61,7 +61,7 @@ void interruptByDestructor()
                        assert(false);
                      }
                      catch (const char* e) {
-                       assert(stoken.stop_signaled());
+                       assert(stoken.stop_requested());
                        t1WasInterrupted = true;
                        //throw;
                      }
@@ -69,11 +69,11 @@ void interruptByDestructor()
                        assert(false);
                      }
                    });
-   assert(!t1.get_stop_source().stop_signaled());
+   assert(!t1.get_stop_source().stop_requested());
 
    // call destructor after 4 times the interval (should signal the interrupt)
    std::this_thread::sleep_for(4 * interval);
-   assert(!t1.get_stop_source().stop_signaled());
+   assert(!t1.get_stop_source().stop_requested());
    std::cout << "\n- destruct jthread t1 (should signal interrupt)" << std::endl;
   }
 
@@ -97,7 +97,7 @@ void interruptStartedThread()
                      try {
                        // loop until interrupted (at most 40 times the interval)
                        for (int i=0; i < 40; ++i) {
-                          if (stoken.stop_signaled()) {
+                          if (stoken.stop_requested()) {
                             throw "interrupted";
                           }
                           std::this_thread::sleep_for(interval);
@@ -113,8 +113,8 @@ void interruptStartedThread()
 
    std::this_thread::sleep_for(4 * interval);
    std::cout << "\n- interrupt jthread t1" << std::endl;
-   t1.signal_stop();
-   assert(t1.get_stop_source().stop_signaled());
+   t1.request_stop();
+   assert(t1.get_stop_source().stop_requested());
    std::cout << "\n- join jthread t1" << std::endl;
    t1.join();
    assert(interrupted);
@@ -135,13 +135,13 @@ void interruptStartedThreadWithSubthread()
                      printID("t1 STARTED with id");
                      std::jthread t2([interval, stoken] {
                                        printID("t2 STARTED with id");
-                                       while(!stoken.stop_signaled()) {
+                                       while(!stoken.stop_requested()) {
                                          std::cout.put('2').flush();
                                          std::this_thread::sleep_for(interval/2.3);
                                        }
                                        std::cout << "\nt2 INTERRUPTED" << std::endl;
                                      });
-                     while(!stoken.stop_signaled()) {
+                     while(!stoken.stop_requested()) {
                         std::cout.put('1').flush();
                         std::this_thread::sleep_for(interval);
                      }
@@ -150,8 +150,8 @@ void interruptStartedThreadWithSubthread()
 
    std::this_thread::sleep_for(4 * interval);
    std::cout << "\n- interrupt jthread t1 (should signal interrupt to t2)" << std::endl;
-   t1.signal_stop();
-   assert(t1.get_stop_source().stop_signaled());
+   t1.request_stop();
+   assert(t1.get_stop_source().stop_requested());
    std::cout << "\n- join jthread t1" << std::endl;
    t1.join();
    std::cout << "\n- destruct jthread t1" << std::endl;
@@ -170,20 +170,20 @@ void basicAPIWithFunc()
 {
   std::cout << "\n*** start basicAPIWithFunc(): " << std::endl;
   std::stop_source is;
-  assert(is.valid());
-  assert(!is.stop_signaled());
+  assert(is.stoppable());
+  assert(!is.stop_requested());
   {
     std::cout << "\n- start jthread t1" << std::endl;
     std::jthread t(&foo, "foo() called in thread with id: ");
     is = t.get_stop_source();
-    std::cout << is.stop_signaled() << std::endl;
-    assert(is.valid());
-    assert(!is.stop_signaled());
+    std::cout << is.stop_requested() << std::endl;
+    assert(is.stoppable());
+    assert(!is.stop_requested());
     std::this_thread::sleep_for(0.5s);
     std::cout << "\n- destruct jthread it" << std::endl;
   }
-  assert(is.valid());
-  assert(is.stop_signaled());
+  assert(is.stoppable());
+  assert(is.stop_requested());
   std::cout << "\n*** OK" << std::endl;
 }
 
@@ -214,17 +214,17 @@ void testExchangeToken()
                               itPtr.store(nullptr);
                             }
 		            // print character according to current interrupt token state:
-		            // - '.' if valid and not interrupted,
-		            // - 's' if valid and stop signaled
-		            // - '-' if no valid
-		            if (actToken.stop_signaled()) {
+		            // - '.' if stoppable and not interrupted,
+		            // - 's' if stoppable and stop signaled
+		            // - '-' if not stoppable
+		            if (actToken.stop_requested()) {
                               if (c != 's') {
                                 c = 's';
                                 ++numInterrupts;
                               }
 		            }
 		            else {
-		              c = actToken.stop_done_or_possible() ?  '.' : '-';
+		              c = actToken.callbacks_ignored() ?  '-' : '.';
                             }
                             std::cout.put(c).flush();
                             std::this_thread::sleep_for(0.1ms);
@@ -238,22 +238,22 @@ void testExchangeToken()
 
    std::this_thread::sleep_for(interval);
    std::cout << "\n- signal interrupt" << std::endl;
-   t1.signal_stop();
+   t1.request_stop();
 
    std::this_thread::sleep_for(interval);
-   std::cout << "\n- replace by invalid token" << std::endl;
+   std::cout << "\n- replace by invalid/unstoppable token" << std::endl;
    std::stop_token it;
    itPtr.store(&it);
 
    std::this_thread::sleep_for(interval);
-   std::cout << "\n- replace by valid token" << std::endl;
+   std::cout << "\n- replace by valid/stoppable token" << std::endl;
    auto isTmp = std::stop_source{};
    it = std::stop_token{isTmp.get_token()};
    itPtr.store(&it);
 
    std::this_thread::sleep_for(interval);
    std::cout << "\n- signal interrupt again" << std::endl;
-   isTmp.signal_stop();
+   isTmp.request_stop();
 
    std::this_thread::sleep_for(interval);
    std::cout << "\n- destruct jthread t1" << std::endl;
@@ -275,18 +275,18 @@ void testConcurrentInterrupt()
               printID("t1 STARTED (id: ", ") printing . or - or i");
               try {
                 char c = ' ';
-                for (int i=0; !it.stop_signaled(); ++i) {
+                for (int i=0; !it.stop_requested(); ++i) {
 		    // print character according to current interrupt token state:
-		    // - '.' if valid and not interrupted,
-		    // - 's' if valid and stop signaled
-		    // - '-' if no valid
-		    if (stoken.stop_signaled()) {
+		    // - '.' if stoppable and not interrupted,
+		    // - 's' if stoppable and stop signaled
+		    // - '-' if not stoppable
+		    if (stoken.stop_requested()) {
                       c = 's';
 		    }
 		    else {
 		      // should never switch back to not interrupted:
                       assert(c != 's');
-		      c = stoken.stop_done_or_possible() ?  '.' : '-';
+		      c = stoken.callbacks_ignored() ?  '-' : '.';
                     }
                     std::cout.put(c).flush();
                     std::this_thread::sleep_for(0.1ms);
@@ -300,8 +300,8 @@ void testConcurrentInterrupt()
 
    std::this_thread::sleep_for(0.5s);
 
-   // starts thread concurrently calling signal_stop() for the same token:
-   std::cout << "\n- loop over " << numThreads << " threads that signal_stop() concurrently" << std::endl;
+   // starts thread concurrently calling request_stop() for the same token:
+   std::cout << "\n- loop over " << numThreads << " threads that request_stop() concurrently" << std::endl;
    std::vector<std::jthread> tv;
    for (int i = 0; i < numThreads; ++i) {
        std::this_thread::sleep_for(0.1ms);
@@ -309,8 +309,8 @@ void testConcurrentInterrupt()
                         printID("- interrupting thread started with id:");
                         for (int i = 0; i < 13; ++i) {
                           std::cout.put('x').flush();
-                          t1.signal_stop();
-                          assert(t1.signal_stop() == true);
+                          t1.request_stop();
+                          assert(t1.request_stop() == true);
                           std::this_thread::sleep_for(0.01ms);
                         }
                       });
@@ -320,7 +320,7 @@ void testConcurrentInterrupt()
        t.join();
    }
    std::cout << "\n- signal end" << std::endl;
-   is.signal_stop();
+   is.request_stop();
    std::cout << "\n- destruct jthread t1" << std::endl;
   }
   std::cout << "\n*** OK" << std::endl;
@@ -334,28 +334,28 @@ void testJthreadMove()
   {
     bool interruptSignaled = false;
     std::jthread t1{[&interruptSignaled] (std::stop_token st) {
-                      while (!st.stop_signaled()) {
+                      while (!st.stop_requested()) {
                         std::this_thread::sleep_for(0.1s);
                       }
-                      if(st.stop_signaled()) {
+                      if(st.stop_requested()) {
                         interruptSignaled = true;
                       }
                     }};
     std::jthread t2{std::move(t1)};  // should compile
 
     auto ssource = t1.get_stop_source();
-    assert(!ssource.valid());
-    assert(!ssource.stop_signaled());
+    assert(!ssource.stoppable());
+    assert(!ssource.stop_requested());
     //assert(ssource == std::stop_source{}); 
     ssource = t2.get_stop_source();
     assert(ssource != std::stop_source{}); 
-    assert(ssource.valid());
-    assert(!ssource.stop_signaled());
+    assert(ssource.stoppable());
+    assert(!ssource.stop_requested());
 
     assert(!interruptSignaled);
-    t1.signal_stop();
+    t1.request_stop();
     assert(!interruptSignaled);
-    t2.signal_stop();
+    t2.request_stop();
     t2.join();
     assert(interruptSignaled);
   }

@@ -366,7 +366,7 @@ void testCBRegistering()
                                             [&] { callbackExecuted = true; });
     assert(!callbackExecuted);
 
-    it.signal_stop();
+    it.request_stop();
     assert(callbackExecuted);
   }
 }
@@ -386,6 +386,7 @@ int main()
   std::cout << "\n\n**************************\n";
   testCBRegistering();
   std::cout << "\n\n**************************\n";
+  std::cout << "**** all OK\n";
  }
  catch (const std::exception& e) {
    std::cerr << "EXCEPTION: " << e.what() << std::endl;

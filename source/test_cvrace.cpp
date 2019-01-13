@@ -39,7 +39,7 @@ void testCVDeadlock()
                       readyCV.wait_until(lg,
                                          [&ready] { return ready; },
                                          it);
-                      if (it.stop_signaled()) {
+                      if (it.stop_requested()) {
                         std::cout << "\n" <<std::this_thread::get_id()<<": t1: signal stop" << std::endl;
                       }
                       else {
@@ -54,7 +54,7 @@ void testCVDeadlock()
                         std::cout << "\n" <<std::this_thread::get_id()<<": t2: lock " <<&readyMutex << std::endl;
                       std::unique_lock<std::mutex> lg{readyMutex};
                       std::cout << "\n" <<std::this_thread::get_id()<<": t2: signal stop" << std::endl;
-		      t1StopSource.signal_stop();
+		      t1StopSource.request_stop();
                       std::cout << "\n" <<std::this_thread::get_id()<<": t2: signal-stop done" << std::endl;
                     });
 

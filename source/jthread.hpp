@@ -63,8 +63,8 @@ class jthread
     // - supplementary API:
     //   - for the calling thread:
     stop_source get_stop_source() const noexcept;
-    bool signal_stop() noexcept {
-      return get_stop_source().signal_stop();
+    bool request_stop() noexcept {
+      return get_stop_source().request_stop();
     }
 
 
@@ -120,7 +120,7 @@ inline jthread::jthread(Callable&& cb, Args&&... args)
 // destructor:
 jthread::~jthread() {
   if (joinable()) {   // if not joined/detached, signal stop and wait for end:
-    signal_stop();
+    request_stop();
     join();
   }
 }

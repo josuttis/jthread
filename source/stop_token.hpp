@@ -25,6 +25,8 @@ struct __stop_callback_base {
   std::atomic<bool> __callbackFinishedExecuting_{false};
 
   virtual void __execute() noexcept = 0;
+  virtual ~__stop_callback_base() {
+  }
 };
 
 struct __stop_state {
@@ -283,7 +285,7 @@ struct __stop_state {
   // bits 33-63 - source ref count (31 bits)
   std::atomic<std::uint64_t> __state_{__source_ref_increment};
   __stop_callback_base* __head_ = nullptr;
-  std::thread::id __signallingThread_;
+  std::thread::id __signallingThread_{};
 };
 
 class stop_source;
@@ -292,16 +294,23 @@ class stop_callback;
 
 class stop_token {
  public:
-  stop_token() noexcept : __state_(nullptr) {}
+  // construct:
+  // - TODO: explicit?
+  stop_token() noexcept
+   : __state_(nullptr) {
+  }
 
-  stop_token(const stop_token& __it) noexcept : __state_(__it.__state_) {
+  // copy/move/assign/destroy:
+  stop_token(const stop_token& __it) noexcept
+   : __state_(__it.__state_) {
     if (__state_ != nullptr) {
       __state_->__add_token_reference();
     }
   }
 
   stop_token(stop_token&& __it) noexcept
-      : __state_(std::exchange(__it.__state_, nullptr)) {}
+   : __state_(std::exchange(__it.__state_, nullptr)) {
+  }
 
   ~stop_token() {
     if (__state_ != nullptr) {
@@ -323,16 +332,17 @@ class stop_token {
     return *this;
   }
 
-  [[nodiscard]] bool stop_signaled() const noexcept {
+  void swap(stop_token& __it) noexcept {
+    std::swap(__state_, __it.__state_);
+  }
+
+  // stop handling:
+  [[nodiscard]] bool stop_requested() const noexcept {
     return __state_ != nullptr && __state_->__is_stop_requested();
   }
 
-  [[nodiscard]] bool stop_done_or_possible() const noexcept {
-    return __state_ != nullptr && __state_->__is_stop_requestable();
-  }
-
-  void swap(stop_token& __it) noexcept {
-    std::swap(__state_, __it.__state_);
+  [[nodiscard]] bool callbacks_ignored() const noexcept {
+    return !(__state_ != nullptr && __state_->__is_stop_requestable());
   }
 
   friend bool operator==(
@@ -396,15 +406,15 @@ class stop_source {
     return *this;
   }
 
-  [[nodiscard]] bool stop_signaled() const noexcept {
+  [[nodiscard]] bool stop_requested() const noexcept {
     return __state_ != nullptr && __state_->__is_stop_requested();
   }
 
-  [[nodiscard]] bool valid() const noexcept {
+  [[nodiscard]] bool stoppable() const noexcept {
     return __state_ != nullptr;
   }
 
-  bool signal_stop() const noexcept {
+  bool request_stop() const noexcept {
     if (__state_ != nullptr) {
       return __state_->__request_stop();
     }
