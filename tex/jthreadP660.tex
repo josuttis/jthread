@@ -5,19 +5,26 @@
 {\small
 \begin{tabular}{@{}ll}
 Project:  	& ISO JTC1/SC22/WG21: Programming Language C++ \\
-Doc No: 	& WG21 P0660R7 \\
-Date: 		& 2018-11-04 \\
+Doc No: 	& WG21 P0660R8 \\
+Date: 		& 2019-01-13 \\
 Reply to: 	& Nicolai Josuttis (nico@josuttis.de), \\
                 &         Lewis Baker (lbaker@fb.com) \\
                 &         Billy O'Neal (bion@microsoft.com) \\
                 &         Herb Sutter (hsutter@microsoft.com), \\
                 &         Anthony Williams (anthony@justsoftwaresolutions.co.uk) \\
 Audience: 	& SG1, LEWG, LWG \\
-Prev. Version:	& \url{www.wg21.link/P0660R6}, \url{www.wg21.link/P1287R0} \\
+Prev. Version:	& \url{www.wg21.link/P0660R7}, \url{www.wg21.link/P1287R0} \\
 \end{tabular}
 }
 
-\section*{{\huge{}Interrupt Tokens and a Joining Thread, Rev 7}}
+\section*{{\huge{}Stop Tokens and a Joining Thread, Rev 8}}
+
+\subsubsection*{New in R8}
+As requested at
+\href{http://wiki.edg.com/bin/view/Wg21sandiego2018/P0660}{{the LEWG meeting in San Diego 2018}:
+\begin{itemize}
+ \item Terminology (especially \tcode{interrupt_token} to \tcode{stop_token}.
+\end{itemize}
 
 \subsubsection*{New in R7}
 \begin{itemize}
@@ -74,23 +81,23 @@ on top of the existing C++ standard library without special OS support.
 \subsection*{Basis examples}
 
 \begin{itemize}
- \item A jthread automatically signals an interrupt at the end of its lifetime to the started thread
+ \item At the end of its lifetime a \tcode{jthread} automatically signals a request to stop the started thread
         (if still joinable) and joins:
 \begin{codeblock}
 void testJThreadWithToken() 
 {
-    std::jthread t([] (std::interrupt_token itoken) {
-                     while (!itoken.is_interrupted()) {
+    std::jthread t([] (std::stop_token itoken) {
+                     while (!itoken.stop_requested()) {
                        //...
                      }
                    });
     //...
-} // jthread destructor signals interrupt and therefore ends the started thread and joins
+} // jthread destructor signals requests to stop and therefore ends the started thread and joins
 \end{codeblock}
 
-The interrupt could also be explicitly signaled with \tcode{t.interrupt()}.
+The stop could also be explicitly requested with \tcode{t.request_stop()}.
 
- \item If the started thread doesn't take an interrupt token, 
+ \item If the started thread doesn't take an stop token, 
         the destructor still has the benefit of calling \tcode{join()} (if still joinable):
 \begin{codeblock}
 void testJThreadJoining()
@@ -120,7 +127,7 @@ void compareWithStdThreadJoining()
 }
 \end{codeblock}
 
- \item An extended CV API enables to interrupt CV waits using the passed interrupt token
+ \item An extended CV API enables to interrupt CV waits using the passed stop token
         (i.e. interrupting the CV wait without polling):
 \begin{codeblock}
 void testInterruptibleCVWait() 
@@ -128,7 +135,7 @@ void testInterruptibleCVWait()
   bool ready = false;
   std::mutex readyMutex;
   std::condition_variable_any readyCV;
-  std::jthread t([&ready, &readyMutex, &readyCV] (std::interrupt_token it) {
+  std::jthread t([&ready, &readyMutex, &readyCV] (std::stop_token it) {
                     while (...) {
                       ...
                       {
@@ -137,13 +144,13 @@ void testInterruptibleCVWait()
                                            [&ready] {
                                               return ready;
                                            },
-                                           it);  // also ends wait if \tcode{it} interrupted
+                                           it);  // also ends wait on stop request for \tcode{it}
                       }
                       ...
                     }
                   });
   ...
-} // jthread destructor signals interrupt and therefore unblocks the CV wait and ends the started thread
+} // jthread destructor signals stop request and therefore unblocks the CV wait and ends the started thread
 \end{codeblock}
 \end{itemize}
 
@@ -158,7 +165,9 @@ This is a new feature so that it shall have the following feature macro:
 \subsubsection*{Acknowledgements}
 
 Thanks to all who incredibly helped me to prepare this paper, such as all people in the C++ concurrency and library working group.
-Especially, we want to thank: Hans Boehm, Olivier Giroux, Pablo Halpern, Howard Hinnant, Alisdair Meredith, Gor Nishanov, Ville Voutilainen, and Jonathan Wakely.
+Especially, we want to thank:
+ Hans Boehm, Olivier Giroux, Pablo Halpern, Howard Hinnant, Alisdair Meredith, Gor Nishanov,
+ Tony van Eerd, Ville Voutilainen, and Jonathan Wakely.
 
 
 \section*{Proposed Wording}
