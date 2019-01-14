@@ -50,13 +50,13 @@ using namespace::std::literals;
 //  So, either the test or the fix seems to be wrong.
 //
 // HH:
-//  I’m guessing that to reliably test this, one is going to have to rebuild your condition_variable_any2
+//  Iï¿½m guessing that to reliably test this, one is going to have to rebuild your condition_variable_any2
 //  with an internal mutex that checks for unlock-after-destruction.
 //  And the problem with that is now you no no longer have a std::mutex to put into your internal std::condition_variable...
 //
 //  _Maybe_ you could test it by making your internal std::condition_variable a std::condition_variable_any,
 //  then you could put a debugging mutex into it.
-//  But I’m not sure, because this is getting pretty weird and I have not actually tried this.
+//  But Iï¿½m not sure, because this is getting pretty weird and I have not actually tried this.
 //------------------------------------------------------
 
 #ifndef ORIG_CVANY_RACE_TEST
@@ -69,7 +69,7 @@ void f() {
     m.lock();
     f_ready = true;
     cv->notify_one();
-    delete cv;
+    cv->~condition_variable_any2();
     std::memset(cv, 0x55, sizeof(*cv)); // UB but OK to ensure the check
     m.unlock();
 }
@@ -141,7 +141,7 @@ void testCVAnyMutex()
                     std::unique_lock ul{m};
                     f_ready = true;
                     cv->notify_one();
-                    delete cv;
+                    cv->~condition_variable_any2();
                     std::memset(cv, 0x55, sizeof(*cv)); // UB but OK to ensure the check
                  });
   t1.join();
