@@ -112,6 +112,12 @@ namespace std {
     // \expos
     Callback callback; 
   };
+
+  template <typename Callback>
+  stop_callback(const stop_token&, Callback&&) -> stop_callback<Callback>;
+
+  template <typename Callback>
+  stop_callback(stop_token&&, Callback&&) -> stop_callback<Callback>;
 }
 \end{codeblock}
 
