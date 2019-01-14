@@ -1,256 +1,173 @@
-///////////////////////////////////////////////////////////////////////////////
-// Copyright (c) Lewis Baker
-// Licenced under MIT license. See LICENSE.txt for details.
-///////////////////////////////////////////////////////////////////////////////
-
-#ifdef ORIG
-
-#include <cppcoro/cancellation_token.hpp>
-#include <cppcoro/cancellation_source.hpp>
-#include <cppcoro/cancellation_registration.hpp>
-#include <cppcoro/operation_cancelled.hpp>
-
+#include <exception>
+#include <iostream>
+#include <cassert>
 #include <thread>
+#include <atomic>
+#include <chrono>
+#include <optional>
+#include <functional>
+#include <condition_variable>
+#include <mutex>
 
-#include <ostream>
-#include "doctest/doctest.h"
+#include "stop_token.hpp"
 
-TEST_SUITE_BEGIN("cancellation_token tests");
+#include "test.hpp"
 
-TEST_CASE("default cancellation_token is not cancellable")
+TEST(DefaultTokenIsNotStoppable)
 {
-	cppcoro::cancellation_token t;
-	CHECK(!t.is_cancellation_requested());
-	CHECK(!t.can_be_cancelled());
+	std::stop_token t;
+	CHECK(!t.stop_requested());
+	CHECK(t.callbacks_ignored());
 }
 
-TEST_CASE("calling request_cancellation on cancellation_source updates cancellation_token")
+TEST(RequestingStopOnSourceUpdatesToken)
 {
-	cppcoro::cancellation_source s;
-	cppcoro::cancellation_token t = s.token();
-	CHECK(t.can_be_cancelled());
-	CHECK(!t.is_cancellation_requested());
-	s.request_cancellation();
-	CHECK(t.is_cancellation_requested());
-	CHECK(t.can_be_cancelled());
+	std::stop_source s;
+	std::stop_token t = s.get_token();
+	CHECK(!t.callbacks_ignored());
+	CHECK(!t.stop_requested());
+	s.request_stop();
+	CHECK(t.stop_requested());
+	CHECK(!t.callbacks_ignored());
 }
 
-TEST_CASE("cancellation_token can't be cancelled when last cancellation_source destructed")
+TEST(TokenCantBeStoppedWhenNoMoreSources)
 {
-	cppcoro::cancellation_token t;
+	std::stop_token t;
 	{
-		cppcoro::cancellation_source s;
-		t = s.token();
-		CHECK(t.can_be_cancelled());
+		std::stop_source s;
+		t = s.get_token();
+		CHECK(!t.callbacks_ignored());
 	}
 
-	CHECK(!t.can_be_cancelled());
+	CHECK(t.callbacks_ignored());
 }
 
-TEST_CASE("cancelation_token can be cancelled when last cancellation_source destructed if cancellation already requested")
+TEST(TokenCanBeStoppedWhenNoMoreSourcesIfStopAlreadyRequested)
 {
-	cppcoro::cancellation_token t;
+	std::stop_token t;
 	{
-		cppcoro::cancellation_source s;
-		t = s.token();
-		CHECK(t.can_be_cancelled());
-		s.request_cancellation();
+		std::stop_source s;
+		t = s.get_token();
+		CHECK(!t.callbacks_ignored());
+		s.request_stop();
 	}
 
-	CHECK(t.can_be_cancelled());
-	CHECK(t.is_cancellation_requested());
+	CHECK(!t.callbacks_ignored());
+	CHECK(t.stop_requested());
 }
 
-TEST_CASE("cancellation_registration when cancellation not yet requested")
+TEST(CallbackNotExecutedImmediatelyIfStopNotYetRequested)
 {
-	cppcoro::cancellation_source s;
+	std::stop_source s;
 
 	bool callbackExecuted = false;
 	{
-		cppcoro::cancellation_registration callbackRegistration(
-			s.token(),
-			[&] { callbackExecuted = true; });
+		std::stop_callback cb(s.get_token(), [&] { callbackExecuted = true; });
 	}
 
 	CHECK(!callbackExecuted);
 
-	{
-		cppcoro::cancellation_registration callbackRegistration(
-			s.token(),
-			[&] { callbackExecuted = true; });
-
-		CHECK(!callbackExecuted);
-
-		s.request_cancellation();
-
-		CHECK(callbackExecuted);
-	}
+	s.request_stop();
 }
 
-TEST_CASE("throw_if_cancellation_requested")
+TEST(CallbackExecutedIfStopRequestedBeforeDestruction)
 {
-	cppcoro::cancellation_source s;
-	cppcoro::cancellation_token t = s.token();
+	std::stop_source s;
+	bool callbackExecuted = false;
+	std::stop_callback cb(
+		s.get_token(),
+		[&] { callbackExecuted = true; });
 
-	CHECK_NOTHROW(t.throw_if_cancellation_requested());
+	CHECK(!callbackExecuted);
 
-	s.request_cancellation();
+	s.request_stop();
 
-	CHECK_THROWS_AS(t.throw_if_cancellation_requested(), const cppcoro::operation_cancelled&);
+	CHECK(callbackExecuted);
 }
 
-TEST_CASE("cancellation_registration called immediately when cancellation already requested")
+TEST(CallbackExecutedImmediatelyIfStopAlreadyRequested)
 {
-	cppcoro::cancellation_source s;
-	s.request_cancellation();
+	std::stop_source s;
+	s.request_stop();
 
 	bool executed = false;
-	cppcoro::cancellation_registration r{ s.token(), [&] { executed = true; } };
+	std::stop_callback r{ s.get_token(), [&] { executed = true; } };
 	CHECK(executed);
 }
 
-TEST_CASE("register many callbacks"
-	* doctest::description{
-	"this checks the code-path that allocates the next chunk of entries "
-	"in the internal data-structres, which occurs on 17th callback" })
+TEST(RegisterManyCallbacks)
 {
-	cppcoro::cancellation_source s;
-	auto t = s.token();
+	std::stop_source s;
+	auto t = s.get_token();
 
 	int callbackExecutionCount = 0;
 	auto callback = [&] { ++callbackExecutionCount; };
 
-	// Allocate enough to require a second chunk to be allocated.
-	cppcoro::cancellation_registration r1{ t, callback };
-	cppcoro::cancellation_registration r2{ t, callback };
-	cppcoro::cancellation_registration r3{ t, callback };
-	cppcoro::cancellation_registration r4{ t, callback };
-	cppcoro::cancellation_registration r5{ t, callback };
-	cppcoro::cancellation_registration r6{ t, callback };
-	cppcoro::cancellation_registration r7{ t, callback };
-	cppcoro::cancellation_registration r8{ t, callback };
-	cppcoro::cancellation_registration r9{ t, callback };
-	cppcoro::cancellation_registration r10{ t, callback };
-	cppcoro::cancellation_registration r11{ t, callback };
-	cppcoro::cancellation_registration r12{ t, callback };
-	cppcoro::cancellation_registration r13{ t, callback };
-	cppcoro::cancellation_registration r14{ t, callback };
-	cppcoro::cancellation_registration r15{ t, callback };
-	cppcoro::cancellation_registration r16{ t, callback };
-	cppcoro::cancellation_registration r17{ t, callback };
-	cppcoro::cancellation_registration r18{ t, callback };
+	std::stop_callback r1{ t, callback };
+	std::stop_callback r2{ t, callback };
+	std::stop_callback r3{ t, callback };
+	std::stop_callback r4{ t, callback };
+	std::stop_callback r5{ t, callback };
+	std::stop_callback r6{ t, callback };
+	std::stop_callback r7{ t, callback };
+	std::stop_callback r8{ t, callback };
+	std::stop_callback r9{ t, callback };
+	std::stop_callback r10{ t, callback };
 
-	s.request_cancellation();
+	s.request_stop();
 
-	CHECK(callbackExecutionCount == 18);
+	CHECK(callbackExecutionCount == 10);
 }
 
-TEST_CASE("concurrent registration and cancellation")
+TEST(ConcurrentCallbackRegistration)
 {
-	// Just check this runs and terminates without crashing.
+	auto threadLoop = [](std::stop_token token)
+	{
+		std::atomic<bool> cancelled = false;
+		while (!cancelled)
+		{
+			std::stop_callback registration{ token, [&]
+			{
+				cancelled = true;
+			} };
+
+			std::stop_callback cb0{ token, [] {} };
+			std::stop_callback cb1{ token, [] {} };
+			std::stop_callback cb2{ token, [] {} };
+			std::stop_callback cb3{ token, [] {} };
+			std::stop_callback cb4{ token, [] {} };
+			std::stop_callback cb5{ token, [] {} };
+			std::stop_callback cb6{ token, [] {} };
+			std::stop_callback cb7{ token, [] {} };
+			std::stop_callback cb8{ token, [] {} };
+			std::stop_callback cb9{ token, [] {} };
+			std::stop_callback cb10{ token, [] {} };
+			std::stop_callback cb11{ token, [] {} };
+			std::stop_callback cb12{ token, [] {} };
+			std::stop_callback cb13{ token, [] {} };
+			std::stop_callback cb14{ token, [] {} };
+			std::stop_callback cb15{ token, [] {} };
+			std::stop_callback cb16{ token, [] {} };
+
+			std::this_thread::yield();
+		}
+	};
+
+	// Just assert this runs and terminates without crashing.
 	for (int i = 0; i < 100; ++i)
 	{
-		cppcoro::cancellation_source source;
+		std::stop_source source;
 
-		std::thread waiter1{ [token = source.token()]
-		{
-			std::atomic<bool> cancelled = false;
-			while (!cancelled)
-			{
-				cppcoro::cancellation_registration registration{ token, [&]
-				{
-					cancelled = true;
-				} };
+		std::thread waiter1{ threadLoop, source.get_token() };
+		std::thread waiter2{ threadLoop, source.get_token() };
+		std::thread waiter3{ threadLoop, source.get_token() };
 
-				cppcoro::cancellation_registration reg0{ token, [] {} };
-				cppcoro::cancellation_registration reg1{ token, [] {} };
-				cppcoro::cancellation_registration reg2{ token, [] {} };
-				cppcoro::cancellation_registration reg3{ token, [] {} };
-				cppcoro::cancellation_registration reg4{ token, [] {} };
-				cppcoro::cancellation_registration reg5{ token, [] {} };
-				cppcoro::cancellation_registration reg6{ token, [] {} };
-				cppcoro::cancellation_registration reg7{ token, [] {} };
-				cppcoro::cancellation_registration reg8{ token, [] {} };
-				cppcoro::cancellation_registration reg9{ token, [] {} };
-				cppcoro::cancellation_registration reg10{ token, [] {} };
-				cppcoro::cancellation_registration reg11{ token, [] {} };
-				cppcoro::cancellation_registration reg12{ token, [] {} };
-				cppcoro::cancellation_registration reg13{ token, [] {} };
-				cppcoro::cancellation_registration reg14{ token, [] {} };
-				cppcoro::cancellation_registration reg15{ token, [] {} };
-				cppcoro::cancellation_registration reg17{ token, [] {} };
-
-				std::this_thread::yield();
-			}
-		} };
-
-		std::thread waiter2{ [token = source.token()]
-		{
-			std::atomic<bool> cancelled = false;
-			while (!cancelled)
-			{
-				cppcoro::cancellation_registration registration{ token, [&]
-				{
-					cancelled = true;
-				} };
-
-				cppcoro::cancellation_registration reg0{ token, [] {} };
-				cppcoro::cancellation_registration reg1{ token, [] {} };
-				cppcoro::cancellation_registration reg2{ token, [] {} };
-				cppcoro::cancellation_registration reg3{ token, [] {} };
-				cppcoro::cancellation_registration reg4{ token, [] {} };
-				cppcoro::cancellation_registration reg5{ token, [] {} };
-				cppcoro::cancellation_registration reg6{ token, [] {} };
-				cppcoro::cancellation_registration reg7{ token, [] {} };
-				cppcoro::cancellation_registration reg8{ token, [] {} };
-				cppcoro::cancellation_registration reg9{ token, [] {} };
-				cppcoro::cancellation_registration reg10{ token, [] {} };
-				cppcoro::cancellation_registration reg11{ token, [] {} };
-				cppcoro::cancellation_registration reg12{ token, [] {} };
-				cppcoro::cancellation_registration reg13{ token, [] {} };
-				cppcoro::cancellation_registration reg14{ token, [] {} };
-				cppcoro::cancellation_registration reg15{ token, [] {} };
-				cppcoro::cancellation_registration reg16{ token, [] {} };
-
-				std::this_thread::yield();
-			}
-		} };
-
-		std::thread waiter3{ [token = source.token()]
-		{
-			std::atomic<bool> cancelled = false;
-			while (!cancelled)
-			{
-				cppcoro::cancellation_registration registration{ token, [&]
-				{
-					cancelled = true;
-				} };
-
-				cppcoro::cancellation_registration reg0{ token, [] {} };
-				cppcoro::cancellation_registration reg1{ token, [] {} };
-				cppcoro::cancellation_registration reg2{ token, [] {} };
-				cppcoro::cancellation_registration reg3{ token, [] {} };
-				cppcoro::cancellation_registration reg4{ token, [] {} };
-				cppcoro::cancellation_registration reg5{ token, [] {} };
-				cppcoro::cancellation_registration reg6{ token, [] {} };
-				cppcoro::cancellation_registration reg7{ token, [] {} };
-				cppcoro::cancellation_registration reg8{ token, [] {} };
-				cppcoro::cancellation_registration reg9{ token, [] {} };
-				cppcoro::cancellation_registration reg10{ token, [] {} };
-				cppcoro::cancellation_registration reg11{ token, [] {} };
-				cppcoro::cancellation_registration reg12{ token, [] {} };
-				cppcoro::cancellation_registration reg13{ token, [] {} };
-				cppcoro::cancellation_registration reg14{ token, [] {} };
-				cppcoro::cancellation_registration reg15{ token, [] {} };
-				cppcoro::cancellation_registration reg16{ token, [] {} };
-
-				std::this_thread::yield();
-			}
-		} };
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
 		std::thread canceller{ [&source]
 		{
-			source.request_cancellation();
+			source.request_stop();
 		} };
 
 		canceller.join();
@@ -260,36 +177,158 @@ TEST_CASE("concurrent registration and cancellation")
 	}
 }
 
-TEST_CASE("cancellation registration single-threaded performance")
+TEST(CallbackDeregisteredFromWithinCallbackDoesNotDeadlock)
 {
-	struct batch
+	std::stop_source src;
+	std::optional<std::stop_callback<std::function<void()>>> cb;
+
+	cb.emplace(src.get_token(), std::function<void()>{ [&] {
+		cb.reset();
+	}});
+
+	src.request_stop();
+
+	CHECK(!cb.has_value());
+}
+
+TEST(CallbackDeregistrationDoesNotWaitForOtherCallbacksToFinishExecuting)
+{
+	std::stop_source src;
+
+	std::mutex mut;
+	std::condition_variable cv;
+
+	bool releaseCallback = false;
+	bool callbackExecuting = false;
+
+	auto dummyCallback = []{};
+
+	std::optional<std::stop_callback<decltype(dummyCallback)&>> cb1{std::in_place, src.get_token(), dummyCallback};
+
+	// Register a first callback that will signal when it starts executing
+	// and then block until it receives a signal.
+	std::stop_callback blockingCb{ src.get_token(), [&] {
+		std::unique_lock lock{mut};
+		callbackExecuting = true;
+		cv.notify_all();
+		cv.wait(lock, [&] { return releaseCallback; });
+	} };
+
+	std::optional<std::stop_callback<decltype(dummyCallback)&>> cb2{std::in_place, src.get_token(), dummyCallback};
+
+	std::thread signallingThread{ [&] { src.request_stop(); } };
+
+	// Wait until the callback starts executing on the signalling-thread.
+	// The signalling thread will remain blocked in this callback until we release it.
 	{
-		batch(cppcoro::cancellation_token t)
-			: r0(t, [] {})
-			, r1(t, [] {})
-			, r2(t, [] {})
-			, r3(t, [] {})
-			, r4(t, [] {})
-			, r5(t, [] {})
-			, r6(t, [] {})
-			, r7(t, [] {})
-			, r8(t, [] {})
-			, r9(t, [] {})
-		{}
+		std::unique_lock lock{mut};
+		cv.wait(lock, [&] { return callbackExecuting; });
+	}
 
-		cppcoro::cancellation_registration r0;
-		cppcoro::cancellation_registration r1;
-		cppcoro::cancellation_registration r2;
-		cppcoro::cancellation_registration r3;
-		cppcoro::cancellation_registration r4;
-		cppcoro::cancellation_registration r5;
-		cppcoro::cancellation_registration r6;
-		cppcoro::cancellation_registration r7;
-		cppcoro::cancellation_registration r8;
-		cppcoro::cancellation_registration r9;
-	};
+	// Then try and deregister the other callbacks.
+	// This operation should not be blocked on other callbacks.
+	cb1.reset();
+	cb2.reset();
 
-	cppcoro::cancellation_source s;
+	// Finally, signal the callback to unblock and wait for the signalling thread to finish.
+	{
+		std::unique_lock lock{mut};
+		releaseCallback = true;
+		cv.notify_all();
+	}
+
+	signallingThread.join();
+}
+
+TEST(CallbackDeregistrationBlocksUntilCallbackFinishes)
+{
+	std::stop_source src;
+
+	std::mutex mut;
+	std::condition_variable cv;
+
+	bool callbackRegistered = false;
+
+	std::thread callbackRegisteringThread{ [&] {
+		bool callbackExecuting = false;
+		bool callbackAboutToReturn = false;
+		bool callbackDeregistered = false;
+
+		{
+			std::stop_callback cb{ src.get_token(), [&] {
+				std::unique_lock lock{mut};
+				callbackExecuting = true;
+				cv.notify_all();
+				lock.unlock();
+				std::this_thread::sleep_for(std::chrono::milliseconds(100));
+				CHECK(!callbackDeregistered);
+				callbackAboutToReturn = true;
+			}};
+
+			{
+				std::unique_lock lock{mut};
+				callbackRegistered = true;
+				cv.notify_all();
+				cv.wait(lock, [&] { return callbackExecuting; });
+			}
+
+			CHECK(!callbackAboutToReturn);
+		}
+
+		callbackDeregistered = true;
+
+		CHECK(callbackExecuting);
+		CHECK(callbackAboutToReturn);
+	}};
+
+	{
+		std::unique_lock lock{mut};
+		cv.wait(lock, [&] { return callbackRegistered; });
+		// Make sure to release the lock before requesting stop
+		// since this will execute the callback which will try to
+		// acquire the lock on the mutex.
+	}
+
+	src.request_stop();
+
+	callbackRegisteringThread.join();
+}
+
+template<typename CB>
+struct callback_batch
+{
+	using callback_t = std::stop_callback<CB&>;
+
+	callback_batch(std::stop_token t, CB& callback)
+	: r0(t, callback)
+	, r1(t, callback)
+	, r2(t, callback)
+	, r3(t, callback)
+	, r4(t, callback)
+	, r5(t, callback)
+	, r6(t, callback)
+	, r7(t, callback)
+	, r8(t, callback)
+	, r9(t, callback)
+	{}
+
+	callback_t r0;
+	callback_t r1;
+	callback_t r2;
+	callback_t r3;
+	callback_t r4;
+	callback_t r5;
+	callback_t r6;
+	callback_t r7;
+	callback_t r8;
+	callback_t r9;
+};
+
+TEST(CancellationSingleThreadPerformance)
+{
+	auto callback = []{};
+
+	std::stop_source s;
 
 	constexpr int iterationCount = 100'000;
 
@@ -297,7 +336,7 @@ TEST_CASE("cancellation registration single-threaded performance")
 
 	for (int i = 0; i < iterationCount; ++i)
 	{
-		cppcoro::cancellation_registration r{ s.token(), [] {} };
+		std::stop_callback r{ s.get_token(), callback };
 	}
 
 	auto end = std::chrono::high_resolution_clock::now();
@@ -308,7 +347,7 @@ TEST_CASE("cancellation registration single-threaded performance")
 
 	for (int i = 0; i < iterationCount; ++i)
 	{
-		batch b{ s.token() };
+		callback_batch b{ s.get_token(), callback };
 	}
 
 	end = std::chrono::high_resolution_clock::now();
@@ -319,11 +358,11 @@ TEST_CASE("cancellation registration single-threaded performance")
 
 	for (int i = 0; i < iterationCount; ++i)
 	{
-		batch b0{ s.token() };
-		batch b1{ s.token() };
-		batch b2{ s.token() };
-		batch b3{ s.token() };
-		batch b4{ s.token() };
+		callback_batch b0{ s.get_token(), callback };
+		callback_batch b1{ s.get_token(), callback };
+		callback_batch b2{ s.get_token(), callback };
+		callback_batch b3{ s.get_token(), callback };
+		callback_batch b4{ s.get_token(), callback };
 	}
 
 	end = std::chrono::high_resolution_clock::now();
@@ -333,7 +372,7 @@ TEST_CASE("cancellation registration single-threaded performance")
 	auto report = [](const char* label, auto time, std::uint64_t count)
 	{
 		auto us = std::chrono::duration_cast<std::chrono::microseconds>(time).count();
-		MESSAGE(label << " took " << us << "us (" << (1000.0 * us / count) << " ns/item)");
+		std::cout << label << " took " << us << "us (" << (1000.0 * us / count) << " ns/item)" << std::endl;
 	};
 
 	report("Individual", time1, iterationCount);
@@ -341,58 +380,7 @@ TEST_CASE("cancellation registration single-threaded performance")
 	report("Batch50", time3, 50 * iterationCount);
 }
 
-TEST_SUITE_END();
-
-#endif
-
-
-#include "stop_token.hpp"
-#include <iostream>
-#include <cassert>
-
-void testCBRegistering()
-{
-  std::stop_source it;
-
-  bool callbackExecuted = false;
-  {
-    std::stop_callback callbackRegistration(it.get_token(),
-                                            [&] { callbackExecuted = true; });
-  }
-  assert(!callbackExecuted);
-
-  {
-    std::stop_callback callbackRegistration(it.get_token(),
-                                            [&] { callbackExecuted = true; });
-    assert(!callbackExecuted);
-
-    it.request_stop();
-    assert(callbackExecuted);
-  }
-}
-
-
-
 int main()
 {
- try {
-  std::set_terminate([](){
-                       std::cout << "ERROR: terminate() called" << std::endl;
-                       assert(false);
-                     });
-
-  std::cout << std::boolalpha;
-
-  std::cout << "\n\n**************************\n";
-  testCBRegistering();
-  std::cout << "\n\n**************************\n";
-  std::cout << "**** all OK\n";
- }
- catch (const std::exception& e) {
-   std::cerr << "EXCEPTION: " << e.what() << std::endl;
- }
- catch (...) {
-   std::cerr << "EXCEPTION" << std::endl;
- }
+	return test_entry::run_all();
 }
-
