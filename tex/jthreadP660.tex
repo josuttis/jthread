@@ -86,8 +86,8 @@ on top of the existing C++ standard library without special OS support.
 \begin{codeblock}
 void testJThreadWithToken() 
 {
-    std::jthread t([] (std::stop_token itoken) {
-                     while (!itoken.stop_requested()) {
+    std::jthread t([] (std::stop_token stoken) {
+                     while (!stoken.stop_requested()) {
                        //...
                      }
                    });
@@ -135,7 +135,7 @@ void testInterruptibleCVWait()
   bool ready = false;
   std::mutex readyMutex;
   std::condition_variable_any readyCV;
-  std::jthread t([&ready, &readyMutex, &readyCV] (std::stop_token it) {
+  std::jthread t([&ready, &readyMutex, &readyCV] (std::stop_token st) {
                     while (...) {
                       ...
                       {
@@ -144,7 +144,7 @@ void testInterruptibleCVWait()
                                            [&ready] {
                                               return ready;
                                            },
-                                           it);  // also ends wait on stop request for \tcode{it}
+                                           st);  // also ends wait on stop request for \tcode{st}
                       }
                       ...
                     }

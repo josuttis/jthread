@@ -97,9 +97,9 @@ namespace std {
   class stop_callback {
   public:
     // \ref{stop_callback.constr} create, destroy:
-    explicit stop_callback(const stop_token& it, Callback&& cb)
+    explicit stop_callback(const stop_token& st, Callback&& cb)
         noexcept(std::is_nothrow_move_constructible_v<Callback>);
-    explicit stop_callback(stop_token&& it, Callback&& cb)
+    explicit stop_callback(stop_token&& st, Callback&& cb)
         noexcept(std::is_nothrow_move_constructible_v<Callback>);
     ~stop_callback();
 
@@ -126,9 +126,9 @@ namespace std {
 
 \indexlibrary{\idxcode{stop_callback}!constructor}%
 \begin{itemdecl}
-explicit stop_callback(const stop_token& it, Callback&& cb)
+explicit stop_callback(const stop_token& st, Callback&& cb)
   noexcept(std::is_nothrow_move_constructible_v<Callback>);
-explicit stop_callback(stop_token&& it, Callback&& cb)
+explicit stop_callback(stop_token&& st, Callback&& cb)
   noexcept(std::is_nothrow_move_constructible_v<Callback>);
 \end{itemdecl}
 \begin{itemdescr}
