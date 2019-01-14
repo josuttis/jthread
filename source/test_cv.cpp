@@ -501,7 +501,7 @@ void testTimedIWait(bool callNotify, bool callInterrupt, Dur dur)
                             std::cout.put(it.stop_requested() ? 'T' : 't').flush();
                           }
                         }
-                        catch ([[maybe_unused]] const char* e) {
+                        catch (const char*) {
                           //std::cout << "t1: interrupted" << std::endl;
                           std::cout.put('i').flush();
                           t1Feedback = State::interrupted;

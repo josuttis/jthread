@@ -316,7 +316,7 @@ void testTemporarilyDisableToken()
                        throw "interrupted";
                      }
                    }
-                   catch ([[maybe_unused]] const char* e) {
+                   catch (const char*) {
                      std::cout.put('i').flush();
                      state.store(State::interrupted); 
                    }
