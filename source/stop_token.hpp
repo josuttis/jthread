@@ -487,4 +487,11 @@ class [[nodiscard]] stop_callback : private __stop_callback_base {
   __stop_state* __state_;
   _Callback __cb_;
 };
+
+template<typename _Callback>
+stop_callback(const stop_token&, _Callback&&) -> stop_callback<_Callback>;
+
+template<typename _Callback>
+stop_callback(stop_token&&, _Callback&&) -> stop_callback<_Callback>;
+
 } // namespace std
