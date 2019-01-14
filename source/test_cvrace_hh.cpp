@@ -50,13 +50,13 @@ using namespace::std::literals;
 //  So, either the test or the fix seems to be wrong.
 //
 // HH:
-//  I�m guessing that to reliably test this, one is going to have to rebuild your condition_variable_any2
+//  I'm guessing that to reliably test this, one is going to have to rebuild your condition_variable_any2
 //  with an internal mutex that checks for unlock-after-destruction.
 //  And the problem with that is now you no no longer have a std::mutex to put into your internal std::condition_variable...
 //
 //  _Maybe_ you could test it by making your internal std::condition_variable a std::condition_variable_any,
 //  then you could put a debugging mutex into it.
-//  But I�m not sure, because this is getting pretty weird and I have not actually tried this.
+//  But I'm not sure, because this is getting pretty weird and I have not actually tried this.
 //------------------------------------------------------
 
 #ifndef ORIG_CVANY_RACE_TEST

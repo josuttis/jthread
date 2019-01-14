@@ -47,6 +47,11 @@ public:
         }
     }
 
+    test_entry(const test_entry&) = delete;
+    test_entry(test_entry&&) = delete;
+    const test_entry& operator=(const test_entry&) = delete;
+    const test_entry& operator=(test_entry&&) = delete;
+
     bool run()
     {
         any_failures = false;
