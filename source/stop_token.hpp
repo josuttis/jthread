@@ -341,8 +341,8 @@ class stop_token {
     return __state_ != nullptr && __state_->__is_stop_requested();
   }
 
-  [[nodiscard]] bool callbacks_ignored() const noexcept {
-    return !(__state_ != nullptr && __state_->__is_stop_requestable());
+  [[nodiscard]] bool stop_possible() const noexcept {
+    return __state_ != nullptr && __state_->__is_stop_requestable();
   }
 
   friend bool operator==(
@@ -410,7 +410,7 @@ class stop_source {
     return __state_ != nullptr && __state_->__is_stop_requested();
   }
 
-  [[nodiscard]] bool stoppable() const noexcept {
+  [[nodiscard]] bool stop_possible() const noexcept {
     return __state_ != nullptr;
   }
 
@@ -448,7 +448,7 @@ template <typename _Callback>
 // requires MoveConstructible<_Callback> && Invocable<_Callback>
 class [[nodiscard]] stop_callback : private __stop_callback_base {
  public:
-  stop_callback(const stop_token& __token, _Callback&& __cb) noexcept(
+  explicit stop_callback(const stop_token& __token, _Callback&& __cb) noexcept(
       std::is_nothrow_move_constructible_v<_Callback>)
       : __state_(nullptr), __cb_(static_cast<_Callback&&>(__cb)) {
     if (__token.__state_ != nullptr &&
@@ -457,7 +457,7 @@ class [[nodiscard]] stop_callback : private __stop_callback_base {
     }
   }
 
-  stop_callback(stop_token&& __token, _Callback&& __cb) noexcept(
+  explicit stop_callback(stop_token&& __token, _Callback&& __cb) noexcept(
       std::is_nothrow_move_constructible_v<_Callback>)
       : __state_(nullptr), __cb_(static_cast<_Callback&&>(__cb)) {
     if (__token.__state_ != nullptr &&

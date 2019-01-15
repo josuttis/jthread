@@ -169,19 +169,19 @@ void basicAPIWithFunc()
 {
   std::cout << "\n*** start basicAPIWithFunc(): " << std::endl;
   std::stop_source is;
-  assert(is.stoppable());
+  assert(is.stop_possible());
   assert(!is.stop_requested());
   {
     std::cout << "\n- start jthread t1" << std::endl;
     std::jthread t(&foo, "foo() called in thread with id: ");
     is = t.get_stop_source();
     std::cout << is.stop_requested() << std::endl;
-    assert(is.stoppable());
+    assert(is.stop_possible());
     assert(!is.stop_requested());
     std::this_thread::sleep_for(0.5s);
     std::cout << "\n- destruct jthread it" << std::endl;
   }
-  assert(is.stoppable());
+  assert(is.stop_possible());
   assert(is.stop_requested());
   std::cout << "\n*** OK" << std::endl;
 }
@@ -223,7 +223,7 @@ void testExchangeToken()
                               }
 		            }
 		            else {
-		              c = actToken.callbacks_ignored() ?  '-' : '.';
+		              c = actToken.stop_possible() ?  '.' : '-';
                             }
                             std::cout.put(c).flush();
                             std::this_thread::sleep_for(0.1ms);
@@ -285,7 +285,7 @@ void testConcurrentInterrupt()
 		    else {
 		      // should never switch back to not interrupted:
                       assert(c != 's');
-		      c = stoken.callbacks_ignored() ?  '-' : '.';
+		      c = stoken.stop_possible() ?  '.' : '-';
                     }
                     std::cout.put(c).flush();
                     std::this_thread::sleep_for(0.1ms);
@@ -343,12 +343,12 @@ void testJthreadMove()
     std::jthread t2{std::move(t1)};  // should compile
 
     auto ssource = t1.get_stop_source();
-    assert(!ssource.stoppable());
+    assert(!ssource.stop_possible());
     assert(!ssource.stop_requested());
     //assert(ssource == std::stop_source{}); 
     ssource = t2.get_stop_source();
     assert(ssource != std::stop_source{}); 
-    assert(ssource.stoppable());
+    assert(ssource.stop_possible());
     assert(!ssource.stop_requested());
 
     assert(!interruptSignaled);

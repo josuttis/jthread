@@ -20,7 +20,7 @@ TEST(DefaultTokenIsNotStoppable)
 {
   std::stop_token t;
   CHECK(!t.stop_requested());
-  CHECK(t.callbacks_ignored());
+  CHECK(!t.stop_possible());
 }
 
 
@@ -30,11 +30,11 @@ TEST(RequestingStopOnSourceUpdatesToken)
 {
   std::stop_source s;
   std::stop_token t = s.get_token();
-  CHECK(!t.callbacks_ignored());
+  CHECK(t.stop_possible());
   CHECK(!t.stop_requested());
   s.request_stop();
   CHECK(t.stop_requested());
-  CHECK(!t.callbacks_ignored());
+  CHECK(t.stop_possible());
 }
 
 
@@ -46,10 +46,10 @@ TEST(TokenCantBeStoppedWhenNoMoreSources)
   {
     std::stop_source s;
     t = s.get_token();
-    CHECK(!t.callbacks_ignored());
+    CHECK(t.stop_possible());
   }
 
-  CHECK(t.callbacks_ignored());
+  CHECK(!t.stop_possible());
 }
 
 
@@ -61,11 +61,11 @@ TEST(TokenCanBeStoppedWhenNoMoreSourcesIfStopAlreadyRequested)
   {
     std::stop_source s;
     t = s.get_token();
-    CHECK(!t.callbacks_ignored());
+    CHECK(t.stop_possible());
     s.request_stop();
   }
 
-  CHECK(!t.callbacks_ignored());
+  CHECK(t.stop_possible());
   CHECK(t.stop_requested());
 }
 
@@ -84,6 +84,8 @@ TEST(CallbackNotExecutedImmediatelyIfStopNotYetRequested)
   CHECK(!callbackExecuted);
 
   s.request_stop();
+
+  CHECK(!callbackExecuted);
 }
 
 
@@ -120,7 +122,7 @@ TEST(CallbackExecutedImmediatelyIfStopAlreadyRequested)
 
 //----------------------------------------------------
 
-TEST(RegisterManyCallbacks)
+TEST(RegisterMultipleCallbacks)
 {
   std::stop_source s;
   auto t = s.get_token();
@@ -192,10 +194,10 @@ TEST(ConcurrentCallbackRegistration)
 
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
-    std::thread canceller{ [&source]
-    {
-      source.request_stop();
-    } };
+    std::thread canceller{ [&source] {
+                              source.request_stop();
+                            }
+                         };
 
     canceller.join();
     waiter1.join();

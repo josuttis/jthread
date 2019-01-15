@@ -15,7 +15,7 @@ void testJThreadWithout()
 
   assert(std::jthread::hardware_concurrency() == std::thread::hardware_concurrency()); 
   std::stop_token stoken;
-  assert(stoken.callbacks_ignored());
+  assert(!stoken.stop_possible());
   {
     std::jthread::id t1ID{std::this_thread::get_id()};
     std::atomic<bool> t1AllSet{false};
@@ -54,7 +54,7 @@ void testThreadWithToken()
 
   std::stop_source ssource;
   std::stop_source origsource;
-  assert(ssource.stoppable());
+  assert(ssource.stop_possible());
   assert(!ssource.stop_requested());
   {
     std::jthread::id t1ID{std::this_thread::get_id()};
@@ -110,7 +110,7 @@ void testJoin()
   std::cout << "\n*** start testJoin()" << std::endl;
 
   std::stop_source ssource;
-  assert(ssource.stoppable());
+  assert(ssource.stop_possible());
   {
     std::jthread t1([](std::stop_token stoken) {
                       // wait until interrupt is signaled (due to calling request_stop() for the token):
@@ -149,7 +149,7 @@ void testDetach()
   std::cout << "\n*** start testDetach()" << std::endl;
 
   std::stop_source ssource;
-  assert(ssource.stoppable());
+  assert(ssource.stop_possible());
   std::atomic<bool> t1FinallyInterrupted{false};
   {
     std::jthread t0;
@@ -163,7 +163,7 @@ void testDetach()
                    t1ID = std::this_thread::get_id();
                    t1InterruptToken = stoken;
                    t1IsInterrupted = stoken.stop_requested();
-                   assert(!stoken.callbacks_ignored());
+                   assert(stoken.stop_possible());
                    assert(!stoken.stop_requested());
                    t1AllSet.store(true);
                    // wait until interrupt is signaled (due to calling request_stop() for the token):
@@ -187,7 +187,7 @@ void testDetach()
     assert(t1IsInterrupted == false);
     assert(t1InterruptToken == t1.get_stop_source().get_token());
     ssource = t1.get_stop_source();
-    assert(!t1InterruptToken.callbacks_ignored());
+    assert(t1InterruptToken.stop_possible());
     assert(!t1InterruptToken.stop_requested());
     // test detach():
     t1.detach();
@@ -345,10 +345,10 @@ void testJThreadAPI()
 
   assert(std::jthread::hardware_concurrency() == std::thread::hardware_concurrency()); 
   std::stop_source ssource;
-  assert(ssource.stoppable());
-  assert(!ssource.get_token().callbacks_ignored());
+  assert(ssource.stop_possible());
+  assert(ssource.get_token().stop_possible());
   std::stop_token stoken;
-  assert(stoken.callbacks_ignored());
+  assert(!stoken.stop_possible());
 
   // thread with no callable and invalid source:
   std::jthread t0;
@@ -356,7 +356,7 @@ void testJThreadAPI()
   assert((std::is_same_v<decltype(nh), std::thread::native_handle_type>)); 
   assert(!t0.joinable());
   std::stop_source ssourceStolen{std::move(ssource)};
-  assert(!ssource.stoppable());
+  assert(!ssource.stop_possible());
   assert(ssource == t0.get_stop_source());
 
   {
@@ -367,7 +367,7 @@ void testJThreadAPI()
                    // check some values of the started thread:
                    t1ID = std::this_thread::get_id();
                    t1InterruptToken = stoken;
-                   assert(!stoken.callbacks_ignored());
+                   assert(stoken.stop_possible());
                    assert(!stoken.stop_requested());
                    t1AllSet.store(true);
                    // wait until interrupt is signaled (due to destructor of t1):
@@ -387,7 +387,7 @@ void testJThreadAPI()
     assert(t1ID == t1.get_id());
     assert(t1InterruptToken == t1.get_stop_source().get_token());
     stoken = t1.get_stop_source().get_token();
-    assert(!t1InterruptToken.callbacks_ignored());
+    assert(t1InterruptToken.stop_possible());
     assert(!t1InterruptToken.stop_requested());
     // test swap():
     std::swap(t0, t1);

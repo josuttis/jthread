@@ -18,20 +18,20 @@ void testStopTokenAPI()
     std::stop_source is2{is1};
     std::stop_source is3 = is1;
     std::stop_source is4{std::move(is1)};
-    assert(!is1.stoppable());
-    assert(is2.stoppable());
-    assert(is3.stoppable());
-    assert(is4.stoppable());
+    assert(!is1.stop_possible());
+    assert(is2.stop_possible());
+    assert(is3.stop_possible());
+    assert(is4.stop_possible());
     is1 = is2;
-    assert(is1.stoppable());
+    assert(is1.stop_possible());
     is1 = std::move(is2);
-    assert(!is2.stoppable());
+    assert(!is2.stop_possible());
     std::swap(is1,is2);
-    assert(!is1.stoppable());
-    assert(is2.stoppable());
+    assert(!is1.stop_possible());
+    assert(is2.stop_possible());
     is1.swap(is2);
-    assert(is1.stoppable());
-    assert(!is2.stoppable());
+    assert(is1.stop_possible());
+    assert(!is2.stop_possible());
   }
 
   //***** stop_token:
@@ -46,10 +46,10 @@ void testStopTokenAPI()
     it1 = std::move(it2);
     std::swap(it1,it2);
     it1.swap(it2);
-    assert(it1.callbacks_ignored());
-    assert(it2.callbacks_ignored());
-    assert(it3.callbacks_ignored());
-    assert(it4.callbacks_ignored());
+    assert(!it1.stop_possible());
+    assert(!it2.stop_possible());
+    assert(!it3.stop_possible());
+    assert(!it4.stop_possible());
   }
 
   //***** source and token:
@@ -59,23 +59,23 @@ void testStopTokenAPI()
     std::stop_source* isp = new std::stop_source;
     std::stop_source& isr = *isp;
     std::stop_token it{isr.get_token()};
-    assert(isr.stoppable());
-    assert(!it.callbacks_ignored());
+    assert(isr.stop_possible());
+    assert(it.stop_possible());
     delete isp;  // not interrupted and losing last source
-    assert(it.callbacks_ignored());
+    assert(!it.stop_possible());
   }
   {
     std::stop_source* isp = new std::stop_source;
     std::stop_source& isr = *isp;
     std::stop_token it{isr.get_token()};
-    assert(isr.stoppable());
-    assert(!it.callbacks_ignored());
+    assert(isr.stop_possible());
+    assert(it.stop_possible());
     isr.request_stop();
     //delete isp;  // interrupted and losing last source
-    //assert(!it.callbacks_ignored());
+    //assert(it.stop_possible());
   }
 
-  //***** stoppable()/callbacks_ignored(), stop_requested(), and request_stop():
+  //***** stop_possible(), stop_requested(), and request_stop():
   {
     std::stop_source isNotValid;
     std::stop_source isNotStopped{std::move(isNotValid)};
@@ -85,18 +85,18 @@ void testStopTokenAPI()
     std::stop_token itNotStopped{isNotStopped.get_token()};
     std::stop_token itStopped{isStopped.get_token()};
 
-    // stoppable() and stop_requested():
-    assert(!isNotValid.stoppable());
-    assert(isNotStopped.stoppable());
-    assert(isStopped.stoppable());
+    // stop_possible() and stop_requested():
+    assert(!isNotValid.stop_possible());
+    assert(isNotStopped.stop_possible());
+    assert(isStopped.stop_possible());
     assert(!isNotValid.stop_requested());
     assert(!isNotStopped.stop_requested());
     assert(isStopped.stop_requested());
 
-    // callbacks_ignored() and stop_requested():
-    assert(itNotValid.callbacks_ignored());
-    assert(!itNotStopped.callbacks_ignored());
-    assert(!itStopped.callbacks_ignored());
+    // stop_possible() and stop_requested():
+    assert(!itNotValid.stop_possible());
+    assert(itNotStopped.stop_possible());
+    assert(itStopped.stop_possible());
     assert(!itNotStopped.stop_requested());
     assert(itStopped.stop_requested());
 
@@ -123,38 +123,38 @@ void testStopTokenAPI()
     // assignments and swap():
     assert(!std::stop_token{}.stop_requested());
     itStopped = std::stop_token{};
-    assert(itStopped.callbacks_ignored());
+    assert(!itStopped.stop_possible());
     assert(!itStopped.stop_requested());
     isStopped = std::stop_source{};
-    assert(isStopped.stoppable());
+    assert(isStopped.stop_possible());
     assert(!isStopped.stop_requested());
 
     std::swap(itStopped, itNotValid);
-    assert(itStopped.callbacks_ignored());
-    assert(itNotValid.callbacks_ignored());
+    assert(!itStopped.stop_possible());
+    assert(!itNotValid.stop_possible());
     assert(!itNotValid.stop_requested());
     std::stop_token itnew = std::move(itNotValid);
-    assert(itNotValid.callbacks_ignored());
+    assert(!itNotValid.stop_possible());
 
     std::swap(isStopped, isNotValid);
-    assert(!isStopped.stoppable());
-    assert(isNotValid.stoppable());
+    assert(!isStopped.stop_possible());
+    assert(isNotValid.stop_possible());
     assert(!isNotValid.stop_requested());
     std::stop_source isnew = std::move(isNotValid);
-    assert(!isNotValid.stoppable());
+    assert(!isNotValid.stop_possible());
   }
 
   // shared ownership semantics:
   std::stop_source is;
   std::stop_token it1{is.get_token()};
   std::stop_token it2{it1};
-  assert(is.stoppable() && !is.stop_requested());
-  assert(!it1.callbacks_ignored() && !it1.stop_requested());
-  assert(!it2.callbacks_ignored() && !it2.stop_requested());
+  assert(is.stop_possible() && !is.stop_requested());
+  assert(it1.stop_possible() && !it1.stop_requested());
+  assert(it2.stop_possible() && !it2.stop_requested());
   is.request_stop();
-  assert(is.stoppable() && is.stop_requested());
-  assert(!it1.callbacks_ignored() && it1.stop_requested());
-  assert(!it2.callbacks_ignored() && it2.stop_requested());
+  assert(is.stop_possible() && is.stop_requested());
+  assert(it1.stop_possible() && it1.stop_requested());
+  assert(it2.stop_possible() && it2.stop_requested());
 
   // == and !=:
   {
