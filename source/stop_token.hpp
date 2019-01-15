@@ -448,7 +448,7 @@ template <typename _Callback>
 // requires MoveConstructible<_Callback> && Invocable<_Callback>
 class [[nodiscard]] stop_callback : private __stop_callback_base {
  public:
-  stop_callback(const stop_token& __token, _Callback&& __cb) noexcept(
+  explicit stop_callback(const stop_token& __token, _Callback&& __cb) noexcept(
       std::is_nothrow_move_constructible_v<_Callback>)
       : __state_(nullptr), __cb_(static_cast<_Callback&&>(__cb)) {
     if (__token.__state_ != nullptr &&
@@ -457,7 +457,7 @@ class [[nodiscard]] stop_callback : private __stop_callback_base {
     }
   }
 
-  stop_callback(stop_token&& __token, _Callback&& __cb) noexcept(
+  explicit stop_callback(stop_token&& __token, _Callback&& __cb) noexcept(
       std::is_nothrow_move_constructible_v<_Callback>)
       : __state_(nullptr), __cb_(static_cast<_Callback&&>(__cb)) {
     if (__token.__state_ != nullptr &&
