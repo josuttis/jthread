@@ -87,7 +87,7 @@ class jthread
 
 // default constructor:
 inline jthread::jthread() noexcept
- : _stopSource{nullptr} {
+ : _stopSource{nostopstate} {
 }
 
 // THE constructor that starts the thread:

@@ -119,6 +119,12 @@ namespace std {
   template <typename Callback>
   stop_callback(stop_token&&, Callback&&) -> stop_callback<Callback>;
 }
+
+template<typename _Callback>
+stop_callback(const stop_token&, _Callback&&) -> stop_callback<_Callback>;
+
+template<typename _Callback>
+stop_callback(stop_token&&, _Callback&&) -> stop_callback<_Callback>;
 \end{codeblock}
 
 %*****
@@ -171,6 +177,10 @@ An stop can only be requested once. Subsequent attempts to request a stop are no
 
 \begin{codeblock}
 namespace std {
+  // \ref{stop_source.nostopstate} no-shared-stop-state indicator
+  struct nostopstate_t{@\seebelow@};
+  inline constexpr nostopstate_t nostopstate(@\unspec@);
+
   class stop_source {
   public:
     // \ref{stop_source.constr} create, copy, destroy:
@@ -195,6 +205,25 @@ namespace std {
   };
 }
 \end{codeblock}
+
+%***** nostopstate_t
+\rSec3[stop_source.nostopstate]{No-shared-stop-state indicator}
+
+\indexlibrary{\idxcode{nostopstate_t}}%
+\indexlibrary{\idxcode{nostopstate}}%
+\begin{itemdecl}
+struct nostopstate_t{@\seebelow@};
+inline constexpr nostopstate_t nullopt(@\unspec@);
+\end{itemdecl}
+
+\pnum
+The struct \tcode{nostopstate_t} is an empty class type used as a unique type to indicate the state of
+not containing a shared stop state for \tcode{stop_source} objects.
+In particular, \tcode{stop_source} has a constructor with \tcode{nostopstate_t} as a single argument;
+this indicates that a stop source object not sharing a stop state shall be constructed.
+
+\pnum
+Type \tcode{nostopstate_t} shall not have a default constructor or an initializer-list constructor, and shall not be an aggregate.
 
 %***** constructors
 \rSec3[stop_source.constr]{\tcode{stop_source} constructors}
@@ -538,8 +567,8 @@ void swap(stop_token& rhs) noexcept;
 [[nodiscard]] bool stop_possible() const noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\returns \tcode{false} if \tcode{stop_requested()} will never reach yield \T{true}
-                (the underlying shared stop state will never be true).
+  \pnum\returns \tcode{false} if \tcode{stop_requested()} will never yield \tcode{true}
+                (the underlying shared stop state will never be able to signal a stop).
                 \begin{note}To return \tcode{true}
                   a \tcode{stop_token} must share a stop state, for which either a stop already was requested
                   or still a \tcode{stop_source} exists that can potentially

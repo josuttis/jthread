@@ -32,6 +32,11 @@ void testStopTokenAPI()
     is1.swap(is2);
     assert(is1.stop_possible());
     assert(!is2.stop_possible());
+
+    // stop_source without shared stop state:
+    std::stop_source is0{std::nostopstate};
+    assert(!is0.stop_requested());
+    assert(!is0.stop_possible());
   }
 
   //***** stop_token:
