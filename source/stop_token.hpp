@@ -11,12 +11,18 @@
 #endif
 
 namespace std {
+
 inline void __spin_yield() noexcept {
   // TODO: Platform-specific code here
 #if defined(__x86_64__) || defined(_M_X64)
   _mm_pause();
 #endif
 }
+
+
+//-----------------------------------------------
+// internal types for shared stop state
+//-----------------------------------------------
 
 struct __stop_callback_base {
   __stop_callback_base* __next_ = nullptr;
@@ -288,9 +294,24 @@ struct __stop_state {
   std::thread::id __signallingThread_{};
 };
 
+
+//-----------------------------------------------
+// forward declarations
+//-----------------------------------------------
+
 class stop_source;
 template <typename _Callback>
 class stop_callback;
+
+// std::nostopstate
+// - to initialize a stop_source without shared stop state
+struct nostopstate_t { explicit nostopstate_t() = default; };
+inline constexpr nostopstate_t nostopstate{};
+
+
+//-----------------------------------------------
+// stop_token
+//-----------------------------------------------
 
 class stop_token {
  public:
@@ -370,11 +391,16 @@ class stop_token {
   __stop_state* __state_;
 };
 
+
+//-----------------------------------------------
+// stop_source
+//-----------------------------------------------
+
 class stop_source {
  public:
   stop_source() : __state_(new __stop_state()) {}
 
-  explicit stop_source(std::nullptr_t) noexcept : __state_(nullptr) {}
+  explicit stop_source(std::nostopstate_t) noexcept : __state_(nullptr) {}
 
   ~stop_source() {
     if (__state_ != nullptr) {
@@ -444,6 +470,11 @@ class stop_source {
   __stop_state* __state_;
 };
 
+
+//-----------------------------------------------
+// stop_callback
+//-----------------------------------------------
+
 template <typename _Callback>
 // requires MoveConstructible<_Callback> && Invocable<_Callback>
 class [[nodiscard]] stop_callback : private __stop_callback_base {
@@ -493,5 +524,6 @@ stop_callback(const stop_token&, _Callback&&) -> stop_callback<_Callback>;
 
 template<typename _Callback>
 stop_callback(stop_token&&, _Callback&&) -> stop_callback<_Callback>;
+
 
 } // namespace std
