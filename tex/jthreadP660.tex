@@ -17,13 +17,17 @@ Prev. Version:	& \url{www.wg21.link/P0660R7}, \url{www.wg21.link/P1287R0} \\
 \end{tabular}
 }
 
+%******************************************************************
 \section*{{\huge{}Stop Tokens and a Joining Thread, Rev 8}}
 
 \subsubsection*{New in R8}
 As requested at
 \href{http://wiki.edg.com/bin/view/Wg21sandiego2018/P0660}{the LEWG meeting in San Diego 2018}:
 \begin{itemize}
- \item Terminology (especially \tcode{interrupt_token} to \tcode{stop_token}).
+ \item Terminology (especially rename \tcode{interrupt_token} to \tcode{stop_token}).
+ \item Add a deduction guide for \tcode{stop_callback}
+ \item Add \tcode{std::nostopstate_t} to create stop stop tokens that don't share a stop state
+ \item Several clarifications in wording
 \end{itemize}
 
 \subsubsection*{New in R7}
@@ -65,6 +69,7 @@ As requested at
  \item Several minor fixes (e.g. on \tcode{noexcept}) and full proposed wording.
 \end{itemize}
 
+%**************************
 \subsection*{Purpose}
 
 This is the proposed wording for a cooperatively interruptible joining thread.
@@ -78,6 +83,7 @@ A default implementation exists at:
 Note that the proposed functionality can be fully implemented 
 on top of the existing C++ standard library without special OS support.
 
+%**************************
 \subsection*{Basis examples}
 
 \begin{itemize}
@@ -154,7 +160,8 @@ void testInterruptibleCVWait()
 \end{codeblock}
 \end{itemize}
 
-\subsubsection*{Feature Test Macro}
+%**************************
+\subsection*{Feature Test Macro}
 
 This is a new feature so that it shall have the following feature macro:
 \begin{codeblock}
@@ -162,7 +169,35 @@ This is a new feature so that it shall have the following feature macro:
 \end{codeblock}
 
 
-\subsubsection*{Acknowledgements}
+%**************************
+\subsection*{Key Design Hints}
+
+\subsubsection*{Guarantees for Races}
+
+\subsubsection*{Other Hints}
+
+The terminology was carfully selected with the following reasons
+\begin{itemize}
+ \item With a stop token we neither "interrupt" nor "cancel" something.
+        We request a stop that cooperatively has to get handled.
+ \item \tcode{stop_possible()} helps to avoid addign new callbacks
+        or checking for stop states.
+        The name was selected to have a common and pretty self-explanatory name
+        that is shared by both \tcode{stop_source}s and \tcode{stop_token}s.
+\end{itemize}
+
+The deduction guide for \tcode{stop_callback}s enables
+constructing a \tcode{stop_callback} with an lvalue callable:
+\begin{codeblock}
+auto lambda = []{};
+std::stop_callback cb{ token, lambda };  // captures by reference
+\end{codeblock}
+
+Adding a new callback is \tcode{noexcept} (unless moving the passed function throws).
+
+
+%**************************
+\subsection*{Acknowledgements}
 
 Thanks to all who incredibly helped me to prepare this paper, such as all people in the C++ concurrency and library working group.
 Especially, we want to thank:
@@ -242,6 +277,7 @@ public:
 };
 \end(codeblock)
 
+%******************************************************************
 \section*{Proposed Wording}
 All against N4762.
 
