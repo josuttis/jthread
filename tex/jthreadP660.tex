@@ -24,7 +24,7 @@ Prev. Version:	& \url{www.wg21.link/P0660R7}, \url{www.wg21.link/P1287R0} \\
 As requested at
 \href{http://wiki.edg.com/bin/view/Wg21sandiego2018/P0660}{the LEWG meeting in San Diego 2018}:
 \begin{itemize}
- \item Terminology (especially rename \tcode{interrupt_token} to \tcode{stop_token}.
+ \item Terminology (especially rename \tcode{interrupt_token} to \tcode{stop_token}).
  \item Add a deduction guide for \tcode{stop_callback}
  \item Add \tcode{std::nostopstate_t} to create stop stop tokens that don't share a stop state
  \item Several clarifications in wording
@@ -204,6 +204,78 @@ Especially, we want to thank:
  Hans Boehm, Olivier Giroux, Pablo Halpern, Howard Hinnant, Alisdair Meredith, Gor Nishanov,
  Tony Van Eerd, Ville Voutilainen, and Jonathan Wakely.
 
+\section*{Design Discussion}
+
+\subsection*{stop_token naming}
+
+Earlier versions of this paper used the names \tcode{interrupt_token},
+\tcode{interrupt_source} and \tcode{interrupt_callback} to refer to the
+abstraction used to signal interrupt.
+
+\subsubsection*{Problems with "interrupt"}
+
+However, the term "interrupt" already has common usage when referring to
+hardware interrupts and the semantics of hardware interrupts are different
+from the semantics of \tcode{interrupt_token}. A hardware interrupt is something
+that, once the interrupt has been handled, returns to the non-interrupted state.
+
+The boost::thread library also uses the term "interrupt" to refer to something
+that can be raised many times and when the interrupt is handled the state is
+reset back to non-interrupted.
+
+This is different from the semantics of the proposed \tcode{interrupt_token}
+abstraction which has the semantics that once it has been signalled it never
+returns to the non-signalled state. Thus the term "interrupt" seems inappropriate
+for the semantics as its existing interpretation is likely to lead to confusion.
+
+\subsubsection*{Alternative names}
+
+There was some discussion in at LEWG at San Diego about alternative names
+for \tcode{interrupt_token} and there were two candidates:
+\tcode{cancellation_token} and \tcode{stop_token}.
+A straw poll was taken in LEWG at San Diego and the group favoured \tcode{stop_token}.
+
+The term \tcode{cancellation_token} has precedent in other C++ libraries.
+For example, Microsoft's PPL uses the names `cancellation_token`, `cancellation_token_source`
+and `cancellation_registration`.
+
+The use of the "cancel" term also has precedent in the Networking TS which defines methods
+such as \tcode{basic_waitable_timer::cancel()} and \tcode{basic_socket::cancel()} and makes
+use of \tcode{std::errc::operation_canceled} as an error code in response to a request to
+cancel the operation.
+
+However, some concerns were raised about the potential for confusion if a \tcode{std::jthread::cancel()}
+method were added as some may confuse this as somehow being related to the semantics of
+\tcode{pthread_cancel()} which is able to cancel a thread at an arbitrary point rather than
+at well-defined cancellation points.
+
+A suggestion was also made to introduce the use of the term "request" to more clearly
+communicate the asynchronous and cooperative nature of the abstraction. This suggestion
+has been adopted.
+
+As a result the proposed names for the types and methods are now as follows:
+\begin(codeblock)
+class stop_token {
+public:
+  ...
+  [[nodiscard]] bool stop_requested() const noexcept;
+  [[nodiscard]] bool stop_possible() const noexcept;
+};
+
+class stop_source {
+public:
+  ...
+  [[nodiscard]] bool stop_requested() const noexcept;
+  [[nodiscard]] bool stop_possible() const noexcept;
+  bool request_stop() const noexcept;
+};
+
+template<Invocable Callback>
+class stop_callback {
+public:
+  ...
+};
+\end(codeblock)
 
 %******************************************************************
 \section*{Proposed Wording}
