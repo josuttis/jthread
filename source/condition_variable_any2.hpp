@@ -39,8 +39,8 @@ class condition_variable_any2
     };
 
     struct cv_internals{
-        std::mutex m;
-        std::condition_variable cv;
+        std::mutex m = {};
+        std::condition_variable cv = {};
 
         void notify_all(){
             std::lock_guard<std::mutex> guard(m);
