@@ -254,7 +254,7 @@ communicate the asynchronous and cooperative nature of the abstraction. This sug
 has been adopted.
 
 As a result the proposed names for the types and methods are now as follows:
-\begin(codeblock)
+\begin{codeblock}
 class stop_token {
 public:
   ...
@@ -275,7 +275,61 @@ class stop_callback {
 public:
   ...
 };
-\end(codeblock)
+\end{codeblock}
+
+\subsection*{Callback Registration/Deregistration}
+
+An important capability for asynchronous use-cases for \tcode{stop_token} is the ability to attach
+a callback to the \tcode{stop_token} that will be called if a request to stop is made. The motivations
+for this are discussed in more detail in P1287R0.
+
+Registration of a callback is performed by constructing a \tcode{stop_callback} object,
+passing the constructor both a \tcode{stop_token} and a \tcode{Invocable} object that
+is invoked if/when a call to \tcode{request_stop()} is made.
+
+For example:
+\begin{codeblock}
+void cancellable_operation(std::stop_token stoken = {})
+{
+  auto handle = begin_operation();
+
+  std::stop_callback cb{ stoken, [\&] { cancel_operation(handle); }};
+
+  ...
+
+  auto result = end_operation(handle);
+}
+\end{codeblock}
+
+When a \tcode{stop_callback} object is constructed, if the \tcode{stop_token} has
+already received a request to stop then the callback is immediately invoked inside
+the constructor. Otherwise, the callback is registered with the \tcode{stop_token}
+and is later invoked if/when some thread calls \tcode{request_stop()}
+on an associated \tcode{stop_source}.
+
+The callback registration is guaranteed to be performed atomically. If there is a
+concurrent call to \tcode{request_stop()} from another thread then either the
+current thread will see the request to stop and immediately invoke the callback
+on the current thread or the other thread will see the callback registration and
+will invoke the callback before returning from \tcode{request_stop()}.
+
+When the \tcode{stop_callback} object is destructed the callback is deregistered
+from the list of callbacks associated with the \tcode{stop_token}'s shared state
+the callback is guaranteed not to be called after the \tcode{stop_callback}
+destructor returns.
+
+Note that there is a potential race here between the callback being deregistered
+and a call to \tcode{request_stop()} being made on another thread which could
+invoke the callback. If the callback has not yet started executing on the other
+thread then the callback is deregistered and is never called. Otherwise, if the
+callback has already started executing on another thread then the call to
+\tcode{~stop_callback()} will block the current thread until the callback returns.
+
+If the call to the \tcode{stop_callback} destructor is made from within the the
+invocation of the callback on the same thread then the destructor does not block
+waiting for the callback to return as this would cause a deadlock. Instead,
+the destructor returns immediately without waiting for the callback to return.
+
 
 %******************************************************************
 \section*{Proposed Wording}
