@@ -170,70 +170,37 @@ This is a new feature so that it shall have the following feature macro:
 
 
 %**************************
-\subsection*{Key Design Hints}
 
-\subsubsection*{Guarantees for Races}
+\subsection*{Design Discussion}
 
-\subsubsection*{Other Hints}
-
-The terminology was carfully selected with the following reasons
-\begin{itemize}
- \item With a stop token we neither "interrupt" nor "cancel" something.
-        We request a stop that cooperatively has to get handled.
- \item \tcode{stop_possible()} helps to avoid addign new callbacks
-        or checking for stop states.
-        The name was selected to have a common and pretty self-explanatory name
-        that is shared by both \tcode{stop_source}s and \tcode{stop_token}s.
-\end{itemize}
-
-The deduction guide for \tcode{stop_callback}s enables
-constructing a \tcode{stop_callback} with an lvalue callable:
-\begin{codeblock}
-auto lambda = []{};
-std::stop_callback cb{ token, lambda };  // captures by reference
-\end{codeblock}
-
-Adding a new callback is \tcode{noexcept} (unless moving the passed function throws).
-
-
-%**************************
-\subsection*{Acknowledgements}
-
-Thanks to all who incredibly helped me to prepare this paper, such as all people in the C++ concurrency and library working group.
-Especially, we want to thank:
- Hans Boehm, Olivier Giroux, Pablo Halpern, Howard Hinnant, Alisdair Meredith, Gor Nishanov,
- Tony Van Eerd, Ville Voutilainen, and Jonathan Wakely.
-
-\section*{Design Discussion}
-
-\subsection*{stop_token naming}
+\subsubsection*{Problems with "interrupt"}
 
 Earlier versions of this paper used the names \tcode{interrupt_token},
 \tcode{interrupt_source} and \tcode{interrupt_callback} to refer to the
 abstraction used to signal interrupt.
 
-\subsubsection*{Problems with "interrupt"}
+However, the term "interrupt" already has common usage in industry and
+typically refers to something which can be interrupted and then return
+back to the non-interrupted state.
 
-However, the term "interrupt" already has common usage when referring to
-hardware interrupts and the semantics of hardware interrupts are different
-from the semantics of \tcode{interrupt_token}. A hardware interrupt is something
-that, once the interrupt has been handled, returns to the non-interrupted state.
+For example, hardware interrupts are raised when some event happens and then
+once the interrupt is handled the system returns back to the non-interrupted
+state, allowing the interrupt to be raised again.
 
-The boost::thread library also uses the term "interrupt" to refer to something
+The boost::thread library also uses the term "interrupt" to refer to an operation
 that can be raised many times and when the interrupt is handled the state is
 reset back to non-interrupted.
 
-This is different from the semantics of the proposed \tcode{interrupt_token}
-abstraction which has the semantics that once it has been signalled it never
-returns to the non-signalled state. Thus the term "interrupt" seems inappropriate
-for the semantics as its existing interpretation is likely to lead to confusion.
+This is different from the semantics of the abstraction proposed in this paper 
+which has the semantics that once it has been signalled it never returns to
+the non-signalled state. Thus the term "interrupt" seems inappropriate and is
+likely to lead to confusion.
 
 \subsubsection*{Alternative names}
 
 There was some discussion in at LEWG at San Diego about alternative names
 for \tcode{interrupt_token} and there were two candidates:
 \tcode{cancellation_token} and \tcode{stop_token}.
-A straw poll was taken in LEWG at San Diego and the group favoured \tcode{stop_token}.
 
 The term \tcode{cancellation_token} has precedent in other C++ libraries.
 For example, Microsoft's PPL uses the names `cancellation_token`, `cancellation_token_source`
@@ -247,7 +214,9 @@ cancel the operation.
 However, some concerns were raised about the potential for confusion if a \tcode{std::jthread::cancel()}
 method were added as some may confuse this as somehow being related to the semantics of
 \tcode{pthread_cancel()} which is able to cancel a thread at an arbitrary point rather than
-at well-defined cancellation points.
+cooperatively at well-defined cancellation points.
+
+A straw poll was taken in LEWG at San Diego and the group favoured \tcode{stop_token}.
 
 A suggestion was also made to introduce the use of the term "request" to more clearly
 communicate the asynchronous and cooperative nature of the abstraction. This suggestion
@@ -277,7 +246,7 @@ public:
 };
 \end{codeblock}
 
-\subsection*{Callback Registration/Deregistration}
+\subsubsection*{Callback Registration/Deregistration}
 
 An important capability for asynchronous use-cases for \tcode{stop_token} is the ability to attach
 a callback to the \tcode{stop_token} that will be called if a request to stop is made. The motivations
@@ -292,11 +261,8 @@ For example:
 void cancellable_operation(std::stop_token stoken = {})
 {
   auto handle = begin_operation();
-
-  std::stop_callback cb{ stoken, [\&] { cancel_operation(handle); }};
-
+  std::stop_callback cb{ stoken, [&] { cancel_operation(handle); }};
   ...
-
   auto result = end_operation(handle);
 }
 \end{codeblock}
@@ -330,6 +296,34 @@ invocation of the callback on the same thread then the destructor does not block
 waiting for the callback to return as this would cause a deadlock. Instead,
 the destructor returns immediately without waiting for the callback to return.
 
+\subsubsection*{Other Hints}
+
+The terminology was carfully selected with the following reasons
+\begin{itemize}
+ \item With a stop token we neither "interrupt" nor "cancel" something.
+        We request a stop that cooperatively has to get handled.
+ \item \tcode{stop_possible()} helps to avoid addign new callbacks
+        or checking for stop states.
+        The name was selected to have a common and pretty self-explanatory name
+        that is shared by both \tcode{stop_source}s and \tcode{stop_token}s.
+\end{itemize}
+
+The deduction guide for \tcode{stop_callback}s enables
+constructing a \tcode{stop_callback} with an lvalue callable:
+\begin{codeblock}
+auto lambda = []{};
+std::stop_callback cb{ token, lambda };  // captures by reference
+\end{codeblock}
+
+Adding a new callback is \tcode{noexcept} (unless moving the passed function throws).
+
+%**************************
+\subsection*{Acknowledgements}
+
+Thanks to all who incredibly helped me to prepare this paper, such as all people in the C++ concurrency and library working group.
+Especially, we want to thank:
+ Hans Boehm, Olivier Giroux, Pablo Halpern, Howard Hinnant, Alisdair Meredith, Gor Nishanov,
+ Tony Van Eerd, Ville Voutilainen, and Jonathan Wakely.
 
 %******************************************************************
 \section*{Proposed Wording}
