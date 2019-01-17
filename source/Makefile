@@ -97,6 +97,15 @@ test_cvrace_stop: stop_token.hpp jthread.hpp condition_variable_any2.hpp test_cv
 run_cvrace_stop: test_cvrace_stop
 	./test_cvrace_stop17raw.exe
 
+test_cvrace_pred: condition_variable_any2.hpp test_cvrace_pred.cpp Makefile
+	$(CXX17) $(CXXFLAGS17) $(INCLUDES) test_cvrace_pred.cpp $(LDFLAGS17) -o $@17raw.exe
+	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@17.exe
+	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@.exe
+	echo "- OK:  $@ and $@17  call  $@17raw.exe"
+
+run_cvrace_pred: test_cvrace_pred
+	./test_cvrace_pred17raw.exe
+
 test_cvprodcons: stop_token.hpp jthread.hpp condition_variable_any2.hpp test_cvprodcons.cpp test.hpp Makefile
 	$(CXX17) $(CXXFLAGS17) $(INCLUDES) test_cvprodcons.cpp $(LDFLAGS17) -o $@17raw.exe
 	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@17.exe
@@ -112,4 +121,4 @@ jthread.clang: jthread.hpp jthread.cpp stop_token.hpp iwait.hpp test.hpp Makefil
 	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@clangraw.exe '$$*' > $@.exe
 	echo "- OK:  $@ and $@17  call  $@clangraw.exe"
 
-run_tests: run_cvrace_stop run_cvcb run_cvrace run_cvprodcons run_cv run_jthread2 run_jthread1 run_stokencb run_stoken
+run_tests: run_cvrace_stop run_cvrace_pred run_cvcb run_cvrace run_cvprodcons run_cv run_jthread2 run_jthread1 run_stokencb run_stoken
