@@ -608,10 +608,11 @@ void swap(stop_token& rhs) noexcept;
 bool operator== (const stop_token& lhs, const stop_token& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\returns \tcode{!lhs.stop_possible() \&\& !rhs.stop_possible()} or
-                whether \tcode{lhs} and \tcode{rhs} refer to the
-                same stop state
+  \pnum\returns \tcode{true} if both \tcode{lhs} and \tcode{rhs} both
+                have no shared stop state or refer to the same stop state
                 (copied or moved from the same initial \tcode{stop_source} object).
+               % \tcode{true} if both \tcode{lhs} and \tcode{rhs} both
+               % have no shared stop state or refer to the same stop state
 \end{itemdescr}
 
 \indexlibrarymember{operator!=}{stop_token}%
@@ -766,7 +767,7 @@ The new thread of execution executes
                 \placeholdernc{INVOKE}(\brk{}%
                 \placeholdernc{DECAY_COPY}(\brk{}%
                 std::forward<F>(f)),
-                ssource,%
+                ssource.get_token(),%
                 \placeholdernc{DECAY_COPY}(\brk{}%
                 std::forward<Args>(\brk{}args))...)}
 if that expression is well-formed,
