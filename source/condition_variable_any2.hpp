@@ -72,6 +72,8 @@ class condition_variable_any2
         internals->notify_all();
     }
 
+    // wait()
+
     template<typename Lockable>
     void wait(Lockable& lock) {
         auto local_internals=internals;
@@ -80,8 +82,11 @@ class condition_variable_any2
         std::unique_lock<std::mutex> second_internal_lock(std::move(first_internal_lock));
         local_internals->cv.wait(second_internal_lock);
     }
+
     template<class Lockable,class Predicate>
     void wait(Lockable& lock, Predicate pred) {
+        // have to manually implement the loop so that the user-provided lock is reacquired before calling pred().
+        // (otherwise the test_cvrace_pred test case fails)
         auto local_internals=internals;
         while (!pred()) {
           std::unique_lock<std::mutex> first_internal_lock(local_internals->m);
@@ -90,6 +95,8 @@ class condition_variable_any2
           local_internals->cv.wait(second_internal_lock);
         }
     }
+
+    // wait_until()
 
     template<class Lockable, class Clock, class Duration>
      cv_status wait_until(Lockable& lock,
@@ -105,6 +112,8 @@ class condition_variable_any2
     bool wait_until(Lockable& lock,
                     const chrono::time_point<Clock, Duration>& abs_time,
                     Predicate pred) {
+        // have to manually implement the loop so that the user-provided lock is reacquired before calling pred().
+        // (otherwise the test_cvrace_pred test case fails)
         auto local_internals=internals;
         while (!pred()) {
             bool shouldStop;
@@ -120,6 +129,8 @@ class condition_variable_any2
         }
         return true;
     }
+
+    // wait_for()
 
     template<class Lockable,class Rep, class Period>
     cv_status wait_for(Lockable& lock,
@@ -240,6 +251,8 @@ inline bool condition_variable_any2::wait_until(Lockable& lock,
     if (stoken.stop_requested()) {
       return pred();
     }
+    // have to manually implement the loop so that the user-provided lock is reacquired before calling pred().
+    // (otherwise the test_cvrace_pred test case fails)
     auto local_internals=internals;
     stop_callback cb(stoken, [&local_internals] { local_internals->notify_all(); });
     while (!pred()) {

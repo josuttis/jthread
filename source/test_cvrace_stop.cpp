@@ -21,6 +21,16 @@ bool waiting=false;
 
 std::condition_variable deleter_cv;
 
+//-------------------------
+// Note:
+//  Calling cv->notify_all() and immediately destroying the cv
+//  is this a common pattern that exists in practice and
+//  is required to be supported.
+//  It comes from POSIX.
+//  See the man page for pthread_cond_destroy for an example that does exactly this,
+//  and the notes in the description of the destructors for std::condition_variable and std::condition_variable_any.
+//-------------------------
+
 void deleter_thread() {
     std::unique_lock<std::mutex> lk(m);
     deleter_cv.wait(lk,[]{return waiting;});

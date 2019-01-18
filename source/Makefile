@@ -1,7 +1,8 @@
 include Makefile.h
 
 default: all
-all:: test_stoken test_stokencb test_jthread1 test_jthread2 test_cv test_cvcb test_cvrace test_cvrace_hh test_cvrace_stop test_cvprodcons
+all:: test_stoken test_stokencb test_jthread1 test_jthread2
+all:: test_cv test_cvcb test_cvrace test_cvrace_hh test_cvrace_stop test_cvrace_pred test_cvprodcons
 all::
 	@echo ""
 	@echo "Testcases:"
@@ -14,6 +15,7 @@ all::
 	@echo "  test_cvrace"
 	@echo "  test_cvrace_hh"
 	@echo "  test_cvrace_stop"
+	@echo "  test_cvrace_pred"
 	@echo "  test_cvprodcons"
 
 test_stoken: stop_token.hpp condition_variable_any2.hpp test_stoken.cpp test.hpp Makefile
