@@ -1,12 +1,12 @@
 %!TEX root = std.tex
-\makeevenhead{cpppage}{Josuttis, Baker, O'Neil, Sutter, Williams: \tcode{jthread}}{}{\textbf{P0660R7}}
-\makeoddhead{cpppage}{Josuttis, Baker, O'Neil, Sutter, Williams: \tcode{jthread}}{}{\textbf{P0660R7}}
+\makeevenhead{cpppage}{Josuttis, Baker, O'Neil, Sutter, Williams: \tcode{stop_token} and \tcode{jthread}}{}{\textbf{P0660R8}}
+\makeoddhead{cpppage}{Josuttis, Baker, O'Neil, Sutter, Williams: \tcode{stop_token} and \tcode{jthread}}{}{\textbf{P0660R8}}
 
 {\small
 \begin{tabular}{@{}ll}
 Project:  	& ISO JTC1/SC22/WG21: Programming Language C++ \\
 Doc No: 	& WG21 P0660R8 \\
-Date: 		& 2019-01-13 \\
+Date: 		& 2019-01-20 \\
 Reply to: 	& Nicolai Josuttis (nico@josuttis.de), \\
                 &         Lewis Baker (lbaker@fb.com) \\
                 &         Billy O'Neal (bion@microsoft.com) \\
@@ -26,7 +26,7 @@ As requested at
 \begin{itemize}
  \item Terminology (especially rename \tcode{interrupt_token} to \tcode{stop_token}).
  \item Add a deduction guide for \tcode{stop_callback}
- \item Add \tcode{std::nostopstate_t} to create stop stop tokens that don't share a stop state
+ \item Add \tcode{std::nostopstate_t} to create stop tokens that don't share a stop state
  \item Several clarifications in wording
 \end{itemize}
 
@@ -103,7 +103,7 @@ void testJThreadWithToken()
 
 The stop could also be explicitly requested with \tcode{t.request_stop()}.
 
- \item If the started thread doesn't take an stop token, 
+ \item If the started thread doesn't take a stop token, 
         the destructor still has the benefit of calling \tcode{join()} (if still joinable):
 \begin{codeblock}
 void testJThreadJoining()
@@ -298,11 +298,16 @@ the destructor returns immediately without waiting for the callback to return.
 
 \subsubsection*{Other Hints}
 
-The terminology was carfully selected with the following reasons
+It is intentional that class \tcode{std::jthread} supports the full API of \tcode{std::thread}
+(i.e., by supporting to start the thread without taking a stop token as first parameter)
+to be able to replace any usage of \tcode{std::thread} by \tcode{std::jthread}
+without further code changes.
+
+The terminology was carefully selected with the following reasons
 \begin{itemize}
  \item With a stop token we neither "interrupt" nor "cancel" something.
         We request a stop that cooperatively has to get handled.
- \item \tcode{stop_possible()} helps to avoid addign new callbacks
+ \item \tcode{stop_possible()} helps to avoid adding new callbacks
         or checking for stop states.
         The name was selected to have a common and pretty self-explanatory name
         that is shared by both \tcode{stop_source}s and \tcode{stop_token}s.
@@ -334,5 +339,5 @@ All against N4762.
         To adopt it please ask for the LaTeX source code of the proposed wording. ]
 }
 
-\clearpage
+%\clearpage
 
