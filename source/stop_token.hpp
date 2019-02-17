@@ -519,11 +519,13 @@ class [[nodiscard]] stop_callback : private __stop_callback_base {
   _Callback __cb_;
 };
 
+// enable:
+//  auto lambda = []{};
+//  std::stop_callback cb{ token, lambda }; // captures by reference
 template<typename _Callback>
-stop_callback(const stop_token&, _Callback&&) -> stop_callback<_Callback>;
-
+  stop_callback(const stop_token&, _Callback&&) -> stop_callback<_Callback>;
 template<typename _Callback>
-stop_callback(stop_token&&, _Callback&&) -> stop_callback<_Callback>;
+  stop_callback(stop_token&&, _Callback&&) -> stop_callback<_Callback>;
 
 
 } // namespace std

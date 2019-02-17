@@ -4,11 +4,90 @@
 #include <cassert>
 
 
+void testStopTokenBasicAPI()
+{
+  std::cout << "\n============= testStopTokenBasicAPI()\n";
+
+  // create stop_source
+  std::stop_source ssrc;
+  assert(ssrc.stop_possible());
+  assert(!ssrc.stop_requested());
+
+  // create stop_token from stop_source
+  std::stop_token stok{ssrc.get_token()};
+  assert(ssrc.stop_possible());
+  assert(!ssrc.stop_requested());
+  assert(stok.stop_possible());
+  assert(!stok.stop_requested());
+
+  // register callback
+  bool cb1called{false};
+  auto cb1 = [&]{
+               cb1called = true;
+             };
+  {
+  std::stop_callback scb1{stok, cb1};
+  assert(ssrc.stop_possible());
+  assert(!ssrc.stop_requested());
+  assert(stok.stop_possible());
+  assert(!stok.stop_requested());
+  assert(!cb1called);
+  } // unregister callback
+
+  // register another callback
+  bool cb2called{false};
+  auto cb2 = [&]{
+               assert(stok.stop_requested());
+               cb2called = true;
+             };
+  std::stop_callback scb2{stok, cb2};
+  //???std::stop_callback<std::remove_cvref_t<decltype(cb2)>> scb2{stok, cb2};
+  //???std::stop_callback<std::decay_t<decltype(cb2)>> scb2{stok, cb2};
+  assert(ssrc.stop_possible());
+  assert(!ssrc.stop_requested());
+  assert(stok.stop_possible());
+  assert(!stok.stop_requested());
+  assert(!cb1called);
+  assert(!cb2called);
+
+  // request stop
+  auto b = ssrc.request_stop();
+  assert(!b);
+  assert(ssrc.stop_possible());
+  assert(ssrc.stop_requested());
+  assert(stok.stop_possible());
+  assert(stok.stop_requested());
+  assert(!cb1called);
+  assert(cb2called);
+
+  b = ssrc.request_stop();
+  assert(b);
+
+  // register another callback
+  bool cb3called{false};
+  //auto cb3 = [&]{
+  //             cb3called = true;
+  //           };
+  std::stop_callback scb3{stok, 
+                          [&]{
+                            cb3called = true;
+                          }};
+  assert(ssrc.stop_possible());
+  assert(ssrc.stop_requested());
+  assert(stok.stop_possible());
+  assert(stok.stop_requested());
+  assert(!cb1called);
+  assert(cb2called);
+  assert(cb3called);
+
+  std::cout << "**** all OK\n";
+}
+
 //------------------------------------------------------
 
 void testStopTokenAPI()
 {
-  std::cout << "\n============= testStopToken\n";
+  std::cout << "\n============= testStopTokenAPI()\n";
 
   //***** stop_source:
 
@@ -217,9 +296,9 @@ void sleep(D dur)
 }
 
 template<typename D>
-void testIToken(D dur)
+void testSToken(D dur)
 {
-  std::cout << "\n============= testIToken(" << std::chrono::duration<double,std::milli>(dur).count() << "ms)\n";
+  std::cout << "\n============= testSToken(" << std::chrono::duration<double,std::milli>(dur).count() << "ms)\n";
   int okSteps = 0;
   try {
 
@@ -276,8 +355,9 @@ void testIToken(D dur)
 
 int main()
 {
+  testStopTokenBasicAPI();
   testStopTokenAPI();
-  testIToken(::std::chrono::seconds{0});
-  testIToken(::std::chrono::milliseconds{500});
+  testSToken(::std::chrono::seconds{0});
+  testSToken(::std::chrono::milliseconds{500});
 }
 
