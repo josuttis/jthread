@@ -161,9 +161,10 @@ explicit stop_callback(stop_token&& st, Callback&& cb)
                 with zero arguments on the current thread before the constructor returns.
                 Otherwise, the callback is registered with the shared stop state of \tcode{st}
                 such that \tcode{static_cast<Callback\&\&>(callback)} is invoked by first call to \tcode{src.request_stop()}
-                on a \tcode{stop_source} instance, \tcode{src}, that references the same atomic stop
+                on any \tcode{stop_source} instance \tcode{src} that references the same atomic stop
                 state as \tcode{st}.
                 If invoking the callback throws an unhandled exception then \tcode{std::terminate()} is called.
+
   \pnum\throws Any exception thrown by the initialization of \tcode{callback}.
 \end{itemdescr}
 
@@ -177,7 +178,7 @@ explicit stop_callback(stop_token&& st, Callback&& cb)
                 block until the invocation of \tcode{callback} returns before calling \tcode{callback}'s destructor.
                 The destructor shall not block waiting for the execution of another callback registered
                 with the same atomic stop state to finish.
-                A subsequent call to \tcode{src.request_stop()} on a \tcode{stop_source}, \tcode{src}, with the same
+                A subsequent call to \tcode{src.request_stop()} on any \tcode{stop_source} \tcode{src} with the same
                 associated stop state shall not invoke \tcode{callback} once the destructor has returned.
 \end{itemdescr}
 
@@ -205,7 +206,7 @@ namespace std {
   public:
     // \ref{stop_source.constr} create, copy, destroy:
     stop_source();
-    explicit stop_source(nullptr_t) noexcept;
+    explicit stop_source(nostopstate_t) noexcept;
 
     stop_source(const stop_source&) noexcept;
     stop_source(stop_source&&) noexcept;
@@ -233,7 +234,7 @@ namespace std {
 \indexlibrary{\idxcode{nostopstate}}%
 \begin{itemdecl}
 struct nostopstate_t{@\seebelow@};
-inline constexpr nostopstate_t nullopt(@\unspec@);
+inline constexpr nostopstate_t nostopstate(@\unspec@);
 \end{itemdecl}
 
 \pnum
@@ -262,7 +263,7 @@ stop_source();
 
 \indexlibrary{\idxcode{stop_source}!constructor}%
 \begin{itemdecl}
-explicit stop_source(nullptr_t) noexcept;
+explicit stop_source(nostopstate_t) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\effects Constructs a new \tcode{stop_source} object that can't be used to request stops.
@@ -374,7 +375,7 @@ void swap(stop_source& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\returns \tcode{true} if the stop source can be used to request stops.
-                \begin{note} Returns \tcode{false} if the object was created with the \tcode{nullptr}
+                \begin{note} Returns \tcode{false} if the object was created with \tcode{nostopstate}
                              or the values were moved away.
                              \end{note}
 \end{itemdescr}

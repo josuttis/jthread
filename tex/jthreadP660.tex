@@ -5,20 +5,25 @@
 {\small
 \begin{tabular}{@{}ll}
 Project:  	& ISO JTC1/SC22/WG21: Programming Language C++ \\
-Doc No: 	& WG21 P0660R8 \\
-Date: 		& 2019-01-20 \\
+Doc No: 	& WG21 P0660R9 \\
+Date: 		& 2019-02-17 \\
 Reply to: 	& Nicolai Josuttis (nico@josuttis.de), \\
                 &         Lewis Baker (lbaker@fb.com) \\
                 &         Billy O'Neal (bion@microsoft.com) \\
                 &         Herb Sutter (hsutter@microsoft.com), \\
                 &         Anthony Williams (anthony@justsoftwaresolutions.co.uk) \\
 Audience: 	& SG1, LEWG, LWG \\
-Prev. Version:	& \url{www.wg21.link/P0660R7}, \url{www.wg21.link/P1287R0} \\
+Prev. Version:	& \url{www.wg21.link/P0660R8}, \url{www.wg21.link/P1287R0} \\
 \end{tabular}
 }
 
 %******************************************************************
-\section*{{\huge{}Stop Tokens and a Joining Thread, Rev 8}}
+\section*{{\huge{}Stop Tokens and a Joining Thread, Rev 9}}
+
+\subsubsection*{New in R9}
+\begin{itemize}
+ \item Fixes of small errors and typos.
+\end{itemize}
 
 \subsubsection*{New in R8}
 As requested at
@@ -27,6 +32,7 @@ As requested at
  \item Terminology (especially rename \tcode{interrupt_token} to \tcode{stop_token}).
  \item Add a deduction guide for \tcode{stop_callback}
  \item Add \tcode{std::nostopstate_t} to create stop tokens that don't share a stop state
+ \item Make comparisons hidden friends
  \item Several clarifications in wording
 \end{itemize}
 
