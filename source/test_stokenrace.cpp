@@ -6,6 +6,7 @@
 #include <optional>
 #include <chrono>
 #include <thread>
+#include <cstdlib>
 
 //------------------------------------------------------
 
@@ -147,7 +148,7 @@ void testCallbackConcUnregister()
               std::cout << "end cb1()" << std::endl;
               cb1done = true;   
             };
-  optCB.emplace(stok, cb1);
+  optCB.emplace(stok, std::ref(cb1));
   // anabling this thead create a CORE DUMP at the end of cb1 being in request_stop():
   std::thread t1{[&] {
                    while (!cb1end) {
@@ -173,6 +174,7 @@ void testCallbackConcUnregister()
 
   std::this_thread::sleep_for(6s);
   std::cout << "t1.join()" << std::endl;
+  cb1end = true;
   t1.join();
   std::cout << "t1.join() done" << std::endl;
   assert(ssrc.stop_possible());
@@ -222,7 +224,7 @@ void testCallbackThrow()
   std::set_terminate([]{
                       std::cout << "terminate() called\n";
                       std::cout << "**** all OK\n";
-                      std::quick_exit(0);
+                      std::exit(0);
                      });
 
   // request stop
