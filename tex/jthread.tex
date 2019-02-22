@@ -67,15 +67,14 @@ associated with the \tcode{stop_token} used to construct the \tcode{stop_callbac
 
 \pnum
 To support this, classes \tcode{stop_source}, \tcode{stop_token}, and \tcode{stop_callback}
-implement semantics of shared ownership of an associated atomic stop state.
+implement semantics of shared ownership of an associated shared stop state.
 The last remaining owner of the stop state automatically 
 releases the resources associated with the stop state.
 
 \pnum
-Calls to \tcode{request_stop()}, \tcode{stop_requested()},
-and \tcode{stop_possible()} are atomic operations (6.8.2.1p3 \ref{intro.races})
-on the shared stop state.
-Hence concurrent calls to these functions do not introduce data races. 
+Concurrent calls to \tcode{request_stop()}, \tcode{stop_requested()},
+and \tcode{stop_possible()}
+do not introduce data races. 
 A call to \tcode{request_stop()} that returns \tcode{false} (i.e. the first call)
 synchronizes with a call to \tcode{stop_requested()} on an associated \tcode{stop_token}
 or \tcode{stop_source} that returns \tcode{true}.
@@ -155,7 +154,7 @@ explicit stop_callback(stop_token&& st, Callback&& cb)
                 with zero arguments on the current thread before the constructor returns.
                 Otherwise, the callback is registered with the shared stop state of \tcode{st}
                 such that \tcode{static_cast<Callback\&\&>(callback)} is invoked by first call to \tcode{src.request_stop()}
-                on any \tcode{stop_source} instance \tcode{src} that references the same atomic stop
+                on any \tcode{stop_source} instance \tcode{src} that references the same shared stop
                 state as \tcode{st}.
                 If invoking the callback throws an unhandled exception then \tcode{std::terminate()} is called.
 
@@ -167,13 +166,10 @@ explicit stop_callback(stop_token&& st, Callback&& cb)
 ~stop_callback();
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Deregisters the callback from the associated atomic stop state.
-                If \tcode{callback} is concurrently executing on another thread then the destructor shall
-                block until the invocation of \tcode{callback} returns before calling \tcode{callback}'s destructor.
-                The destructor shall not block waiting for the execution of another callback registered
-                with the same atomic stop state to finish.
-                A subsequent call to \tcode{src.request_stop()} on any \tcode{stop_source} \tcode{src} with the same
-                associated stop state shall not invoke \tcode{callback} once the destructor has returned.
+  \pnum\effects Deregisters the callback from the associated shared stop state.
+                The destructor does not block waiting for the execution of another callback registered
+                with the same shared stop state to finish.
+                The return from the invocation of the callback (if any) will strongly happen before \tcode{callback} is destroyed.
 \end{itemdescr}
 
 %**************************
@@ -185,8 +181,8 @@ explicit stop_callback(stop_token&& st, Callback&& cb)
 \pnum
 \indexlibrary{\idxcode{stop_source}}%
 The class \tcode{stop_source} implements the semantics of signaling a request to stop
-to \tcode{stop_token}s (\ref{stop_token}) sharing the same atomic stop state.
-All \tcode{stop_source}s sharing the same atomic stop state can request a stop.
+to \tcode{stop_token}s (\ref{stop_token}) sharing the same shared stop state.
+All \tcode{stop_source}s sharing the same shared stop state can request a stop.
 Once a request to stop has been made it cannot be undone.
 A subsequent request to stop is a no-op.
 
@@ -252,7 +248,7 @@ stop_source();
   
   \pnum\postconditions \tcode{stop_possible() == true} and \tcode{stop_requested() == false}.
 
-  \pnum\throws \tcode{bad_alloc} If memory could not be allocated for the shared atomic stop state.
+  \pnum\throws \tcode{bad_alloc} If memory could not be allocated for the shared stop state.
 \end{itemdescr}
 
 \indexlibrary{\idxcode{stop_source}!constructor}%
@@ -368,7 +364,7 @@ void swap(stop_source& rhs) noexcept;
 [[nodiscard]] bool stop_possible() const noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\returns \tcode{true} if the stop source can be used to request stops.
+  \pnum\returns \tcode{true} if the stop source can be used to request stops, executed atomically.
                 \begin{note} Returns \tcode{false} if the object was created with \tcode{nostopstate}
                              or the values were moved away.
                              \end{note}
@@ -380,7 +376,7 @@ void swap(stop_source& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\returns \tcode{true} if \tcode{stop_possible()} 
-                and \tcode{request_stop()} was called by one of the owners.
+                and \tcode{request_stop()} was called by one of the owners, executed atomically.
 \end{itemdescr}
 
 \indexlibrarymember{request_stop}{stop_source}%
@@ -396,7 +392,7 @@ bool request_stop() const noexcept;
   %stop/interrupt token is expected. With the change, you could just pass a default-constructed one.
 
   \pnum\effects If \tcode{!stop_possible()} or \tcode{stop_requested()} the call has no effect. 
-                Otherwise, requests a stop so that \tcode{stop_requested() == true}
+                Otherwise, atomically requests a stop so that \tcode{stop_requested() == true}
                 and all registered callbacks are synchronously called.
                 \begin{note} Requesting a stop includes notifying all condition variables
                              of type \tcode{condition_variable_any}
@@ -525,8 +521,8 @@ stop_token(stop_token&& rhs) noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
- \pnum\effects If \tcode{*this} is the last owner of the atomic stop state,
-                releases the resources associated with the atomic stop state.
+ \pnum\effects If \tcode{*this} is the last owner of the shared stop state,
+                releases the resources associated with the shared stop state.
 \end{itemdescr}
 
 %*****
@@ -575,7 +571,7 @@ void swap(stop_token& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\returns \tcode{true} if \tcode{request_stop()} was called on and
-                associated \tcode{stop_source}, otherwise \tcode{false}.
+                associated \tcode{stop_source}, otherwise \tcode{false}, executed atomically.
   \pnum\sync If \tcode{true} is returned then synchronizes with the
              first call to \tcode{request_stop()} on an associated
              \tcode{stop_source}.
@@ -586,8 +582,9 @@ void swap(stop_token& rhs) noexcept;
 [[nodiscard]] bool stop_possible() const noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\returns \tcode{false} if a subsequent call to \tcode{stop_requested()} will never return \tcode{true}.
-                \begin{note}To return \tcode{true} either a call to \tcode{request_stop()}
+  \pnum\returns \tcode{false} if a subsequent call to \tcode{stop_requested()} will never return \tcode{true},
+                otherwise \tcode{true}, executed atomically.
+                \begin{note}To retuurn \tcode{true} either a call to \tcode{request_stop()}
                   on an associated \tcode{stop_source} must have already been made or there
                   must still be associated \tcode{stop_source} objects in existence on which
                   a call to \tcode{request_stop()} could potentially be made in future.
