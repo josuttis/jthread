@@ -61,12 +61,12 @@ to stop can be made via any one of potentially multiple associated
 reverted and second and subsequent requests to stop are no-ops.
 
 \pnum
-Callbacks registered via a \tcode{stop_callback}s object is called when
+Callbacks registered via a \tcode{stop_callback} object is called when
 a request to stop is first made by any of the \tcode{stop_source} objects
 associated with the \tcode{stop_token} used to construct the \tcode{stop_callback}.
 
 \pnum
-To support this, classes \tcode{stop_source}, \tcode{stop_token} and \tcode{stop_callback}
+To support this, classes \tcode{stop_source}, \tcode{stop_token}, and \tcode{stop_callback}
 implement semantics of shared ownership of an associated atomic stop state.
 The last remaining owner of the stop state automatically 
 releases the resources associated with the stop state.
