@@ -136,12 +136,6 @@ namespace std {
   template <typename Callback>
   stop_callback(stop_token&&, Callback&&) -> stop_callback<Callback>;
 }
-
-template<typename _Callback>
-stop_callback(const stop_token&, _Callback&&) -> stop_callback<_Callback>;
-
-template<typename _Callback>
-stop_callback(stop_token&&, _Callback&&) -> stop_callback<_Callback>;
 \end{codeblock}
 
 %*****
@@ -221,8 +215,8 @@ namespace std {
     [[nodiscard]] bool stop_requested() const noexcept;
     bool request_stop() const noexcept;
 
-    friend bool operator== (const stop_source& lhs, const stop_source& rhs) noexcept;
-    friend bool operator!= (const stop_source& lhs, const stop_source& rhs) noexcept;
+    friend [[nodiscard]] bool operator== (const stop_source& lhs, const stop_source& rhs) noexcept;
+    friend [[nodiscard]] bool operator!= (const stop_source& lhs, const stop_source& rhs) noexcept;
   };
 }
 \end{codeblock}
@@ -420,7 +414,7 @@ bool request_stop() const noexcept;
 
 \indexlibrarymember{operator==}{stop_source}%
 \begin{itemdecl}
-bool operator== (const stop_source& lhs, const stop_source& rhs) noexcept;
+[[nodiscard]] bool operator== (const stop_source& lhs, const stop_source& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\returns \tcode{!lhs.stop_possible() \&\& !rhs.stop_possible()} or
@@ -431,7 +425,7 @@ bool operator== (const stop_source& lhs, const stop_source& rhs) noexcept;
 
 \indexlibrarymember{operator!=}{stop_source}%
 \begin{itemdecl}
-bool operator!= (const stop_source& lhs, const stop_source& rhs) noexcept;
+[[nodiscard]] bool operator!= (const stop_source& lhs, const stop_source& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\returns \tcode{!(lhs==rhs)}.
@@ -471,8 +465,8 @@ namespace std {
     [[nodiscard]] bool stop_requested() const noexcept;
     [[nodiscard]] bool stop_possible() const noexcept;
 
-    friend bool operator== (const stop_token& lhs, const stop_token& rhs) noexcept;
-    friend bool operator!= (const stop_token& lhs, const stop_token& rhs) noexcept;
+    friend [[nodiscard]] bool operator== (const stop_token& lhs, const stop_token& rhs) noexcept;
+    friend [[nodiscard]] bool operator!= (const stop_token& lhs, const stop_token& rhs) noexcept;
   };
 }
 \end{codeblock}
@@ -606,7 +600,7 @@ void swap(stop_token& rhs) noexcept;
 
 \indexlibrarymember{operator==}{stop_token}%
 \begin{itemdecl}
-bool operator== (const stop_token& lhs, const stop_token& rhs) noexcept;
+[[nodiscard]] bool operator== (const stop_token& lhs, const stop_token& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\returns \tcode{true} if both \tcode{lhs} and \tcode{rhs} both
@@ -618,7 +612,7 @@ bool operator== (const stop_token& lhs, const stop_token& rhs) noexcept;
 
 \indexlibrarymember{operator!=}{stop_token}%
 \begin{itemdecl}
-bool operator!= (const stop_token& lhs, const stop_token& rhs) noexcept;
+[[nodiscard]] bool operator!= (const stop_token& lhs, const stop_token& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\returns \tcode{!(lhs==rhs)}.
@@ -694,8 +688,9 @@ namespace std {
 {\color{diffcolor}
 \begin{codeblock}
     // stop token handling
-    [[nodiscard]] stop_token get_stop_source() const noexcept;
-    [[nodiscard]] bool request_stop() noexcept;
+    [[nodiscard]] stop_source get_stop_source() noexcept;
+    [[nodiscard]] stop_token get_stop_token() const noexcept;
+    bool request_stop() noexcept;
 \end{codeblock}
 }%\color{diffcolor}
 \begin{codeblock}
@@ -706,7 +701,7 @@ namespace std {
 {\color{diffcolor}
 \begin{codeblock}
   private:
-    stop_token ssource;                 // \expos
+    stop_source ssource;                 // \expos
   };
 \end{codeblock}
 }%\color{diffcolor}
@@ -894,7 +889,7 @@ and \tcode{x.ssource.stop_possible() == false}.
 
 \indexlibrarymember{request_stop}{jthread}%
 \begin{itemdecl}
-[[nodiscard]] bool request_stop() noexcept;
+bool request_stop() noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\effects Equivalent to: \tcode{return ssource.request_stop();}

@@ -92,6 +92,9 @@ on top of the existing C++ standard library without special OS support.
 %**************************
 \subsection*{Basis examples}
 
+%****************
+\subsubsection*{Basis \tcode{jthead} examples}
+
 \begin{itemize}
  \item At the end of its lifetime a \tcode{jthread} automatically signals a request to stop the started thread
         (if still joinable) and joins:
@@ -165,6 +168,32 @@ void testInterruptibleCVWait()
 } // jthread destructor signals stop request and therefore unblocks the CV wait and ends the started thread
 \end{codeblock}
 \end{itemize}
+
+%****************
+\subsubsection*{Basis i\tcode{stop_source}/\tcode{stop_token} examples}
+
+\begin{codeblock}
+// create stop_source and stop_token:
+std::stop_source ssrc;
+std::stop_token stok{ssrc.get_token()};
+
+// register callback
+bool cb1called{false};
+auto cb1 = [&]{ cb1called = true; };
+std::stop_callback scb1{stok, cb1};  // stop_callback holds reference to cb1
+assert(!cb1called);
+
+// request stop
+ssrc.request_stop();                 // calls all currently registered callbacks
+assert(cb1called);
+
+// register another callback
+bool cb2called{false};
+std::stop_callback scb2{stok, 
+                        [&]{ cb2called = true; }
+                       };            // immediately calls callback (moved into scb2)
+assert(cb2called);
+\end{codeblock}
 
 %**************************
 \subsection*{Feature Test Macro}
@@ -295,7 +324,7 @@ and a call to \tcode{request_stop()} being made on another thread which could
 invoke the callback. If the callback has not yet started executing on the other
 thread then the callback is deregistered and is never called. Otherwise, if the
 callback has already started executing on another thread then the call to
-\tcode{~stop_callback()} will block the current thread until the callback returns.
+\tcode{\~stop_callback()} will block the current thread until the callback returns.
 
 If the call to the \tcode{stop_callback} destructor is made from within the the
 invocation of the callback on the same thread then the destructor does not block
