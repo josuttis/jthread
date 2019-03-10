@@ -209,7 +209,7 @@ namespace std {
     [[nodiscard]] stop_token get_token() const noexcept;
     [[nodiscard]] bool stop_possible() const noexcept;
     [[nodiscard]] bool stop_requested() const noexcept;
-    bool request_stop() const noexcept;
+    bool request_stop() noexcept;
 
     friend [[nodiscard]] bool operator== (const stop_source& lhs, const stop_source& rhs) noexcept;
     friend [[nodiscard]] bool operator!= (const stop_source& lhs, const stop_source& rhs) noexcept;
@@ -381,7 +381,7 @@ void swap(stop_source& rhs) noexcept;
 
 \indexlibrarymember{request_stop}{stop_source}%
 \begin{itemdecl}
-bool request_stop() const noexcept;
+bool request_stop() noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   %\pnum\requires \tcode{stop_possible() == true}
@@ -878,10 +878,18 @@ and \tcode{x.ssource.stop_possible() == false}.
 {\color{diffcolor}
 \indexlibrarymember{get_stop_source}{jthread}%
 \begin{itemdecl}
-[[nodiscard]] stop_token get_stop_source() const noexcept
+[[nodiscard]] stop_source get_stop_source() noexcept
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\effects Equivalent to: \tcode{return ssource;}
+\end{itemdescr}
+
+\indexlibrarymember{get_stop_token}{jthread}%
+\begin{itemdecl}
+[[nodiscard]] stop_token get_stop_token() const noexcept
+\end{itemdecl}
+\begin{itemdescr}
+  \pnum\effects Equivalent to: \tcode{return ssource.get_token();}
 \end{itemdescr}
 
 \indexlibrarymember{request_stop}{jthread}%
