@@ -19,7 +19,7 @@ void testJThreadWithout()
   {
     std::jthread::id t1ID{std::this_thread::get_id()};
     std::atomic<bool> t1AllSet{false};
-    std::jthread t1([&t1ID, &t1AllSet] {
+    std::jthread t1([&t1ID, &t1AllSet] {  // NOTE: no stop_token passed
                    // check some values of the started thread:
                    t1ID = std::this_thread::get_id();
                    t1AllSet.store(true);
@@ -38,7 +38,7 @@ void testJThreadWithout()
     // and check all values:
     assert(t1.joinable());
     assert(t1ID == t1.get_id());
-    stoken = t1.get_stop_source().get_token();
+    stoken = t1.get_stop_token();
     assert(!stoken.stop_requested());
   } // leave scope of t1 without join() or detach() (signals cancellation)
   assert(stoken.stop_requested());
@@ -358,6 +358,7 @@ void testJThreadAPI()
   std::stop_source ssourceStolen{std::move(ssource)};
   assert(!ssource.stop_possible());
   assert(ssource == t0.get_stop_source());
+  assert(ssource.get_token() == t0.get_stop_token());
 
   {
     std::jthread::id t1ID{std::this_thread::get_id()};
@@ -386,25 +387,31 @@ void testJThreadAPI()
     assert(t1.joinable());
     assert(t1ID == t1.get_id());
     assert(t1InterruptToken == t1.get_stop_source().get_token());
+    assert(t1InterruptToken == t1.get_stop_token());
     stoken = t1.get_stop_source().get_token();
+    stoken = t1.get_stop_token();
     assert(t1InterruptToken.stop_possible());
     assert(!t1InterruptToken.stop_requested());
     // test swap():
     std::swap(t0, t1);
     assert(!t1.joinable());
     assert(std::stop_token{} == t1.get_stop_source().get_token());
+    assert(std::stop_token{} == t1.get_stop_token());
     assert(t0.joinable());
     assert(t1ID == t0.get_id());
     assert(t1InterruptToken == t0.get_stop_source().get_token());
+    assert(t1InterruptToken == t0.get_stop_token());
     // manual swap with move():
     auto ttmp{std::move(t0)};
     t0 = std::move(t1);
     t1 = std::move(ttmp);
     assert(!t0.joinable());
     assert(std::stop_token{} == t0.get_stop_source().get_token());
+    assert(std::stop_token{} == t0.get_stop_token());
     assert(t1.joinable());
     assert(t1ID == t1.get_id());
     assert(t1InterruptToken == t1.get_stop_source().get_token());
+    assert(t1InterruptToken == t1.get_stop_token());
   } // leave scope of t1 without join() or detach() (signals cancellation)
   assert(stoken.stop_requested());
   std::cout << "\n*** OK" << std::endl;

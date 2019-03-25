@@ -5,6 +5,9 @@
 #include <thread>
 #include <type_traits>
 #include <utility>
+#ifdef SAFE
+#include <iostream>
+#endif
 
 #if defined(__x86_64__) || defined(_M_X64)
 #include <immintrin.h>
@@ -366,12 +369,12 @@ class stop_token {
     return __state_ != nullptr && __state_->__is_stop_requestable();
   }
 
-  friend bool operator==(
+  friend [[nodiscard]] bool operator==(
       const stop_token& __a,
       const stop_token& __b) noexcept {
     return __a.__state_ == __b.__state_;
   }
-  friend bool operator!=(
+  friend [[nodiscard]] bool operator!=(
       const stop_token& __a,
       const stop_token& __b) noexcept {
     return __a.__state_ != __b.__state_;
@@ -455,12 +458,12 @@ class stop_source {
     std::swap(__state_, __other.__state_);
   }
 
-  friend bool operator==(
+  friend [[nodiscard]] bool operator==(
       const stop_source& __a,
       const stop_source& __b) noexcept {
     return __a.__state_ == __b.__state_;
   }
-  friend bool operator!=(
+  friend [[nodiscard]] bool operator!=(
       const stop_source& __a,
       const stop_source& __b) noexcept {
     return __a.__state_ != __b.__state_;
@@ -498,6 +501,11 @@ class [[nodiscard]] stop_callback : private __stop_callback_base {
   }
 
   ~stop_callback() {
+#ifdef SAFE
+    if (__inExecute_.load()) {
+      std::cerr << "*** OOPS: ~stop_callback() while callback executed\n";
+    }
+#endif
     if (__state_ != nullptr) {
       __state_->__remove_callback(this);
     }
@@ -512,11 +520,20 @@ class [[nodiscard]] stop_callback : private __stop_callback_base {
   void __execute() noexcept override {
     // Executed in a noexcept context
     // If it throws then we call std::terminate().
+#ifdef SAFE
+    __inExecute_.store(true);
     __cb_();
+    __inExecute_.store(false);
+#else
+    __cb_();
+#endif
   }
 
   __stop_state* __state_;
   _Callback __cb_;
+#ifdef SAFE
+  std::atomic<bool> __inExecute_{false};
+#endif
 };
 
 // enable:

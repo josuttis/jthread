@@ -62,7 +62,8 @@ class jthread
     //***************************************** 
     // - supplementary API:
     //   - for the calling thread:
-    stop_source get_stop_source() const noexcept;
+    [[nodiscard]] stop_source get_stop_source() noexcept;
+    [[nodiscard]] stop_token get_stop_token() const noexcept;
     bool request_stop() noexcept {
       return get_stop_source().request_stop();
     }
@@ -143,8 +144,11 @@ inline typename jthread::native_handle_type jthread::native_handle() {
   return _thread.native_handle();
 }
 
-inline stop_source jthread::get_stop_source() const noexcept {
+inline stop_source jthread::get_stop_source() noexcept {
   return _stopSource;
+}
+inline stop_token jthread::get_stop_token() const noexcept {
+  return _stopSource.get_token();
 }
 
 void jthread::swap(jthread& t) noexcept {

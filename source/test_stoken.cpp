@@ -40,9 +40,12 @@ void testStopTokenBasicAPI()
                assert(stok.stop_requested());
                cb2called = true;
              };
-  std::stop_callback scb2{stok, cb2};
-  //???std::stop_callback<std::remove_cvref_t<decltype(cb2)>> scb2{stok, cb2};
-  //???std::stop_callback<std::decay_t<decltype(cb2)>> scb2{stok, cb2};
+  //ERROR: std::stop_callback scb2{stok, cb2};
+  //ERROR: ???std::stop_callback<std::remove_cvref_t<decltype(cb2)>> scb2{stok, cb2};
+  //ERROR: std::stop_callback<std::decay_t<decltype(cb2)>> scb2{stok, cb2};
+  //OK: std::stop_callback<decltype(cb2)&> scb2{stok, cb2};
+  //OK:
+  std::stop_callback<decltype(cb2)> scb2{stok, std::move(cb2)};
   assert(ssrc.stop_possible());
   assert(!ssrc.stop_requested());
   assert(stok.stop_possible());
