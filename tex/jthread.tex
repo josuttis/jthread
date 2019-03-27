@@ -211,8 +211,8 @@ namespace std {
     [[nodiscard]] bool stop_requested() const noexcept;
     bool request_stop() noexcept;
 
-    friend [[nodiscard]] bool operator== (const stop_source& lhs, const stop_source& rhs) noexcept;
-    friend [[nodiscard]] bool operator!= (const stop_source& lhs, const stop_source& rhs) noexcept;
+    [[nodiscard]] friend bool operator== (const stop_source& lhs, const stop_source& rhs) noexcept;
+    [[nodiscard]] friend bool operator!= (const stop_source& lhs, const stop_source& rhs) noexcept;
   };
 }
 \end{codeblock}
@@ -461,8 +461,8 @@ namespace std {
     [[nodiscard]] bool stop_requested() const noexcept;
     [[nodiscard]] bool stop_possible() const noexcept;
 
-    friend [[nodiscard]] bool operator== (const stop_token& lhs, const stop_token& rhs) noexcept;
-    friend [[nodiscard]] bool operator!= (const stop_token& lhs, const stop_token& rhs) noexcept;
+    [[nodiscard]] friend bool operator== (const stop_token& lhs, const stop_token& rhs) noexcept;
+    [[nodiscard]] friend bool operator!= (const stop_token& lhs, const stop_token& rhs) noexcept;
   };
 }
 \end{codeblock}
