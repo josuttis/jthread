@@ -28,13 +28,15 @@ inline void __spin_yield() noexcept {
 //-----------------------------------------------
 
 struct __stop_callback_base {
+  void(*__callback_)(void*) = nullptr;
+
   __stop_callback_base* __next_ = nullptr;
   __stop_callback_base** __prev_ = nullptr;
   bool* __isRemoved_ = nullptr;
   std::atomic<bool> __callbackFinishedExecuting_{false};
 
-  virtual void __execute() noexcept = 0;
-  virtual ~__stop_callback_base() {
+  void __execute() noexcept {
+    __callback_(reinterpret_cast<void*>(this));
   }
 };
 
@@ -484,7 +486,10 @@ class [[nodiscard]] stop_callback : private __stop_callback_base {
  public:
   explicit stop_callback(const stop_token& __token, _Callback&& __cb) noexcept(
       std::is_nothrow_move_constructible_v<_Callback>)
-      : __state_(nullptr), __cb_(static_cast<_Callback&&>(__cb)) {
+      : __stop_callback_base{[](void *that) noexcept {
+          static_cast<stop_callback*>(reinterpret_cast<__stop_callback_base*>(that))->__execute();
+        }},
+        __state_(nullptr), __cb_(static_cast<_Callback&&>(__cb)) {
     if (__token.__state_ != nullptr &&
         __token.__state_->__try_add_callback(this, true)) {
       __state_ = __token.__state_;
@@ -493,7 +498,10 @@ class [[nodiscard]] stop_callback : private __stop_callback_base {
 
   explicit stop_callback(stop_token&& __token, _Callback&& __cb) noexcept(
       std::is_nothrow_move_constructible_v<_Callback>)
-      : __state_(nullptr), __cb_(static_cast<_Callback&&>(__cb)) {
+      : __stop_callback_base{[](void *that) noexcept {
+          static_cast<stop_callback*>(reinterpret_cast<__stop_callback_base*>(that))->__execute();
+        }},
+        __state_(nullptr), __cb_(static_cast<_Callback&&>(__cb)) {
     if (__token.__state_ != nullptr &&
         __token.__state_->__try_add_callback(this, false)) {
       __state_ = std::exchange(__token.__state_, nullptr);
@@ -517,7 +525,7 @@ class [[nodiscard]] stop_callback : private __stop_callback_base {
   stop_callback(stop_callback&&) = delete;
 
  private:
-  void __execute() noexcept override {
+  void __execute() noexcept {
     // Executed in a noexcept context
     // If it throws then we call std::terminate().
 #ifdef SAFE
