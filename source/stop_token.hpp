@@ -28,7 +28,7 @@ inline void __spin_yield() noexcept {
 //-----------------------------------------------
 
 struct __stop_callback_base {
-  void(*__callback_)(void*) = nullptr;
+  void(*__callback_)(__stop_callback_base*) = nullptr;
 
   __stop_callback_base* __next_ = nullptr;
   __stop_callback_base** __prev_ = nullptr;
@@ -36,7 +36,7 @@ struct __stop_callback_base {
   std::atomic<bool> __callbackFinishedExecuting_{false};
 
   void __execute() noexcept {
-    __callback_(reinterpret_cast<void*>(this));
+    __callback_(this);
   }
 };
 
@@ -486,8 +486,8 @@ class [[nodiscard]] stop_callback : private __stop_callback_base {
  public:
   explicit stop_callback(const stop_token& __token, _Callback&& __cb) noexcept(
       std::is_nothrow_move_constructible_v<_Callback>)
-      : __stop_callback_base{[](void *that) noexcept {
-          static_cast<stop_callback*>(reinterpret_cast<__stop_callback_base*>(that))->__execute();
+      : __stop_callback_base{[](__stop_callback_base *__that) noexcept {
+          static_cast<stop_callback*>(__that)->__execute();
         }},
         __state_(nullptr), __cb_(static_cast<_Callback&&>(__cb)) {
     if (__token.__state_ != nullptr &&
@@ -498,8 +498,8 @@ class [[nodiscard]] stop_callback : private __stop_callback_base {
 
   explicit stop_callback(stop_token&& __token, _Callback&& __cb) noexcept(
       std::is_nothrow_move_constructible_v<_Callback>)
-      : __stop_callback_base{[](void *that) noexcept {
-          static_cast<stop_callback*>(reinterpret_cast<__stop_callback_base*>(that))->__execute();
+      : __stop_callback_base{[](__stop_callback_base *__that) noexcept {
+          static_cast<stop_callback*>(__that)->__execute();
         }},
         __state_(nullptr), __cb_(static_cast<_Callback&&>(__cb)) {
     if (__token.__state_ != nullptr &&
