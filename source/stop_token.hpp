@@ -38,6 +38,9 @@ struct __stop_callback_base {
   void __execute() noexcept {
     __callback_(this);
   }
+
+ protected:
+  ~__stop_callback_base() = default;
 };
 
 struct __stop_state {
