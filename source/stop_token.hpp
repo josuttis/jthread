@@ -40,6 +40,8 @@ struct __stop_callback_base {
   }
 
  protected:
+  // it shall only by us who deletes this
+  // (workaround for virtual __execute() and destructor)
   ~__stop_callback_base() = default;
 };
 
