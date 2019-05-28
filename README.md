@@ -7,7 +7,7 @@ Draft implementation of the C++ paper P0660
 Author:  Nicolai Josuttis (http://www.josuttis.com/contact.html)
 
 The code examples are licensed under a Creative Commons Attribution 4.0 International License 
-(http://creativecommons.org/licenses/by-sa/4.0/).
+(http://creativecommons.org/licenses/by/4.0/).
 
 TOC:
 ====
