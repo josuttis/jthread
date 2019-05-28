@@ -1,5 +1,5 @@
 # jthread
-C++ class for a joining and cooperative interruptible thread (should become std::jthread) 
+C++ class for a joining and cooperative interruptible thread (should become std::jthread) with stop_token helper
 
 Draft implementation of the C++ paper P0660
   https://wg21.link/p0660
