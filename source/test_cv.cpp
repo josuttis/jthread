@@ -583,6 +583,12 @@ void testManyCV(bool callNotify, bool callInterrupt)
     bool ready = false;
     std::mutex readyMutex;
     std::condition_variable_any2 readyCV;
+
+    std::array<bool,numExtraCV> arrReady{};  // don't forget to initialize with {} here !!!
+    std::array<std::mutex,numExtraCV> arrReadyMutex{};
+    std::array<std::condition_variable_any2,numExtraCV> arrReadyCV{};
+    std::vector<std::jthread> vThreadsDeferred;
+
     std::jthread t0(cvIWait, 0,
                              std::ref(ready), std::ref(readyMutex), std::ref(readyCV),
                              callNotify);
@@ -592,9 +598,6 @@ void testManyCV(bool callNotify, bool callInterrupt)
 
       // starts thread concurrently calling request_stop() for the same token:
       std::cout << "\n- loop to start " << numExtraCV << " threads sharing the token and waiting concurently" << std::endl;
-      std::array<bool,numExtraCV> arrReady{};  // don't forget to initialize with {} here !!!
-      std::array<std::mutex,numExtraCV> arrReadyMutex{};
-      std::array<std::condition_variable_any2,numExtraCV> arrReadyCV{};
 
       std::vector<std::jthread> vThreads;
       for (int idx = 0; idx < numExtraCV; ++idx) {
@@ -635,17 +638,12 @@ void testManyCV(bool callNotify, bool callInterrupt)
         t0.request_stop();
       }
       else {
-        // without detach the destructors of the thgreads will block
-        // BECAUSE: by replacing the usual interrupt token, we have
-        //          disabled ability to signal interrupts via the
-        //          default interrupt token originally attached.
-        //          Thus, the interrupt signal of the destructor of the
-        //          jthread has no effect without any notification.
-        for (auto& t : vThreads) {
-          if (t.joinable()) {
-            t.detach();
-          }
-        }
+        // Move ownership of the threads to a scope that will
+        // destruct after thread t0 has destructed (and thus
+        // signalled cancellation and joined) but before the
+        // condition_variable/mutex/ready-flag objects that
+        // they reference have been destroyed.
+        vThreadsDeferred = std::move(vThreads);
       }
       std::cout << "\n- leaving scope of additional threads" << std::endl;
     } // leave scope of additional threads (already notified/interrupted or detached)
