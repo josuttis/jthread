@@ -1317,10 +1317,10 @@ template <class Lock, class Predicate>
  \pnum\effects Registers \tcode{*this} to get notified on a request to stop on \tcode{stoken}
                 during this call and then equivalent to:
 \begin{codeblock}
-while(!pred() && !stoken.stop_requested()) {
-  wait(lock, [&pred, &stoken] {
-                return pred() || stoken.stop_requested();
-             });
+while (!stoken.stop_requested()) {
+  if (pred())
+    return true;
+  wait(lock);
 }
 return pred();
 \end{codeblock}
@@ -1363,12 +1363,11 @@ template <class Lock, class Clock, class Duration, class Predicate>
  \pnum\effects Registers \tcode{*this} to get notified on a request to stop on \tcode{stoken}
                 during this call and then equivalent to:
 \begin{codeblock}
-while(!pred() && !stoken.stop_requested() && Clock::now() < abs_time) {
-  cv.wait_until(lock,
-                abs_time,
-                [&pred, &stoken] {
-                  return pred() || stoken.stop_requested();
-                });
+while (!stoken.stop_requested()) {
+  if (pred())
+    return true;
+  if (cv.wait_until(lock, abs_time) == cv_status::timeout)
+    return pred();
 }
 return pred();
 \end{codeblock}
