@@ -558,6 +558,6 @@ class [[nodiscard]] stop_callback : private __stop_callback_base {
 };
 
 template<typename _Callback>
-  stop_callback(stop_token, _Callback) -> stop_callback<_Callback>;
+  stop_callback(stop_token, _Callback) -> stop_callback<std::unwrap_reference_t<_Callback>>;
 
 } // namespace std
