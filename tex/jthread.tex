@@ -1315,7 +1315,7 @@ template <class Lock, class Predicate>
 
 %{\color{diffcolor}
  \pnum\effects Registers \tcode{*this} to get notified on a request to stop on \tcode{stoken}
-                during this call and then equivalent to:
+               during this call and then equivalent to:
 \begin{codeblock}
 while (!stoken.stop_requested()) {
   if (pred())
@@ -1372,9 +1372,10 @@ return pred();
 \end{codeblock}
 
 \pnum
-\begin{note} There is no blocking, if \tcode{pred()} is initially \tcode{true}, 
-stoken is not stop_possible, it was already requested to stop, or
-the timeout has already expired. \end{note}
+\begin{note} There is no blocking if
+             \tcode{pred()} is initially \tcode{true}, 
+             \tcode{stoken.stop_requested()} was already \tcode{true} or
+             the timeout has already expired. \end{note}
 
 \pnum
 \begin{note} The returned value indicates whether the predicate evaluates to \tcode{true}
