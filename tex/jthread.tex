@@ -174,7 +174,12 @@ explicit stop_callback(stop_token&& st, C&& cb)
   \pnum\effects Unregisters the callback from the associated shared stop state.
                 The destructor does not block waiting for the execution of another callback registered
                 with the same shared stop state to finish.
-                The return from the invocation of the callback (if any) will strongly happen before \tcode{callback} is destroyed.
+                If \tcode{callback} is concurrently executing on another thread then the return
+                from the invocation of \tcode{callback} will strongly happen before 
+                \tcode{callback} is destroyed.
+                If \tcode{~stop_callback()} is invoked while the invocation of \tcode{callback}
+                is active on the current thread then the destructor does not block waiting
+                for the return from \tcode{callback}.
 \end{itemdescr}
 
 %**************************
