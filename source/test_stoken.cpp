@@ -26,7 +26,7 @@ void testStopTokenBasicAPI()
                cb1called = true;
              };
   {
-  std::stop_callback scb1{stok, cb1};
+  std::stop_callback scb1{stok, cb1}; // copies cb1
   assert(ssrc.stop_possible());
   assert(!ssrc.stop_requested());
   assert(stok.stop_possible());
@@ -40,12 +40,12 @@ void testStopTokenBasicAPI()
                assert(stok.stop_requested());
                cb2called = true;
              };
-  //ERROR: std::stop_callback scb2{stok, cb2};
-  //ERROR: ???std::stop_callback<std::remove_cvref_t<decltype(cb2)>> scb2{stok, cb2};
-  //ERROR: std::stop_callback<std::decay_t<decltype(cb2)>> scb2{stok, cb2};
+  //OK: std::stop_callback scb2{stok, cb2};
+  //OK: std::stop_callback<std::decay_t<decltype(cb2)>> scb2{stok, cb2};
   //OK: std::stop_callback<decltype(cb2)&> scb2{stok, cb2};
   //OK:
-  std::stop_callback<decltype(cb2)> scb2{stok, std::move(cb2)};
+  std::stop_callback<decltype(cb2)> scb2a{stok, cb2}; // copies cb2
+  std::stop_callback<decltype(cb2)> scb2b{stok, std::move(cb2)};
   assert(ssrc.stop_possible());
   assert(!ssrc.stop_requested());
   assert(stok.stop_possible());

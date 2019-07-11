@@ -87,7 +87,7 @@ or \tcode{stop_source} that returns \tcode{true}.
 namespace std {
   // \ref{stop_callback} class \tcode{stop_callback}
   template <Invocable Callback>
-    requires MoveConstructible<Callback>
+    requires Destructible<Callback>
   class stop_callback;
   // \ref{stop_source} class \tcode{stop_source}
   class stop_source;
@@ -109,14 +109,18 @@ namespace std {
 \begin{codeblock}
 namespace std {
   template <Invocable Callback>
-    requires MoveConstructible<Callback>
+    requires Destructible<Callback>
   class stop_callback {
   public:
     // \ref{stop_callback.constr} create, destroy:
-    explicit stop_callback(const stop_token& st, Callback&& cb)
-        noexcept(std::is_nothrow_move_constructible_v<Callback>);
-    explicit stop_callback(stop_token&& st, Callback&& cb)
-        noexcept(std::is_nothrow_move_constructible_v<Callback>);
+    template <typename C>
+        requires Constructible<Callback, C>
+    explicit stop_callback(const stop_token& st, C&& cb)
+        noexcept(std::is_nothrow_constructible_v<Callback, C>);
+    template <typename C>
+        requires Constructible<Callback, C>
+    explicit stop_callback(stop_token&& st, C&& cb)
+        noexcept(std::is_nothrow_constructible_v<Callback, C>);
     ~stop_callback();
 
     stop_callback(const stop_callback&) = delete;
@@ -130,10 +134,7 @@ namespace std {
   };
 
   template <typename Callback>
-  stop_callback(const stop_token&, Callback&&) -> stop_callback<Callback>;
-
-  template <typename Callback>
-  stop_callback(stop_token&&, Callback&&) -> stop_callback<Callback>;
+  stop_callback(stop_token, Callback) -> stop_callback<Callback>;
 }
 \end{codeblock}
 
@@ -142,13 +143,17 @@ namespace std {
 
 \indexlibrary{\idxcode{stop_callback}!constructor}%
 \begin{itemdecl}
-explicit stop_callback(const stop_token& st, Callback&& cb)
-  noexcept(std::is_nothrow_move_constructible_v<Callback>);
-explicit stop_callback(stop_token&& st, Callback&& cb)
-  noexcept(std::is_nothrow_move_constructible_v<Callback>);
+template <typename C>
+  requires Constructible<Callback, C>
+explicit stop_callback(const stop_token& st, C&& cb)
+  noexcept(std::is_nothrow_constructible_v<Callback, C>);
+template <typename C>
+  requires Constructible<Callback, C>
+explicit stop_callback(stop_token&& st, C&& cb)
+  noexcept(std::is_nothrow_constructible_v<Callback, C>);
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Initialises \tcode{callback} with \tcode{static_cast<Callback\&\&>(cb)}.
+  \pnum\effects Initialises \tcode{callback} with \tcode{static_cast<C\&\&>(cb)}.
                 If \tcode{st.stop_requested()} is \tcode{true} then immediately invokes
                 \tcode{static_cast<Callback\&\&>(callback)}
                 with zero arguments in the current thread before the constructor returns.

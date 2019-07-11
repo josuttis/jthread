@@ -215,9 +215,9 @@ TEST(CallbackDeregisteredFromWithinCallbackDoesNotDeadlock)
   std::stop_source src;
   std::optional<std::stop_callback<std::function<void()>>> cb;
 
-  cb.emplace(src.get_token(), std::function<void()>{ [&] {
+  cb.emplace(src.get_token(), [&] {
     cb.reset();
-  }});
+  });
 
   src.request_stop();
 

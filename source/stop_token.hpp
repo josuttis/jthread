@@ -486,27 +486,35 @@ class stop_source {
 //-----------------------------------------------
 
 template <typename _Callback>
-// requires MoveConstructible<_Callback> && Invocable<_Callback>
+// requires Destructible<_Callback> && Invocable<_Callback>
 class [[nodiscard]] stop_callback : private __stop_callback_base {
  public:
-  explicit stop_callback(const stop_token& __token, _Callback&& __cb) noexcept(
-      std::is_nothrow_move_constructible_v<_Callback>)
+  template <
+    typename _C,
+    std::enable_if_t<std::is_constructible_v<_Callback, _C>, int> = 0>
+    // requires Constructible<Callback, C>
+  explicit stop_callback(const stop_token& __token, _C&& __cb) noexcept(
+      std::is_nothrow_constructible_v<_Callback, _C>)
       : __stop_callback_base{[](__stop_callback_base *__that) noexcept {
           static_cast<stop_callback*>(__that)->__execute();
         }},
-        __state_(nullptr), __cb_(static_cast<_Callback&&>(__cb)) {
+        __state_(nullptr), __cb_(static_cast<_C&&>(__cb)) {
     if (__token.__state_ != nullptr &&
         __token.__state_->__try_add_callback(this, true)) {
       __state_ = __token.__state_;
     }
   }
 
-  explicit stop_callback(stop_token&& __token, _Callback&& __cb) noexcept(
-      std::is_nothrow_move_constructible_v<_Callback>)
+  template <
+    typename _C,
+    std::enable_if_t<std::is_constructible_v<_Callback, _C>, int> = 0>
+    // requires Constructible<Callback, C>
+  explicit stop_callback(stop_token&& __token, _C&& __cb) noexcept(
+      std::is_nothrow_constructible_v<_Callback, _C>)
       : __stop_callback_base{[](__stop_callback_base *__that) noexcept {
           static_cast<stop_callback*>(__that)->__execute();
         }},
-        __state_(nullptr), __cb_(static_cast<_Callback&&>(__cb)) {
+        __state_(nullptr), __cb_(static_cast<_C&&>(__cb)) {
     if (__token.__state_ != nullptr &&
         __token.__state_->__try_add_callback(this, false)) {
       __state_ = std::exchange(__token.__state_, nullptr);
@@ -549,13 +557,7 @@ class [[nodiscard]] stop_callback : private __stop_callback_base {
 #endif
 };
 
-// enable:
-//  auto lambda = []{};
-//  std::stop_callback cb{ token, lambda }; // captures by reference
 template<typename _Callback>
-  stop_callback(const stop_token&, _Callback&&) -> stop_callback<_Callback>;
-template<typename _Callback>
-  stop_callback(stop_token&&, _Callback&&) -> stop_callback<_Callback>;
-
+  stop_callback(stop_token, _Callback) -> stop_callback<_Callback>;
 
 } // namespace std

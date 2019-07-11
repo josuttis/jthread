@@ -193,7 +193,7 @@ std::stop_token stok{ssrc.get_token()};
 // register callback
 bool cb1called{false};
 auto cb1 = [&]{ cb1called = true; };
-std::stop_callback scb1{stok, cb1};  // stop_callback holds reference to cb1
+std::stop_callback scb1{stok, cb1};  // stop_callback copies cb1
 assert(!cb1called);
 
 // request stop
@@ -361,11 +361,15 @@ The terminology was carefully selected with the following reasons
         that is shared by both \tcode{stop_source}s and \tcode{stop_token}s.
 \end{itemize}
 
-The deduction guide for \tcode{stop_callback}s enables
-constructing a \tcode{stop_callback} with an lvalue callable:
+The deduction guide for \tcode{stop_callback}s deduces the callback argument such
+that the constructor performs a decay-copy of the callback argument.
+
+If you want to instead capture the callback by reference you can use \tcode{std::ref()} to
+pass a \tcode{std::reference_wrapper<T>} object.
 \begin{codeblock}
 auto lambda = []{};
-std::stop_callback cb{ token, lambda };  // captures by reference
+std::stop_callback cb1{ token, lambda };  // copies the lambda
+std::stop_callback cb2{ token, std::ref(lambda) }; // captures lambda by reference
 \end{codeblock}
 
 Adding a new callback is \tcode{noexcept} (unless moving the passed function throws).

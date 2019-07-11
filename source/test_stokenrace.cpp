@@ -89,13 +89,12 @@ void testCallbackUnregister()
   bool cb1called{false};
   std::optional<std::stop_callback<std::function<void()>>> cb;
   cb.emplace(stok,
-             std::function<void()>{ [&] {
-                                      cb1called = true;
-                                      // remove this lambda in optional while being called
-                                      cb.reset();
-                                      //std::this_thread::sleep_for(5s);
-                                    }
-                                  });
+             [&] {
+                cb1called = true;
+                // remove this lambda in optional while being called
+                cb.reset();
+                //std::this_thread::sleep_for(5s);
+              });
   assert(ssrc.stop_possible());
   assert(!ssrc.stop_requested());
   assert(stok.stop_possible());
@@ -122,10 +121,9 @@ struct RegUnregCB {
 
   void reg(std::stop_token& stok) {
     cb.emplace(stok,
-               std::function<void()>{ [&] {
-                                        called = true;
-                                      }
-                                    });
+               [&] {
+                 called = true;
+               });
   }
   void unreg() {
     cb.reset();
