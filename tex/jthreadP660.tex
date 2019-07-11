@@ -361,18 +361,153 @@ The terminology was carefully selected with the following reasons
         that is shared by both \tcode{stop_source}s and \tcode{stop_token}s.
 \end{itemize}
 
-The deduction guide for \tcode{stop_callback}s deduces the callback argument such
-that the constructor performs a decay-copy of the callback argument.
+\subsubsection*{initialization of \tcode{stop_callback}s}
 
-If you want to instead capture the callback by reference you can use \tcode{std::ref()} to
-pass a \tcode{std::reference_wrapper<T>} object.
+Class \tcode{stop_callback} was carefully designed to be able to accept any callback,
+whether passed as lvalue or rvalue and whether an implicit conversion
+to a specified callback type is requested.
+
+The deduction guide for \tcode{stop_callback}s deduces the callback argument such
+that the constructor performs a decayed copy of the callback argument.
+And because the constructors are function templates,
+type conversions are possible.
+
+Given:
 \begin{codeblock}
-auto lambda = []{};
-std::stop_callback cb1{ token, lambda };  // copies the lambda
-std::stop_callback cb2{ token, std::ref(lambda) }; // captures lambda by reference
+struct implicitArg {
+};
+struct explicitArg {
+};
+struct myCallback {
+  myCallback(implicitArg x);
+  explicit myCallback(explicitArg x);
+  void operator()() const;
+};
 \end{codeblock}
 
-Adding a new callback is \tcode{noexcept} (unless moving the passed function throws).
+we have the following behavior:
+
+\begin{LongTable}{\tcode{stop_callback} initializations}{}{x{.51\hsize}x{.45\hsize}}
+\\ \topline
+\lhdr{Example} &   \rhdr{Behavior} \\ \capsep
+\endfirsthead
+\continuedcaption\\
+\topline
+\lhdr{Example} &   \rhdr{Behavior} \\ \capsep
+\endhead
+
+ \tcode{auto stop = [] \{ ... \}; } \br
+ \tcode{stop_callback  cb\{token, stop\}; }
+  &
+        Constructs copy of \tcode{stop} lambda in \tcode{cb}.
+        \\ \rowsep
+
+ \tcode{auto stop = [] \{ ... \}; } \br
+ \tcode{stop_callback  cb\{token, move(stop)\}; }
+  &
+        Moves \tcode{stop} into \tcode{cb}.
+	\\ \rowsep
+
+ \tcode{auto stop = [] \{ ... \}; } \br
+ \tcode{stop_callback cb\{token, ref(stop)\}; }
+  &
+        Captures lvalue reference to stop in \tcode{cb}.
+        Deduces Callback arg to \tcode{reference_wrapper<lambda>}
+	
+        %???: With Jonathan’s deduction guide suggestion this would deduce
+        %Callback arg to lambda\tcode{\&}.
+        % NO
+        \\ \rowsep
+
+ \tcode{stop_callback cb\{token, [] \{ ... \}\}; }
+  &
+        Move constructs temporary lambda into cb.
+	\\ \rowsep
+
+ \tcode{auto cb = [token] \{     } \br
+ \hspace*{1em}\tcode{function<void()> f;     } \br
+ \hspace*{1em}\tcode{if (cond) \{     } \br
+ \hspace*{2em}\tcode{  f = [] \{ ... \};     } \br
+ \hspace*{1em}\tcode{\} else \{     } \br
+ \hspace*{2em}\tcode{  f = [] \{ ... \};     } \br
+ \hspace*{1em}\tcode{\}     } \br
+ \hspace*{1em}\tcode{return stop_callback\{token, f\};     } \br
+ \tcode{\}();     }
+  &	
+        Initializes \tcode{cb} with a copy of \tcode{f}.
+        Callback arg deduced to be \tcode{function<void()>}
+        \\ \rowsep
+
+ \tcode{stop_callback<function<void()>> cb\{ } \br
+ \hspace*{1em}\tcode{token, [] \{ ... \} } \br
+ \tcode{\}; }
+  &
+        %Constructs a temporary function<void()> from lambda and moves this temporary into cb.
+        Directly constructs function member of \tcode{cb} from lambda.
+        No temporary/move operation.
+        \\ \rowsep
+
+ \tcode{function<void()> f = [] \{ ... \};     } \br
+ \tcode{stop_callback<function<void()>> cb\{token, f\}; } 
+  &
+        %Ill-formed. Cannot bind function<void()>&& parameter to lvalue argument, f.
+        Copies \tcode{f} into \tcode{cb}.
+        \\ \rowsep
+
+ \tcode{function<void()> f = [] \{ ... \};     } \br
+ \tcode{stop_callback cb\{token, f\}; } 
+  &
+        %Ill-formed. Cannot bind function<void()>&& parameter to lvalue argument, f.
+        Copies \tcode{f} into \tcode{cb}.
+        Callback arg deduced to be \tcode{function<void()>}.
+        \\ \rowsep
+
+ \tcode{implicitArg i; } \br
+ \tcode{stop_callback<myCallback> cb\{token, i\}; }
+  &
+        %Implicitly converts ‘i’ to temporary myCallback and moves this into ‘cb’.
+        Directly constructs \tcode{myCallback} member of \tcode{cb} from \tcode{i}.
+        \\ \rowsep
+
+ \tcode{explicitArg e; } \br
+ \tcode{stop_callback<myCallback> cb\{token, e\}; }
+  &
+        %Ill-formed. Cannot implicitly convert ‘e’ to ‘myCallback&&’.
+        %
+        %Either ill-formed (if we constrain constructor parameter with ConvertibleTo<Callback>.
+        %Or it is valid and directly constructs myCallback member of ‘cb’ from ‘e’ if we constrain constructor
+        %parameter with Constructible<Callback, Arg>, possibly marking stop_callback constructor as explicit(!ConvertibleTo<Arg, Callback>)
+        %Or it is valid and directly constructs myCallback member of ‘cb’ from ‘e’ if we constrain constructor parameter with Constructible<Callback, Arg>, possibly marking stop_callback constructor as explicit(!ConvertibleTo<Arg, Callback>)
+        Directly constructs myCallback member of \tcode{cb} from \tcode{e} if we constrain constructor.
+        \\ \rowsep
+
+ \tcode{stop_callback<myCallback> cb =     } \br
+ \hspace*{1em}\tcode{  [\&]() -> stop_callback<myCallback> \{     } \br
+ \hspace*{2em}\tcode{    explicitArg e;     } \br
+ \hspace*{2em}\tcode{    return \{token, e\};     } \br
+ \hspace*{1em}\tcode{  \}();     }
+  &
+        %Currently ill-formed.
+        %All stop_callback constructors are unconditionally explicit.
+        Ill-formed.
+
+        %Would still be ill-formed even if we marked constructor as explicit(!ConvertibleTo<Arg, Callback>)
+        \\ \rowsep
+
+ \tcode{stop_callback<myCallback> cb =     } \br
+ \hspace*{1em}\tcode{  [\&]() -> stop_callback<myCallback> \{     } \br
+ \hspace*{2em}\tcode{    implicitArg i;     } \br
+ \hspace*{2em}\tcode{    return \{token, i\};     } \br
+ \hspace*{1em}\tcode{  \}();     }
+  &
+        %Currently ill-formed.
+        %All stop_callback constructors are unconditionally explicit.
+        Ill-formed.
+
+        %Would become valid if we marked constructor as explicit(!ConvertibleTo<Arg, Callback>)
+        \\ \rowsep
+\end{LongTable}
+ 
 
 %**************************
 \subsection*{Acknowledgements}
