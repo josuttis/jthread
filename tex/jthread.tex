@@ -61,7 +61,7 @@ to stop can be made via any one of potentially multiple associated
 withdrawn (second and subsequent requests to stop have no effect).
 
 \pnum
-Callbacks registered via a \tcode{stop_callback} object is called when
+Callbacks registered via a \tcode{stop_callback} object are called when
 a request to stop is first made by any of the \tcode{stop_source} objects
 associated with the \tcode{stop_token} used to construct the \tcode{stop_callback}.
 
@@ -153,7 +153,7 @@ explicit stop_callback(stop_token&& st, Callback&& cb)
                 \tcode{static_cast<Callback\&\&>(callback)}
                 with zero arguments in the current thread before the constructor returns.
                 Otherwise, the callback is registered with the shared stop state of \tcode{st}
-                such that \tcode{static_cast<Callback\&\&>(callback)} is invoked by first call to \tcode{src.request_stop()}
+                such that \tcode{static_cast<Callback\&\&>(callback)} is invoked by the first call to \tcode{src.request_stop()}
                 on any \tcode{stop_source} instance \tcode{src} that references the same shared stop
                 state as \tcode{st}.
                 If invoking the callback throws an unhandled exception then \tcode{std::terminate()} is called.
@@ -652,7 +652,7 @@ namespace std {
 The class \tcode{jthread} provides a mechanism
 to create a new thread of execution.
 The functionality is the same as for class \tcode{thread} (\ref{thread.thread.class})
-with the additional ability to request to stop and to
+with the additional ability to request that the thread stop and to
 automatically \tcode{join()} the started thread.
 
 {\color{blue}
@@ -1283,14 +1283,10 @@ return wait_until(lock, chrono::steady_clock::now() + rel_time, std::move(pred))
 \rSec3[thread.condvarany.interruptwait]{Interruptable waits}
 
 \pnum
-The following wait functions ensure to stop waiting
+The following wait functions will stop waiting
 as soon as there is a request to stop for the passed \tcode{stop_token}.
-In that case the functions return immediatelly
-(returning \tcode{false} if the predicate evaluates to \tcode{false}). 
-\begin{note} 
-        Because all signatures here call
-        \tcode{stop_requested()}, their calls synchronize with \tcode{request_stop()}.
-      \end{note}
+In that case the functions return immediately,
+returning \tcode{false} if the predicate evaluates to \tcode{false}. 
 
 % Hans Boehm:
 %We then also need some statement for the waiting functions that if they return with an stopped/interrupted status,
@@ -1319,21 +1315,20 @@ template <class Lock, class Predicate>
 
 %{\color{diffcolor}
  \pnum\effects Registers \tcode{*this} to get notified on a request to stop on \tcode{stoken}
-                during this call and then equivalent to:
+               during this call and then equivalent to:
 \begin{codeblock}
-while(!pred() && !stoken.stop_requested()) {
-  wait(lock, [&pred, &stoken] {
-                return pred() || stoken.stop_requested();
-             });
+while (!stoken.stop_requested()) {
+  if (pred())
+    return true;
+  wait(lock);
 }
 return pred();
 \end{codeblock}
 
  \pnum \begin{note} The returned value indicates whether the predicate evaluated to
-        \tcode{true} regardless of whether
-        there was a request to stop. \end{note}
+        \tcode{true} regardless of whether there was a request to stop. \end{note}
 
- \pnum \postconditions \tcode{lock} is locked by the calling thread unless an exception is thrown.
+ \pnum \postconditions \tcode{lock} is locked by the calling thread.
 
  \pnum \remarks
         If the function fails to meet the postcondition, \tcode{terminate()}
@@ -1341,8 +1336,7 @@ return pred();
         \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
 
  \pnum \throws 
-        \tcode{std::bad_alloc} if memory for the internal data structures could not be allocated, or
-        any exception thrown by \tcode{pred}.
+        Any exception thrown by \tcode{pred}.
 
 %}%diffcolor
 
@@ -1368,30 +1362,26 @@ template <class Lock, class Clock, class Duration, class Predicate>
  \pnum\effects Registers \tcode{*this} to get notified on a request to stop on \tcode{stoken}
                 during this call and then equivalent to:
 \begin{codeblock}
-while(!pred() && !stoken.stop_requested() && Clock::now() < abs_time) {
-  cv.wait_until(lock,
-                abs_time,
-                [&pred, &stoken] {
-                  return pred() || stoken.stop_requested();
-                });
+while (!stoken.stop_requested()) {
+  if (pred())
+    return true;
+  if (cv.wait_until(lock, abs_time) == cv_status::timeout)
+    return pred();
 }
 return pred();
 \end{codeblock}
 
 \pnum
-\begin{note} There is no blocking, if \tcode{pred()} is initially \tcode{true}, 
-stoken is not stop_possible, it was already requested to stop, or
-the timeout has already expired. \end{note}
+\begin{note} There is no blocking if
+             \tcode{pred()} is initially \tcode{true}, 
+             \tcode{stoken.stop_requested()} was already \tcode{true} or
+             the timeout has already expired. \end{note}
 
 \pnum
 \begin{note} The returned value indicates whether the predicate evaluates to \tcode{true}
-regardless of whether the timeout was triggered. \end{note}
+regardless of whether the timeout was triggered or a request to stop was made. \end{note}
 
- \pnum \begin{note} The returned value indicates whether the predicate evaluated to
-        \tcode{true} regardless of whether the timeout was triggered
-        or it was requested to stop. \end{note}
-
- \pnum \postconditions \tcode{lock} is locked by the calling thread unless an exception is thrown.
+ \pnum \postconditions \tcode{lock} is locked by the calling thread.
 
  \pnum \remarks
         If the function fails to meet the postcondition, \tcode{terminate()}
@@ -1399,8 +1389,7 @@ regardless of whether the timeout was triggered. \end{note}
         \begin{note} This can happen if the re-locking of the mutex throws an exception. \end{note}
 
  \pnum \throws 
-        \tcode{std::bad_alloc} if memory for the internal data structures could not be allocated,
-        any timeout-related exception\iref{thread.req.timing},
+        Timeout-related exceptions \iref{thread.req.timing},
         or any exception thrown by \tcode{pred}.
 
 %{\color{diffcolor}
