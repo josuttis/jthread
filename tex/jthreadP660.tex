@@ -6,7 +6,7 @@
 \begin{tabular}{@{}ll}
 Project:  	& ISO JTC1/SC22/WG21: Programming Language C++ \\
 Doc No: 	& WG21 P0660R10 \\
-Date: 		& 2019-07-12 \\
+Date: 		& 2019-07-11 \\
 Reply to: 	& Nicolai Josuttis (nico@josuttis.de), \\
                 &         Lewis Baker (lbaker@fb.com) \\
                 &         Billy O'Neal (bion@microsoft.com) \\
@@ -23,7 +23,9 @@ Prev. Version:	& \url{www.wg21.link/P0660R9}, \url{www.wg21.link/P1287R0} \\
 \subsubsection*{New in R10}
 \begin{itemize}
  \item \tcode{stop_callback} has type member \tcode{callback_type}.
- \item \tcode{stop_callback} stores lvalue reference for passed \tcode{std::reference_wapper<>}.
+ \item \tcode{stop_callback} constructor supports copying/conversion of callback.
+ \item \tcode{stop_callback} deduction guide now deduces to decayed type
+       and to lvalue reference for passed \tcode{std::reference_wapper<>}.
  \item Several editorial fixes.
 \end{itemize}
 
@@ -420,7 +422,7 @@ we have the following behavior:
         Captures lvalue reference to stop in \tcode{cb}.
         Deduces \tcode{callback_type} as \tcode{decltype(stop)\&}.
 	
-        %???: With Jonathan’s deduction guide suggestion this would deduce
+        %???: With JonathanÃ‚Â’s deduction guide suggestion this would deduce
         %Callback arg to lambda\tcode{\&}.
         % NO
         \\ \rowsep
@@ -471,20 +473,14 @@ we have the following behavior:
  \tcode{ImplicitArg i; } \br
  \tcode{stop_callback<MyCallback> cb\{token, i\}; }
   &
-        %Implicitly converts ‘i’ to temporary MyCallback and moves this into ‘cb’.
-        Directly constructs \tcode{MyCallback} member of \tcode{cb} from \tcode{i}.
+        %Implicitly converts i to temporary myCallback and moves this into cb.
+        Directly constructs \tcode{myCallback} member of \tcode{cb} from \tcode{i} by calling implicit constructor.
         \\ \rowsep
 
  \tcode{ExplicitArg e; } \br
  \tcode{stop_callback<MyCallback> cb\{token, e\}; }
   &
-        %Ill-formed. Cannot implicitly convert ‘e’ to ‘MyCallback&&’.
-        %
-        %Either ill-formed (if we constrain constructor parameter with ConvertibleTo<Callback>.
-        %Or it is valid and directly constructs MyCallback member of ‘cb’ from ‘e’ if we constrain constructor
-        %parameter with Constructible<Callback, Arg>, possibly marking stop_callback constructor as explicit(!ConvertibleTo<Arg, Callback>)
-        %Or it is valid and directly constructs MyCallback member of ‘cb’ from ‘e’ if we constrain constructor parameter with Constructible<Callback, Arg>, possibly marking stop_callback constructor as explicit(!ConvertibleTo<Arg, Callback>)
-        Directly constructs MyCallback member of \tcode{cb} from \tcode{e}. %if we constrain constructor.
+        Directly constructs myCallback member of \tcode{cb} from \tcode{e} by calling explicit constructor.
         \\ \rowsep
 
  \tcode{stop_callback<MyCallback> cb =     } \br
@@ -495,7 +491,7 @@ we have the following behavior:
   &
         %Currently ill-formed.
         %All stop_callback constructors are unconditionally explicit.
-        Ill-formed.
+        Ill-formed. Implicit construction not supported.
 
         %Would still be ill-formed even if we marked constructor as explicit(!ConvertibleTo<Arg, Callback>)
         \\ \rowsep
@@ -508,7 +504,7 @@ we have the following behavior:
   &
         %Currently ill-formed.
         %All stop_callback constructors are unconditionally explicit.
-        Ill-formed.
+        Ill-formed. Implicit construction not supported.
 
         %Would become valid if we marked constructor as explicit(!ConvertibleTo<Arg, Callback>)
         \\ \rowsep
