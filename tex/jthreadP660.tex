@@ -22,9 +22,11 @@ Prev. Version:	& \url{www.wg21.link/P0660R9}, \url{www.wg21.link/P1287R0} \\
 
 \subsubsection*{New in R10}
 \begin{itemize}
- \item Several editorial fixes requested by Jonathan Wakely.
- \item stop_callback constructor supports copying/conversion of callback.
- \item stop_callback deduction guide now deduces to decayed type.
+ \item \tcode{stop_callback} has type member \tcode{callback_type}.
+ \item \tcode{stop_callback} constructor supports copying/conversion of callback.
+ \item \tcode{stop_callback} deduction guide now deduces to decayed type
+       and to lvalue reference for passed \tcode{std::reference_wapper<>}.
+ \item Several editorial fixes.
 \end{itemize}
 
 \subsubsection*{New in R9}
@@ -363,26 +365,30 @@ The terminology was carefully selected with the following reasons
         that is shared by both \tcode{stop_source}s and \tcode{stop_token}s.
 \end{itemize}
 
-\subsubsection*{initialization of \tcode{stop_callback}s}
+\subsubsection*{Initialization of \tcode{stop_callback}s}
 
 Class \tcode{stop_callback} was carefully designed to be able to accept any callback,
 whether passed as lvalue or rvalue and whether an implicit conversion
 to a specified callback type is requested.
 
-The deduction guide for \tcode{stop_callback}s deduces the callback argument such
-that the constructor performs a decayed copy of the callback argument.
-And because the constructors are function templates,
+The deduction guide for \tcode{stop_callback}s deduces the callback argument type
+(\tcode{callback_type})
+such that the constructor performs a decayed copy of the callback argument
+unless a \tcode{std::reference_wrapper<>} is passed.
+If a \tcode{std::reference_wrapper<>} is passed,
+the callback argument type becomes an lvalue reference.
+Because the constructors are function templates,
 type conversions are possible.
 
 Given:
 \begin{codeblock}
-struct implicitArg {
+struct ImplicitArg {
 };
-struct explicitArg {
+struct ExplicitArg {
 };
-struct myCallback {
-  myCallback(implicitArg x);
-  explicit myCallback(explicitArg x);
+struct MyCallback {
+  MyCallback(ImplicitArg x);
+  explicit MyCallback(ExplicitArg x);
   void operator()() const;
 };
 \end{codeblock}
@@ -414,9 +420,9 @@ we have the following behavior:
  \tcode{stop_callback cb\{token, ref(stop)\}; }
   &
         Captures lvalue reference to stop in \tcode{cb}.
-        Deduces Callback arg to \tcode{reference_wrapper<lambda>}
+        Deduces \tcode{callback_type} as \tcode{decltype(stop)\&}.
 	
-        %???: With Jonathans deduction guide suggestion this would deduce
+        %???: With JonathanÂs deduction guide suggestion this would deduce
         %Callback arg to lambda\tcode{\&}.
         % NO
         \\ \rowsep
@@ -425,6 +431,30 @@ we have the following behavior:
   &
         Move constructs temporary lambda into cb.
 	\\ \rowsep
+
+ \tcode{stop_callback<function<void()>> cb\{ } \br
+ \hspace*{1em}\tcode{token, [] \{ ... \} } \br
+ \tcode{\}; }
+  &
+        %Constructs a temporary function<void()> from lambda and moves this temporary into cb.
+        Directly constructs function member of \tcode{cb} from lambda.
+        No temporary/move operation.
+        \\ \rowsep
+
+ \tcode{function<void()> f = [] \{ ... \};     } \br
+ \tcode{stop_callback cb\{token, f\}; } 
+  &
+        %Ill-formed. Cannot bind function<void()>&& parameter to lvalue argument, f.
+        Copies \tcode{f} into \tcode{cb}.
+        Deduces \tcode{callback_type} as \tcode{function<void()>}.
+        \\ \rowsep
+
+ \tcode{function<void()> f = [] \{ ... \};     } \br
+ \tcode{stop_callback<function<void()>> cb\{token, f\}; } 
+  &
+        %Ill-formed. Cannot bind function<void()>&& parameter to lvalue argument, f.
+        Copies \tcode{f} into \tcode{cb}.
+        \\ \rowsep
 
  \tcode{auto cb = [token] \{     } \br
  \hspace*{1em}\tcode{function<void()> f;     } \br
@@ -437,55 +467,25 @@ we have the following behavior:
  \tcode{\}();     }
   &	
         Initializes \tcode{cb} with a copy of \tcode{f}.
-        Callback arg deduced to be \tcode{function<void()>}
+        Deduces \tcode{callback_type} as \tcode{function<void()>}.
         \\ \rowsep
 
- \tcode{stop_callback<function<void()>> cb\{ } \br
- \hspace*{1em}\tcode{token, [] \{ ... \} } \br
- \tcode{\}; }
+ \tcode{ImplicitArg i; } \br
+ \tcode{stop_callback<MyCallback> cb\{token, i\}; }
   &
-        %Constructs a temporary function<void()> from lambda and moves this temporary into cb.
-        Directly constructs function member of \tcode{cb} from lambda.
-        No temporary/move operation.
-        \\ \rowsep
-
- \tcode{function<void()> f = [] \{ ... \};     } \br
- \tcode{stop_callback<function<void()>> cb\{token, f\}; } 
-  &
-        %Ill-formed. Cannot bind function<void()>&& parameter to lvalue argument, f.
-        Copies \tcode{f} into \tcode{cb}.
-        \\ \rowsep
-
- \tcode{function<void()> f = [] \{ ... \};     } \br
- \tcode{stop_callback cb\{token, f\}; } 
-  &
-        %Ill-formed. Cannot bind function<void()>&& parameter to lvalue argument, f.
-        Copies \tcode{f} into \tcode{cb}.
-        Callback arg deduced to be \tcode{function<void()>}.
-        \\ \rowsep
-
- \tcode{implicitArg i; } \br
- \tcode{stop_callback<myCallback> cb\{token, i\}; }
-  &
-        %Implicitly converts i to temporary myCallback and moves this into cb.
+        %Implicitly converts i to temporary myCallback and moves this into cb.
         Directly constructs \tcode{myCallback} member of \tcode{cb} from \tcode{i} by calling implicit constructor.
         \\ \rowsep
 
- \tcode{explicitArg e; } \br
- \tcode{stop_callback<myCallback> cb\{token, e\}; }
+ \tcode{ExplicitArg e; } \br
+ \tcode{stop_callback<MyCallback> cb\{token, e\}; }
   &
-        %Ill-formed. Cannot implicitly convert e to myCallback&&.
-        %
-        %Either ill-formed (if we constrain constructor parameter with ConvertibleTo<Callback>.
-        %Or it is valid and directly constructs myCallback member of cb from e if we constrain constructor
-        %parameter with Constructible<Callback, Arg>, possibly marking stop_callback constructor as explicit(!ConvertibleTo<Arg, Callback>)
-        %Or it is valid and directly constructs myCallback member of cb from e if we constrain constructor parameter with Constructible<Callback, Arg>, possibly marking stop_callback constructor as explicit(!ConvertibleTo<Arg, Callback>)
         Directly constructs myCallback member of \tcode{cb} from \tcode{e} by calling explicit constructor.
         \\ \rowsep
 
- \tcode{stop_callback<myCallback> cb =     } \br
- \hspace*{1em}\tcode{  [\&]() -> stop_callback<myCallback> \{     } \br
- \hspace*{2em}\tcode{    explicitArg e;     } \br
+ \tcode{stop_callback<MyCallback> cb =     } \br
+ \hspace*{1em}\tcode{  [\&]() -> stop_callback<MyCallback> \{     } \br
+ \hspace*{2em}\tcode{    ExplicitArg e;     } \br
  \hspace*{2em}\tcode{    return \{token, e\};     } \br
  \hspace*{1em}\tcode{  \}();     }
   &
@@ -496,9 +496,9 @@ we have the following behavior:
         %Would still be ill-formed even if we marked constructor as explicit(!ConvertibleTo<Arg, Callback>)
         \\ \rowsep
 
- \tcode{stop_callback<myCallback> cb =     } \br
- \hspace*{1em}\tcode{  [\&]() -> stop_callback<myCallback> \{     } \br
- \hspace*{2em}\tcode{    implicitArg i;     } \br
+ \tcode{stop_callback<MyCallback> cb =     } \br
+ \hspace*{1em}\tcode{  [\&]() -> stop_callback<MyCallback> \{     } \br
+ \hspace*{2em}\tcode{    ImplicitArg i;     } \br
  \hspace*{2em}\tcode{    return \{token, i\};     } \br
  \hspace*{1em}\tcode{  \}();     }
   &

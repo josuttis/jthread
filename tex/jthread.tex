@@ -112,6 +112,8 @@ namespace std {
     requires Destructible<Callback>
   class stop_callback {
   public:
+    using callback_type = Callback;
+
     // \ref{stop_callback.constr} create, destroy:
     template <typename C>
         requires Constructible<Callback, C>
@@ -134,7 +136,7 @@ namespace std {
   };
 
   template <typename Callback>
-  stop_callback(stop_token, Callback) -> stop_callback<Callback>;
+  stop_callback(stop_token, Callback) -> stop_callback<unwrap_reference_t<Callback>>;
 }
 \end{codeblock}
 
@@ -597,7 +599,7 @@ void swap(stop_token& rhs) noexcept;
 \begin{itemdescr}
   \pnum\returns \tcode{false} if a subsequent call to \tcode{stop_requested()} will never return \tcode{true},
                 otherwise \tcode{true}, executed atomically.
-                \begin{note}To retuurn \tcode{true} either a call to \tcode{request_stop()}
+                \begin{note}To return \tcode{true} either a call to \tcode{request_stop()}
                   on an associated \tcode{stop_source} must have already been made or there
                   must still be associated \tcode{stop_source} objects in existence on which
                   a call to \tcode{request_stop()} could potentially be made in future.
@@ -613,10 +615,10 @@ void swap(stop_token& rhs) noexcept;
 [[nodiscard]] bool operator== (const stop_token& lhs, const stop_token& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\returns \tcode{true} if \tcode{!lhs.stop_possible() \&\& !rhs.stop_possible()},
-                \tcode{true} if \tcode{lhs} and \tcode{rhs} share ownership
+  \pnum\returns \tcode{true} if \tcode{lhs} and \tcode{rhs} share ownership
                 of the same stop state
                 (copied or moved from the same initial \tcode{stop_source} object),
+                or if both \tcode{lhs} and \tcode{rhs} have no associated stop state,
                 otherwise \tcode{false}.
 \end{itemdescr}
 

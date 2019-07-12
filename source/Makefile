@@ -1,7 +1,7 @@
 include Makefile.h
 
 default: all
-all:: test_stoken test_stokencb test_stokenrace test_jthread1 test_jthread2
+all:: test_stoken test_stokencb test_stokenrace test_stopcb test_jthread1 test_jthread2
 all:: test_cv test_cvcb test_cvrace test_cvrace_hh test_cvrace_stop test_cvrace_pred test_cvprodcons
 all::
 	@echo ""
@@ -9,6 +9,7 @@ all::
 	@echo "  test_stoken"
 	@echo "  test_stokencb"
 	@echo "  test_stokenrace"
+	@echo "  test_stopcb"
 	@echo "  test_jthread1"
 	@echo "  test_jthread2"
 	@echo "  test_cv"
@@ -45,6 +46,15 @@ test_stokenrace: stop_token.hpp condition_variable_any2.hpp test_stokenrace.cpp 
 
 run_stokenrace: test_stokenrace
 	./test_stokenrace17raw.exe
+
+test_stopcb: stop_token.hpp test_stopcb.cpp test.hpp Makefile
+	$(CXX17) $(CXXFLAGS17) $(INCLUDES) test_stopcb.cpp $(LDFLAGS17) -o $@17raw.exe
+	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@17.exe
+	echo PATH=\"$(PATH17)/bin:$$PATH\" ./$@17raw.exe '$$*' > $@.exe
+	echo "- OK:  $@ and $@17  call  $@17raw.exe"
+
+run_stopcb: test_stopcb
+	./test_stopcb17raw.exe
 
 test_jthread1: stop_token.hpp condition_variable_any2.hpp jthread.hpp test_jthread1.cpp test.hpp Makefile
 	$(CXX17) $(CXXFLAGS17) $(INCLUDES) test_jthread1.cpp $(LDFLAGS17) -o $@17raw.exe
