@@ -15,6 +15,22 @@
 
 namespace std {
 
+#if __cplusplus <= 201703L
+template<typename T>
+struct unwrap_reference {
+  using type = T;
+};
+
+template<typename T>
+struct unwrap_reference<std::reference_wrapper<T>> {
+  using type = T&;
+};
+
+template<class T> using unwrap_reference_t = typename unwrap_reference<T>::type;
+#endif
+
+// workaround for non exitsing unwrap_reference:
+
 inline void __spin_yield() noexcept {
   // TODO: Platform-specific code here
 #if defined(__x86_64__) || defined(_M_X64)
@@ -489,16 +505,19 @@ template <typename _Callback>
 // requires Destructible<_Callback> && Invocable<_Callback>
 class [[nodiscard]] stop_callback : private __stop_callback_base {
  public:
+  using callback_type = _Callback;
+
   template <
-    typename _C,
-    std::enable_if_t<std::is_constructible_v<_Callback, _C>, int> = 0>
+    typename _CB,
+    std::enable_if_t<std::is_constructible_v<_Callback, _CB>, int> = 0>
     // requires Constructible<Callback, C>
-  explicit stop_callback(const stop_token& __token, _C&& __cb) noexcept(
-      std::is_nothrow_constructible_v<_Callback, _C>)
+  explicit stop_callback(const stop_token& __token, _CB&& __cb) noexcept(
+      std::is_nothrow_constructible_v<_Callback, _CB>)
       : __stop_callback_base{[](__stop_callback_base *__that) noexcept {
           static_cast<stop_callback*>(__that)->__execute();
         }},
-        __state_(nullptr), __cb_(static_cast<_C&&>(__cb)) {
+        __state_(nullptr),
+        __cb_(static_cast<_CB&&>(__cb)) {
     if (__token.__state_ != nullptr &&
         __token.__state_->__try_add_callback(this, true)) {
       __state_ = __token.__state_;
@@ -506,15 +525,16 @@ class [[nodiscard]] stop_callback : private __stop_callback_base {
   }
 
   template <
-    typename _C,
-    std::enable_if_t<std::is_constructible_v<_Callback, _C>, int> = 0>
+    typename _CB,
+    std::enable_if_t<std::is_constructible_v<_Callback, _CB>, int> = 0>
     // requires Constructible<Callback, C>
-  explicit stop_callback(stop_token&& __token, _C&& __cb) noexcept(
-      std::is_nothrow_constructible_v<_Callback, _C>)
+  explicit stop_callback(stop_token&& __token, _CB&& __cb) noexcept(
+      std::is_nothrow_constructible_v<_Callback, _CB>)
       : __stop_callback_base{[](__stop_callback_base *__that) noexcept {
           static_cast<stop_callback*>(__that)->__execute();
         }},
-        __state_(nullptr), __cb_(static_cast<_C&&>(__cb)) {
+        __state_(nullptr),
+        __cb_(static_cast<_CB&&>(__cb)) {
     if (__token.__state_ != nullptr &&
         __token.__state_->__try_add_callback(this, false)) {
       __state_ = std::exchange(__token.__state_, nullptr);

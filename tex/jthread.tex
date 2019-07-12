@@ -112,6 +112,8 @@ namespace std {
     requires Destructible<Callback>
   class stop_callback {
   public:
+    using callback_type = Callback;
+
     // \ref{stop_callback.constr} create, destroy:
     template <typename C>
         requires Constructible<Callback, C>
@@ -134,7 +136,7 @@ namespace std {
   };
 
   template <typename Callback>
-  stop_callback(stop_token, Callback) -> stop_callback<Callback>;
+  stop_callback(stop_token, Callback) -> stop_callback<unwrap_reference_t<Callback>>;
 }
 \end{codeblock}
 
