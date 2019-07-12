@@ -177,9 +177,12 @@ int main()
  }
  catch (const std::exception& e) {
    std::cerr << "EXCEPTION: " << e.what() << std::endl;
+   return 1;
  }
  catch (...) {
    std::cerr << "EXCEPTION" << std::endl;
+   return 1;
  }
+ std::cout << "**** all OK\n";
 }
 
