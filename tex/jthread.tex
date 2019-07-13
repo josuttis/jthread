@@ -408,7 +408,7 @@ bool request_stop() noexcept;
                 and all registered callbacks are synchronously called.
                 \begin{note} Requesting to stop includes notifying all condition variables
                              of type \tcode{condition_variable_any}
-                             temporarily registered during an interruptable wait (\ref{thread.condition.stop_source})
+                             temporarily registered during an interruptible wait (\ref{thread.condvarany.interruptwait}).
                              \end{note}
 
   \pnum\postconditions \tcode{!stop_possible() || stop_requested()}
@@ -984,7 +984,7 @@ namespace std {
 \end{codeblock}
 {\color{insertcolor}
 \begin{codeblock}
-    // \ref{thread.condvarany.wait} noninterruptable waits:
+    // \ref{thread.condvarany.wait} noninterruptible waits:
 \end{codeblock}
 }%insertcolor
 \begin{codeblock}
@@ -1096,7 +1096,7 @@ void notify_all() noexcept;
 %*** wait functions:
 
 {\color{insertcolor}
-\rSec3[thread.condvarany.wait]{Noninterruptable waits}
+\rSec3[thread.condvarany.wait]{Noninterruptible waits}
 }
 
 % wait(Lock)
@@ -1292,7 +1292,7 @@ return wait_until(lock, chrono::steady_clock::now() + rel_time, std::move(pred))
 %                    stop_token stoken);
 
 %**************************************
-\rSec3[thread.condvarany.interruptwait]{Interruptable waits}
+\rSec3[thread.condvarany.interruptwait]{Interruptible waits}
 
 \pnum
 The following wait functions will stop waiting
