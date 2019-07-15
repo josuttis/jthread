@@ -87,9 +87,9 @@ void testThreadWithToken()
     ssource = t1.get_stop_source();
     assert(!ssource.stop_requested());
     auto ret = ssource.request_stop();
-    assert(!ret);
-    ret = ssource.request_stop();
     assert(ret);
+    ret = ssource.request_stop();
+    assert(!ret);
     assert(ssource.stop_requested());
     assert(!t1done.load());
     assert(!origsource.stop_requested());

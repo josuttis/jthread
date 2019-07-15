@@ -55,7 +55,7 @@ void testStopTokenBasicAPI()
 
   // request stop
   auto b = ssrc.request_stop();
-  assert(!b);
+  assert(b);
   assert(ssrc.stop_possible());
   assert(ssrc.stop_requested());
   assert(stok.stop_possible());
@@ -64,7 +64,7 @@ void testStopTokenBasicAPI()
   assert(cb2called);
 
   b = ssrc.request_stop();
-  assert(b);
+  assert(!b);
 
   // register another callback
   bool cb3called{false};
@@ -188,9 +188,9 @@ void testStopTokenAPI()
     assert(itStopped.stop_requested());
 
     // request_stop():
-    assert(isNotStopped.request_stop() == false);
     assert(isNotStopped.request_stop() == true);
-    assert(isStopped.request_stop() == true);
+    assert(isNotStopped.request_stop() == false);
+    assert(isStopped.request_stop() == false);
     assert(isNotStopped.stop_requested());
     assert(isStopped.stop_requested());
     assert(itNotStopped.stop_requested());

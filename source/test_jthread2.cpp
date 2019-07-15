@@ -302,22 +302,27 @@ void testConcurrentInterrupt()
    // starts thread concurrently calling request_stop() for the same token:
    std::cout << "\n- loop over " << numThreads << " threads that request_stop() concurrently" << std::endl;
    std::vector<std::jthread> tv;
+   int requestStopNumTrue = 0;
    for (int i = 0; i < numThreads; ++i) {
        std::this_thread::sleep_for(0.1ms);
-       std::jthread t([&t1] {
+       std::jthread t([&t1, &requestStopNumTrue] {
                         printID("- interrupting thread started with id:");
                         for (int i = 0; i < 13; ++i) {
                           std::cout.put('x').flush();
-                          t1.request_stop();
-                          assert(t1.request_stop() == true);
-                          std::this_thread::sleep_for(0.01ms);
+                          requestStopNumTrue += (t1.request_stop() == true);
+                          assert(t1.request_stop() == false);
+                          std::this_thread::sleep_for(0.001ms);
                         }
                       });
        tv.push_back(std::move(t));
    }
+   std::cout << "\n- join interrupting threads" << std::endl;
    for (auto& t : tv) {
        t.join();
    }
+   // only one request to request_stop() should have returned true:
+   std::cout << "\n- requestStopNumTrue: " << requestStopNumTrue << std::endl;
+   assert(requestStopNumTrue == 1);
    std::cout << "\n- signal end" << std::endl;
    is.request_stop();
    std::cout << "\n- destruct jthread t1" << std::endl;

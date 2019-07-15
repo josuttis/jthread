@@ -101,7 +101,7 @@ void exampleProducerConsumer(double prodSec, double consSec, bool interrupt)
             // Found the item I'm looking for. Cancel producer.
             // Whoops, this is being called while holding a lock on mutex 'itemMx'!
             strm << " INTERRUPT";
-            ssource.request_stop();
+            assert(ssource.request_stop() == true);
             return;
           }
         }
@@ -118,7 +118,7 @@ void exampleProducerConsumer(double prodSec, double consSec, bool interrupt)
 
   if (interrupt) {
     std::this_thread::sleep_for(prodSleep*10);
-    ssource.request_stop();
+    assert(ssource.request_stop() == true);
   }
 #ifdef QQQ
   {

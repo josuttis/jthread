@@ -55,7 +55,7 @@ void testCallbackRegister()
   // request stop
   std::cout << "request stop\n";
   auto b = ssrc.request_stop();
-  assert(!b);
+  assert(b);
   assert(ssrc.stop_possible());
   assert(ssrc.stop_requested());
   assert(stok.stop_possible());
@@ -103,7 +103,7 @@ void testCallbackUnregister()
 
   // request stop
   auto b = ssrc.request_stop();
-  assert(!b);
+  assert(b);
   assert(ssrc.stop_possible());
   assert(ssrc.stop_requested());
   assert(stok.stop_possible());

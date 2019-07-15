@@ -91,7 +91,7 @@ struct __stop_state {
 
     if (!__try_lock_and_signal_until_signalled()) {
       // Stop has already been requested.
-      return true;
+      return false;
     }
 
     // Set the 'stop_requested' signal and acquired the lock.
@@ -136,7 +136,7 @@ struct __stop_state {
         // No more items should be added to the queue after we have
         // marked the state as interrupted, only removed from the queue.
         // Avoid acquring/releasing the lock in this case.
-        return false;
+        return true;
       }
 
       __lock();
@@ -144,7 +144,7 @@ struct __stop_state {
 
     __unlock();
 
-    return false;
+    return true;
   }
 
   bool __is_stop_requested() noexcept {

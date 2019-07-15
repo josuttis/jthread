@@ -428,5 +428,9 @@ TEST(CancellationSingleThreadPerformance)
 
 int main()
 {
-  return test_entry::run_all();
+  auto status = test_entry::run_all();
+  if (status == 0) {
+    std::cout << "**** all OK\n";
+  }
+  return status;
 }
