@@ -45,7 +45,7 @@ between threads, as summarized in \tref{thread.lib.summary}.
 %******************************************************************
 \rSec1[thread.stop_token]{Stop Tokens}
 
-\TODO {subsection}
+%\TODO {subsection}
 
 %done: \TODO{plural class name: ... objects}
 %done: \TODO{request_stop() returns true on a state change)
@@ -201,7 +201,7 @@ explicit stop_callback(stop_token&& st, C&& cb)
                 with the associated shared stop state to finish.
                 If \tcode{callback} is concurrently executing on another thread, then the return
                 from the invocation of \tcode{callback} strongly happens before
-                (\ref{intro.races}}
+                (\ref{intro.races})
                 \tcode{callback} is destroyed.
                 If \tcode{callback} is executing on the current thread, then
                 the destructor does not block (\ref{defns.block}) waiting for the return from
@@ -291,7 +291,7 @@ and is not an aggregate.
 stop_source();
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\postconditions \tcode{stop_possible() == true && {stop_requested() == false}.
+  \pnum\postconditions \tcode{stop_possible() == true \&\& stop_requested() == false}.
 
   \pnum\throws \tcode{bad_alloc} if memory could not be allocated for the shared stop state.
 \end{itemdescr}
@@ -858,7 +858,7 @@ synchronizes with the beginning of the invocation of the copy of \tcode{f}.
 
 \pnum\postconditions \tcode{get_id() != id()}.
 {\color{diffcolor}
-                     \tcode{ssource.stop_possible()} is \T{true}.
+                     \tcode{ssource.stop_possible()} is \tcode{true}.
 }
                      \tcode{*this} represents the newly started thread.
 {\color{diffcolor}
@@ -930,7 +930,7 @@ state of \tcode{x} to \tcode{*this} and sets \tcode{x} to a default constructed 
 \postconditions \tcode{x.get_id() == id()} and \tcode{get_id()} returns the value of
 \tcode{x.get_id()} prior to the assignment.
 \tcode{ssource} yields the value of \tcode{x.ssource} prior to the assignment
-and \tcode{x.ssource.stop_possible()\ is \tcode{false}.
+and \tcode{x.ssource.stop_possible()} is \tcode{false}.
 }%\color{diffcolor}
 
 \pnum
