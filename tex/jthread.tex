@@ -54,7 +54,7 @@ between threads, as summarized in \tref{thread.lib.summary}.
 %done: \TODO{== false   =>  is false}
 
 %**************************
-\rSec2[thread.stop_token.syn]{Header \tcode{<stop_token>} synopsis}
+\rSec2[thread.stop_token.intro]{Stop Token Introduction}
 
 \pnum
 This clause describes components that can be used to
@@ -183,11 +183,11 @@ explicit stop_callback(stop_token&& st, C&& cb)
                 is evaluated
                 in the current thread before the constructor returns.
                 Otherwise, the callback is registered with the shared stop state of \tcode{st}
-                such that \tcode{static_cast<Callback\&\&>(callback)} is invoked
+                such that \tcode{static_cast<Callback\&\&>(callback)()} is evaluated
                 by the first call to \tcode{src.request_stop()}
                 on any \tcode{stop_source} instance \tcode{src} that references the associated shared stop
                 state as \tcode{st}.
-                If invoking the callback exists via an exception,
+                If invoking the callback exits via an exception,
                 then \tcode{terminate()} is called.
 
   \pnum\throws Any exception thrown by the initialization of \tcode{callback}.
@@ -206,7 +206,7 @@ explicit stop_callback(stop_token&& st, C&& cb)
                 (\ref{intro.races})
                 \tcode{callback} is destroyed.
                 If \tcode{callback} is executing on the current thread, then
-                the destructor does not block (\ref{defns.block}) waiting for the return from
+                the destructor does not block (\iref{defns.block}) waiting for the return from
                 the invocation of \tcode{callback}.
 
                 %\tcode{callback} is destroyed.
@@ -293,7 +293,7 @@ and is not an aggregate.
 stop_source();
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\postconditions \tcode{stop_possible() == true \&\& stop_requested() == false} is \tcode{true}.
+  \pnum\postconditions \tcode{stop_possible()} \tcode{\&\&} \tcode{!stop_requested()} is \tcode{true}.
 
   \pnum\throws \tcode{bad_alloc} if memory could not be allocated for the shared stop state.
 \end{itemdescr}
@@ -304,7 +304,7 @@ explicit stop_source(nostopstate_t) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\postconditions \tcode{stop_possible()} is \tcode{false}.
-                \begin{note} No resources have to be associated for the state.  \end{note}
+                \begin{note} No resources are associated for the state.  \end{note}
 \end{itemdescr}
 
 %*** special members:
@@ -332,7 +332,7 @@ stop_source(stop_source&& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\postconditions \tcode{*this} contains the old value of \tcode{rhs} and
-                        \tcode{rhs.stop_possible()} is {false}.
+                        \tcode{rhs.stop_possible()} is \tcode{false}.
 \end{itemdescr}
 
 %*****
@@ -344,7 +344,7 @@ stop_source(stop_source&& rhs) noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
- \pnum\effects If \tcode{stop_possible()} and \tcode{*this} is the last owner of the stop state,
+ \pnum\effects If \tcode{stop_possible()} is \tcode{true} and \tcode{*this} is the last owner of the stop state,
                 releases the resources associated with the stop state.
 \end{itemdescr}
 
@@ -393,12 +393,14 @@ void swap(stop_source& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\effects If \tcode{stop_possible()} is \tcode{false}, constructs a \tcode{stop_token} object
-                that does not share a stop state.
+                \tcode{st} that does not share a stop state.
                 Otherwise, constructs a \tcode{stop_token} object \tcode{st}
                 that shares the ownership of the stop state with \tcode{*this}.
 
   \pnum\postconditions \tcode{stop_possible() == st.stop_possible()}
                 and \tcode{stop_requested() == st.stop_requested()}.
+
+  \pnum\returns \tcode{st}.
 \end{itemdescr}
 
 
@@ -447,13 +449,14 @@ bool request_stop() noexcept;
                 the call has no effect. 
                 Otherwise, performs a stop request so that \tcode{stop_requested()} is \tcode{true}
                 and all registered callbacks are synchronously called.
-                The access to \placeholder{x} is an atomic-read-modify-write operation.
+                The access to \placeholder{x} is an atomic read-modify-write operation
+                (\iref{intro.races}).
                 % TODO: NEU
-                If an invocation of a callback exists via an exception 
+                If an invocation of a callback exits via an exception 
                 then \tcode{terminate()} is called.
                 \begin{note} A stop request includes notifying all condition variables
                              of type \tcode{condition_variable_any}
-                             temporarily registered during an interruptible wait (\ref{thread.condvarany.interruptwait}).
+                             temporarily registered during an interruptible wait (\iref{thread.condvarany.interruptwait}).
                              \end{note}
 
   \pnum\postconditions \tcode{!stop_possible() || stop_requested()}
@@ -535,7 +538,7 @@ stop_token() noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\effects Constructs a new \tcode{stop_token} object that can never receive a stop request.
-                \begin{note} Therefore, no resources have to be associated for the state. \end{note}
+                \begin{note} No resources are associated for the state.  \end{note}
 
   \pnum\postconditions \tcode{stop_possible()} is \tcode{false} and 
                        \tcode{stop_requested()} is \tcode{false}.
@@ -549,10 +552,12 @@ stop_token(const stop_token& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   % The 'effects' here seem in conflict with the requirement that *this == rhs is a post-condition.
-  \pnum\effects If \tcode{rhs.stop_possible()} is \tcode{false}, constructs a \tcode{stop_token} object
-                that can never receive a stop request.
-                Otherwise, constructs a \tcode{stop_token}
-                that shares the ownership of the stop state with \tcode{rhs}.
+  \pnum\effects %If \tcode{rhs.stop_possible()} is \tcode{false}, constructs a \tcode{stop_token} object
+                %that can never receive a stop request.
+                %Otherwise, constructs a \tcode{stop_token}
+                %that shares the ownership of the stop state with \tcode{rhs}.
+                Constructs a \tcode{stop_token} that shares the ownership
+                of the stop state with \tcode{rhs}, if any.
 
   \pnum\postconditions \tcode{stop_possible() == rhs.stop_possible()}
                 and \tcode{stop_requested() == rhs.stop_requested()}
@@ -564,8 +569,6 @@ stop_token(const stop_token& rhs) noexcept;
 stop_token(stop_token&& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\effects Move constructs an object of type \tcode{stop_token} from \tcode{rhs}.
-
   \pnum\postconditions \tcode{*this} contains the old value of \tcode{rhs} and
                         \tcode{rhs.stop_possible()} is \tcode{false}.
 \end{itemdescr}
@@ -650,7 +653,7 @@ void swap(stop_token& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\returns \tcode{false} if a subsequent call to \tcode{stop_requested()} will never return \tcode{true},
-                otherwise \tcode{true}, executed atomically.
+                otherwise \tcode{true}.
                 \begin{note}To return \tcode{true} either a call to \tcode{request_stop()}
                   on an associated \tcode{stop_source} must have already been made or there
                   must still be associated \tcode{stop_source} objects in existence on which
@@ -670,7 +673,7 @@ void swap(stop_token& rhs) noexcept;
   \pnum\returns \tcode{true} if \tcode{lhs} and \tcode{rhs} share ownership
                 of the associated stop state
                 (copied or moved from the same initial \tcode{stop_source} object),
-                or if both \tcode{lhs} and \tcode{rhs} have no associated stop state,
+                or if both \tcode{lhs} and \tcode{rhs} have no associated stop state;
                 otherwise \tcode{false}.
 \end{itemdescr}
 
@@ -688,10 +691,6 @@ void swap(stop_token& rhs) noexcept;
 %******************************************************************
 \rSec1[thread.jthreads]{Joining Threads}
 
-\pnum
-\ref{thread.jthreads} describes components that can be used to create and manage threads
-with the ability to
-cooperatively cancel the running thread, by requesting it to stop.
 
 %**************************
 \rSec2[thread.jthread.syn]{Header \tcode{<jthread>} synopsis}
@@ -715,7 +714,7 @@ namespace std {
 \pnum
 The class \tcode{jthread} provides a mechanism
 to create a new thread of execution.
-The functionality is the same as for class \tcode{thread} (\ref{thread.thread.class})
+The functionality is the same as for class \tcode{thread} (\iref{thread.thread.class})
 with the additional ability to request that the thread stop and to
 automatically \tcode{join()} the started thread.
 
@@ -798,18 +797,18 @@ template<class F, class... Args> explicit jthread(F&& f, Args&&... args);
 {\color{diffcolor}
         \tcode{%
                 \placeholdernc{INVOKE}(\brk{}%
-                \placeholdernc{DECAY_COPY}(\brk{}%
+                \placeholdernc{decay-copy}(\brk{}%
                 std::forward<F>(f)),
                 ssource.get_token(),
-                \placeholdernc{DECAY_COPY}(\brk{}%
+                \placeholdernc{decay-copy}(\brk{}%
                 std::forward<Args>(\brk{}args))...)}
         or
 }
         \tcode{%
                 \placeholdernc{INVOKE}(\brk{}%
-                \placeholdernc{DECAY_COPY}(\brk{}%
+                \placeholdernc{decay-copy}(\brk{}%
                 std::forward<F>(f)),
-                \placeholdernc{DECAY_COPY}(\brk{}%
+                \placeholdernc{decay-copy}(\brk{}%
                 std::forward<Args>(\brk{}args))...)}
 \iref{func.require} are valid expressions.
 
@@ -825,35 +824,29 @@ The new thread of execution executes
 {\color{diffcolor}
         \tcode{%
                 \placeholdernc{INVOKE}(\brk{}%
-                \placeholdernc{DECAY_COPY}(\brk{}%
+                \placeholdernc{decay-copy}(\brk{}%
                 std::forward<F>(f)),
                 ssource.get_token(),
-                \placeholdernc{DECAY_COPY}(\brk{}%
+                \placeholdernc{decay-copy}(\brk{}%
                 std::forward<Args>(\brk{}args))...)}
 if that expression is well-formed,
 otherwise
 }
         \tcode{%
                 \placeholdernc{INVOKE}(\brk{}%
-                \placeholdernc{DECAY_COPY}(\brk{}%
+                \placeholdernc{decay-copy}(\brk{}%
                 std::forward<F>(f)),
-                \placeholdernc{DECAY_COPY}(\brk{}%
+                \placeholdernc{decay-copy}(\brk{}%
                 std::forward<Args>(\brk{}args))...)}
 with the calls to
-\tcode{\placeholder{DECAY_COPY}} being evaluated in the constructing thread.
+\tcode{\placeholder{decay-copy}} being evaluated in the constructing thread.
 Any return value from this invocation is ignored.
 \begin{note} This implies that any exceptions not thrown from the invocation of the copy
 of \tcode{f} will be thrown in the constructing thread, not the new thread. \end{note}
-If the invocation
-with \tcode{\placeholdernc{INVOKE}()}
-%of
-%\tcode{%
-%\placeholdernc{INVOKE}(\brk{}%
-%\placeholdernc{DECAY_COPY}(\brk{}%
-%std::forward<F>(f)),
-%\placeholdernc{DECAY_COPY}(\brk{}%
-%std::forward<Args>(args))...)}
-exists via an exception, \tcode{terminate()} is called.
+{\color{diffcolor}
+If the \placeholdernc{INVOKE} expression
+exits via an exception, \tcode{terminate()} is called.
+}
 
 \pnum\sync The completion of the invocation of the constructor
 synchronizes with the beginning of the invocation of the copy of \tcode{f}.
@@ -865,8 +858,8 @@ synchronizes with the beginning of the invocation of the copy of \tcode{f}.
 }
                      \tcode{*this} represents the newly started thread.
 {\color{diffcolor}
-\begin{note} Note that the calling thread can perform a stop request only once,
-                because it can't replace this stop token.  \end{note}
+\begin{note} The calling thread can perform a stop request only once,
+                because it cannot replace this stop token.  \end{note}
 }%\color{diffcolor}
 
 \pnum\throws \tcode{system_error} if unable to start the new thread.
@@ -910,7 +903,6 @@ and \tcode{x.ssource.stop_possible()} is \tcode{false}.
 \begin{itemdescr}
 \pnum
 If \tcode{joinable()} is \tcode{true}, calls \tcode{request_stop()} and \tcode{join()}.
-Otherwise, has no effects.
 \begin{note} Operations on \tcode{*this} are not synchronized. \end{note}
 \end{itemdescr}
 }%\color{diffcolor}
@@ -1059,7 +1051,7 @@ namespace std {
 \end{codeblock}
 {\color{insertcolor}
 \begin{codeblock}
-    // \ref{thread.condvarany.interruptwait} \tcode{stop_token} waits:
+    // \ref{thread.condvarany.interruptwait} interruptible waits:
     template<class Lock, class Predicate>
       bool wait_until(Lock& lock,
                       Predicate pred,
@@ -1379,7 +1371,7 @@ template<class Lock, class Predicate>
 \begin{itemdescr}
 
 %{\color{diffcolor}
- \pnum\effects Registers \tcode{*this} to get notified on a stop request on \tcode{stoken}
+ \pnum\effects Registers for the duration of this call \tcode{*this} to get notified on a stop request on \tcode{stoken}
                during this call and then equivalent to:
 \begin{codeblock}
 while (!stoken.stop_requested()) {
@@ -1424,7 +1416,7 @@ template<class Lock, class Clock, class Duration, class Predicate>
 %}
 
 \begin{itemdescr}
- \pnum\effects Registers \tcode{*this} to get notified on a stop request on \tcode{stoken}
+ \pnum\effects Registers for the duration of this call \tcode{*this} to get notified on a stop request on \tcode{stoken}
                 during this call and then equivalent to:
 \begin{codeblock}
 while (!stoken.stop_requested()) {
