@@ -53,6 +53,8 @@ between threads, as summarized in \tref{thread.lib.summary}.
 %done: \TODO{request stop => perform stop request}
 %done: \TODO{== false   =>  is false}
 
+%**************************
+\rSec2[thread.stop_token.syn]{Header \tcode{<stop_token>} synopsis}
 
 \pnum
 This clause describes components that can be used to
@@ -67,9 +69,9 @@ The last remaining owner of the stop state automatically
 releases the resources associated with the stop state.
 
 \pnum
-A \tcode{stop_token} can be passed to an operation which can
+A \tcode{stop_token} can be passed to an operation which can either
 \begin{itemize}
- \item either actively poll the token to check if there has been a stop request or
+ \item actively poll the token to check if there has been a stop request, or
  \item register a callback using the \tcode{stop_callback} class template which
         will be called in the event that a stop request is made.
 \end{itemize}
@@ -185,7 +187,7 @@ explicit stop_callback(stop_token&& st, C&& cb)
                 by the first call to \tcode{src.request_stop()}
                 on any \tcode{stop_source} instance \tcode{src} that references the associated shared stop
                 state as \tcode{st}.
-                If invoking the callback exists via an exception 
+                If invoking the callback exists via an exception,
                 then \tcode{terminate()} is called.
 
   \pnum\throws Any exception thrown by the initialization of \tcode{callback}.
@@ -255,8 +257,8 @@ namespace std {
     [[nodiscard]] bool stop_requested() const noexcept;
     bool request_stop() noexcept;
 
-    [[nodiscard]] friend bool operator== (const stop_source& lhs, const stop_source& rhs) noexcept;
-    [[nodiscard]] friend bool operator!= (const stop_source& lhs, const stop_source& rhs) noexcept;
+    [[nodiscard]] friend bool operator==(const stop_source& lhs, const stop_source& rhs) noexcept;
+    [[nodiscard]] friend bool operator!=(const stop_source& lhs, const stop_source& rhs) noexcept;
   };
 }
 \end{codeblock}
@@ -291,7 +293,7 @@ and is not an aggregate.
 stop_source();
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\postconditions \tcode{stop_possible() == true \&\& stop_requested() == false}.
+  \pnum\postconditions \tcode{stop_possible() == true \&\& stop_requested() == false} is \tcode{true}.
 
   \pnum\throws \tcode{bad_alloc} if memory could not be allocated for the shared stop state.
 \end{itemdescr}
@@ -465,7 +467,7 @@ bool request_stop() noexcept;
 
 \indexlibrarymember{operator==}{stop_source}%
 \begin{itemdecl}
-[[nodiscard]] bool operator== (const stop_source& lhs, const stop_source& rhs) noexcept;
+[[nodiscard]] bool operator==(const stop_source& lhs, const stop_source& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\returns \tcode{true} if \tcode{!lhs.stop_possible() \&\& !rhs.stop_possible()},
@@ -477,7 +479,7 @@ bool request_stop() noexcept;
 
 \indexlibrarymember{operator!=}{stop_source}%
 \begin{itemdecl}
-[[nodiscard]] bool operator!= (const stop_source& lhs, const stop_source& rhs) noexcept;
+[[nodiscard]] bool operator!=(const stop_source& lhs, const stop_source& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\returns \tcode{!(lhs==rhs)}.
@@ -517,8 +519,8 @@ namespace std {
     [[nodiscard]] bool stop_requested() const noexcept;
     [[nodiscard]] bool stop_possible() const noexcept;
 
-    [[nodiscard]] friend bool operator== (const stop_token& lhs, const stop_token& rhs) noexcept;
-    [[nodiscard]] friend bool operator!= (const stop_token& lhs, const stop_token& rhs) noexcept;
+    [[nodiscard]] friend bool operator==(const stop_token& lhs, const stop_token& rhs) noexcept;
+    [[nodiscard]] friend bool operator!=(const stop_token& lhs, const stop_token& rhs) noexcept;
   };
 }
 \end{codeblock}
@@ -662,7 +664,7 @@ void swap(stop_token& rhs) noexcept;
 
 \indexlibrarymember{operator==}{stop_token}%
 \begin{itemdecl}
-[[nodiscard]] bool operator== (const stop_token& lhs, const stop_token& rhs) noexcept;
+[[nodiscard]] bool operator==(const stop_token& lhs, const stop_token& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\returns \tcode{true} if \tcode{lhs} and \tcode{rhs} share ownership
@@ -674,7 +676,7 @@ void swap(stop_token& rhs) noexcept;
 
 \indexlibrarymember{operator!=}{stop_token}%
 \begin{itemdecl}
-[[nodiscard]] bool operator!= (const stop_token& lhs, const stop_token& rhs) noexcept;
+[[nodiscard]] bool operator!=(const stop_token& lhs, const stop_token& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
   \pnum\returns \tcode{!(lhs==rhs)}.
@@ -782,7 +784,7 @@ jthread() noexcept;
   \pnum\effects Constructs a \tcode{jthread} object that does not represent a thread of execution.
 
   \pnum\postconditions \tcode{get_id() == id()}
-        {\color{diffcolor} and \tcode{ssource.stop_possible()} is \tcode{false}}.
+        {\color{diffcolor} is \tcode{true} and \tcode{ssource.stop_possible()} is \tcode{false}}.
 \end{itemdescr}
 
 \indexlibrary{\idxcode{jthread}!constructor}%
@@ -809,7 +811,7 @@ template<class F, class... Args> explicit jthread(F&& f, Args&&... args);
                 std::forward<F>(f)),
                 \placeholdernc{DECAY_COPY}(\brk{}%
                 std::forward<Args>(\brk{}args))...)}
-\iref{func.require} shall be a valid expression.
+\iref{func.require} are valid expressions.
 
 \pnum\remarks
 This constructor shall not participate in overload resolution if \tcode{remove_cvref_t<F>}
@@ -851,14 +853,15 @@ with \tcode{\placeholdernc{INVOKE}()}
 %std::forward<F>(f)),
 %\placeholdernc{DECAY_COPY}(\brk{}%
 %std::forward<Args>(args))...)}
-terminates with an uncaught exception, \tcode{terminate()} shall be called.
+exists via an exception, \tcode{terminate()} is called.
 
 \pnum\sync The completion of the invocation of the constructor
 synchronizes with the beginning of the invocation of the copy of \tcode{f}.
 
-\pnum\postconditions \tcode{get_id() != id()}.
+\pnum\postconditions \tcode{get_id() != id()}
 {\color{diffcolor}
-                     \tcode{ssource.stop_possible()} is \tcode{true}.
+                     is \tcode{true} and
+                     \tcode{ssource.stop_possible()} is \tcode{true} and
 }
                      \tcode{*this} represents the newly started thread.
 {\color{diffcolor}
@@ -906,7 +909,7 @@ and \tcode{x.ssource.stop_possible()} is \tcode{false}.
 {\color{diffcolor}
 \begin{itemdescr}
 \pnum
-If \tcode{joinable()}, calls \tcode{request_stop()} and \tcode{join()}.
+If \tcode{joinable()} is \tcode{true}, calls \tcode{request_stop()} and \tcode{join()}.
 Otherwise, has no effects.
 \begin{note} Operations on \tcode{*this} are not synchronized. \end{note}
 \end{itemdescr}
