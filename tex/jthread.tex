@@ -11,17 +11,14 @@ threads\iref{intro.multithread}, perform mutual exclusion, and communicate condi
 and values
 between threads, as summarized in \tref{thread.lib.summary}.
 
-\begin{libsumtab}{Thread support library summary}{tab:thread.lib.summary}
+\begin{libsumtab}{Thread support library summary}{tab:thread.summary}
 \ref{thread.req}      & Requirements          &                               \\ \rowsep
-\ref{thread.threads}  & Threads               & \tcode{<thread>}              \\ \rowsep
 \color{insertcolor}
 \ref{thread.stop_token} &
         \color{insertcolor} Stop Tokens       &
                 \color{insertcolor} \tcode{<stop_token>}              \\ \rowsep
 \color{insertcolor}
-\ref{thread.jthreads} &
-        \color{insertcolor} Joining Threads       &
-                \color{insertcolor} \tcode{<jthread>}              \\ \rowsep
+\ref{thread.threads}  & Threads               & \tcode{<thread>}              \\ \rowsep
 \ref{thread.mutex}    & Mutual exclusion      & \tcode{<mutex>}               \\
                       &                       & \tcode{<shared_mutex>}        \\ \rowsep
 \ref{thread.condition}& Condition variables   & \tcode{<condition_variable>}  \\ \rowsep
@@ -30,11 +27,6 @@ between threads, as summarized in \tref{thread.lib.summary}.
 
 %******************************************************************
 \rSec1[thread.req]{Requirements}
-
-...
-
-%******************************************************************
-\rSec1[thread.threads]{Threads}
 
 ...
 
@@ -684,28 +676,45 @@ void swap(stop_token& rhs) noexcept;
   \pnum\returns \tcode{!(lhs==rhs)}.
 \end{itemdescr}
 
+}%\color{insertcolor}
 
 \clearpage
 
 %******************************************************************
-\rSec1[thread.jthreads]{Joining Threads}
+\rSec1[thread.threads]{Threads}
 
+...
 
 %**************************
-\rSec2[thread.jthread.syn]{Header \tcode{<jthread>} synopsis}
-\indexhdr{jthread}%
+\rSec2[thread.syn]{Header \tcode{<thread>} synopsis}
+\indexhdr{thread}%
 
 \begin{codeblock}
-#include <stop_token>
-
 namespace std {
+  class thread;
+
+  void swap(thread& x, thread& y) noexcept;
+\end{codeblock}
+
+{\color{insertcolor}
+\begin{codeblock}
   // \ref{thread.jthread.class} class \tcode{jthread}
   class jthread;
 
   void swap(jthread& x, jthread& y) noexcept;
+\end{codeblock}
+}%\color{insertcolor}
+\begin{codeblock}
+  ...
 }
 \end{codeblock}
 
+%**************************
+\rSec2[thread.thread.class]{Class \tcode{thread}}
+
+...
+
+{\color{insertcolor}
 
 %**************************
 \rSec2[thread.jthread.class]{Class \tcode{jthread}}
@@ -718,7 +727,7 @@ with the additional ability to request that the thread stop and to
 automatically \tcode{join()} the started thread.
 
 {\color{blue}
-[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to class \tcode{std::thread}.} ]
+[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences in behavior to class \tcode{std::thread}.} ]
 }
 
 \indexlibrary{\idxcode{jthread}}%
