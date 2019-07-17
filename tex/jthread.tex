@@ -83,7 +83,7 @@ associated with the \tcode{stop_token} used to construct the \tcode{stop_callbac
 Calls to \tcode{request_stop()}, \tcode{stop_requested()},
 and \tcode{stop_possible()}
 do not introduce data races. 
-A call to \tcode{request_stop()} that return \tcode{true}
+A call to \tcode{request_stop()} that returns \tcode{true}
 synchronizes with a call to \tcode{stop_requested()} on an associated \tcode{stop_token}
 or \tcode{stop_source} that returns \tcode{true}.
 %NEW:
@@ -1484,7 +1484,7 @@ template<class Lock, class Rep, class Period, class Predicate>
 \begin{itemdescr}
  \pnum \effects Equivalent to:
 \begin{codeblock}
-return wait_until(lock, chrono::steady_clock::now() + rel_time, std::move(pred), std::move(stoken));
+return wait_until(lock, chrono::steady_clock::now() + rel_time, move(pred), move(stoken));
 \end{codeblock}
 \end{itemdescr}
 
