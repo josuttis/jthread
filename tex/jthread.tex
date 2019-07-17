@@ -80,7 +80,7 @@ to stop can be made via any associated
 \tcode{stop_source} object and this request will be visible to all associated
 \tcode{stop_token} objects.
 Once a stop request has been made it cannot be
-withdrawn (a second and subsequent stop requests have no effect).
+withdrawn (a subsequent stop request has no effect).
 
 \pnum
 Callbacks registered via a \tcode{stop_callback} object are called when
@@ -278,8 +278,8 @@ inline constexpr nostopstate_t nostopstate(@\unspec@);
 \pnum
 The struct \tcode{nostopstate_t} is an empty class type used as a unique type to indicate the state of
 not containing a shared stop state for \tcode{stop_source} objects.
-In particular, \tcode{stop_source} has a constructor with \tcode{nostopstate_t} as a single argument;
-this indicates that a \tcode{stop_source} object not sharing a stop state is constructed.
+In particular, \tcode{stop_source} has a constructor with \tcode{nostopstate_t} as a single argument type;
+this indicates that a \tcode{stop_source} object is constructed that has no shared stop state.
 
 \pnum
 Type \tcode{nostopstate_t} does not have a default constructor or an initializer-list constructor,
@@ -303,7 +303,8 @@ stop_source();
 explicit stop_source(nostopstate_t) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\postconditions \tcode{stop_possible()} is \tcode{false}.
+  \pnum\postconditions \tcode{stop_possible()} is \tcode{false} and
+                       \tcode{stop_requested()} is \tcode{false}.
                 \begin{note} No resources are associated for the state.  \end{note}
 \end{itemdescr}
 
@@ -322,7 +323,6 @@ stop_source(const stop_source& rhs) noexcept;
   %       could return 'false' if another thread concurrently called request_stop().
   %       Is this a problem putting it in in a post-condition?
   \pnum\postconditions \tcode{stop_possible() == rhs.stop_possible()}
-                and \tcode{stop_requested() == rhs.stop_requested()}
                 and \tcode{*this == rhs}.
 \end{itemdescr}
 
@@ -427,7 +427,7 @@ void swap(stop_source& rhs) noexcept;
 \begin{itemdescr}
   \pnum\returns \tcode{true} if \tcode{stop_possible()} is \tcode{true} 
                 and \tcode{request_stop()} was called by any \tcode{stop_source} object
-                of the associated shared stop state,
+                associated with the same shared stop state,
                 otherwise \tcode{false}.
                 The evaluation of the return value is performed atomically.
 \end{itemdescr}
@@ -559,9 +559,7 @@ stop_token(const stop_token& rhs) noexcept;
                 Constructs a \tcode{stop_token} that shares the ownership
                 of the stop state with \tcode{rhs}, if any.
 
-  \pnum\postconditions \tcode{stop_possible() == rhs.stop_possible()}
-                and \tcode{stop_requested() == rhs.stop_requested()}
-                and \tcode{*this == rhs}.
+  \pnum\postconditions \tcode{*this == rhs}.
 \end{itemdescr}
 
 \indexlibrary{\idxcode{stop_token}!constructor}%
@@ -642,9 +640,10 @@ void swap(stop_token& rhs) noexcept;
   %              otherwise \tcode{false}.
   %              The evaluation of the return value is performed atomically.
 
-  \pnum\sync If \tcode{true} is returned, then synchronizes with the
-             first call to \tcode{request_stop()} on an associated
-             \tcode{stop_source}.
+  % generally covered above:
+  %\pnum\sync If \tcode{true} is returned, then synchronizes with the
+  %           first call to \tcode{request_stop()} on an associated
+  %           \tcode{stop_source}.
 \end{itemdescr}
 
 \indexlibrarymember{stop_possible}{stop_token}%
@@ -652,7 +651,7 @@ void swap(stop_token& rhs) noexcept;
 [[nodiscard]] bool stop_possible() const noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\returns \tcode{false} if a subsequent call to \tcode{stop_requested()} will never return \tcode{true},
+  \pnum\returns \tcode{false} if any subsequent call to \tcode{stop_requested()} will never return \tcode{true},
                 otherwise \tcode{true}.
                 \begin{note}To return \tcode{true} either a call to \tcode{request_stop()}
                   on an associated \tcode{stop_source} must have already been made or there
@@ -886,7 +885,7 @@ jthread(jthread&& x) noexcept;
 \postconditions \tcode{x.get_id() == id()} and \tcode{get_id()} returns the
 value of \tcode{x.get_id()} prior to the start of construction.
 {\color{diffcolor}
-\tcode{ssource} yields the value of \tcode{x.ssource} prior to the start of construction
+\tcode{ssource} has the value of \tcode{x.ssource} prior to the start of construction
 and \tcode{x.ssource.stop_possible()} is \tcode{false}.
 }%\color{diffcolor}
 
@@ -902,7 +901,7 @@ and \tcode{x.ssource.stop_possible()} is \tcode{false}.
 {\color{diffcolor}
 \begin{itemdescr}
 \pnum
-If \tcode{joinable()} is \tcode{true}, calls \tcode{request_stop()} and \tcode{join()}.
+If \tcode{joinable()} is \tcode{true}, calls \tcode{request_stop()} and then \tcode{join()}.
 \begin{note} Operations on \tcode{*this} are not synchronized. \end{note}
 \end{itemdescr}
 }%\color{diffcolor}
@@ -924,7 +923,7 @@ state of \tcode{x} to \tcode{*this} and sets \tcode{x} to a default constructed 
 \pnum
 \postconditions \tcode{x.get_id() == id()} and \tcode{get_id()} returns the value of
 \tcode{x.get_id()} prior to the assignment.
-\tcode{ssource} yields the value of \tcode{x.ssource} prior to the assignment
+\tcode{ssource} has the value of \tcode{x.ssource} prior to the assignment
 and \tcode{x.ssource.stop_possible()} is \tcode{false}.
 }%\color{diffcolor}
 
