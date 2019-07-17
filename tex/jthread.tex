@@ -1484,7 +1484,7 @@ template<class Lock, class Rep, class Period, class Predicate>
 \begin{itemdescr}
  \pnum \effects Equivalent to:
 \begin{codeblock}
-return wait_until(lock, chrono::steady_clock::now() + rel_time, move(pred), move(stoken));
+return wait_until(lock, chrono::steady_clock::now() + rel_time, std::move(pred), std::move(stoken));
 \end{codeblock}
 \end{itemdescr}
 
