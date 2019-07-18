@@ -36,6 +36,7 @@ between threads, as summarized in \tref{thread.lib.summary}.
 
 %******************************************************************
 \rSec1[thread.stop_token]{Stop Tokens}
+%******************************************************************
 
 %\TODO {subsection}
 
@@ -45,6 +46,9 @@ between threads, as summarized in \tref{thread.lib.summary}.
 %done: \TODO{request stop => perform stop request}
 %done: \TODO{== false   =>  is false}
 
+
+%**************************
+% Stop Token Introduction
 %**************************
 \rSec2[thread.stop_token.intro]{Stop Token Introduction}
 
@@ -90,6 +94,8 @@ or \tcode{stop_source} that returns \tcode{true}.
 Registration of a callback synchronizes with the invocation of that callback.
 
 
+%**************************
+% <stop_token> Synopsis
 %**************************
 \rSec2[thread.stop_token.syn]{Header \tcode{<stop_token>} synopsis}
 \indexhdr{stop_token}%
@@ -155,7 +161,9 @@ namespace std {
 \end{codeblock}
 
 
-%*****
+%*******************
+%*** stop_token constructors
+%*******************
 \rSec3[stop_token.constr]{\tcode{stop_token} constructors}
 
 \indexlibrary{\idxcode{stop_token}!constructor}%
@@ -197,7 +205,9 @@ stop_token(stop_token&& rhs) noexcept;
                         \tcode{rhs.stop_possible()} is \tcode{false}.
 \end{itemdescr}
 
-%*****
+%*******************
+%*** stop_token destructor
+%*******************
 \rSec3[stop_token.destr]{\tcode{stop_token} destructor}
 
 \indexlibrary{\idxcode{stop_token}!destructor}%
@@ -210,7 +220,9 @@ stop_token(stop_token&& rhs) noexcept;
                 releases the resources associated with the shared stop state.
 \end{itemdescr}
 
-%*****
+%*******************
+%*** stop_token assignment
+%*******************
 \rSec3[stop_token.assign]{\tcode{stop_token} assignment}
 
 \indexlibrarymember{operator=}{stop_token}%
@@ -233,7 +245,9 @@ stop_token& operator=(stop_token&& rhs) noexcept;
   \pnum\returns \tcode{*this}.
 \end{itemdescr}
 
-%*****
+%*******************
+%*** stop_token swap
+%*******************
 \rSec3[stop_token.swap]{\tcode{stop_token} swap}
 
 \indexlibrarymember{swap}{stop_token}%
@@ -247,7 +261,9 @@ void swap(stop_token& rhs) noexcept;
 \end{itemdescr}
 
 
-%*****
+%*******************
+%*** stop_token members
+%*******************
 \rSec3[stop_token.mem]{\tcode{stop_token} members}
 
 \indexlibrarymember{stop_requested}{stop_token}%
@@ -287,7 +303,9 @@ void swap(stop_token& rhs) noexcept;
 \end{itemdescr}
 
 
-%*****
+%*******************
+%*** stop_token comparisons
+%*******************
 \rSec3[stop_token.cmp]{\tcode{stop_token} comparisons}
 
 \indexlibrarymember{operator==}{stop_token}%
@@ -356,7 +374,9 @@ namespace std {
 }
 \end{codeblock}
 
-%***** nostopstate_t
+%*******************
+%*** No-shared-stop-state indicator nostopstate_t
+%*******************
 \rSec3[stop_source.nostopstate]{No-shared-stop-state indicator}
 
 % double check nullopt_t
@@ -378,7 +398,9 @@ this indicates that a \tcode{stop_source} object is constructed that has no shar
 Type \tcode{nostopstate_t} does not have a default constructor or an initializer-list constructor,
 and is not an aggregate.
 
-%***** constructors
+%*******************
+%*** stop_source constructors
+%*******************
 \rSec3[stop_source.constr]{\tcode{stop_source} constructors}
 
 \indexlibrary{\idxcode{stop_source}!constructor}%
@@ -428,7 +450,9 @@ stop_source(stop_source&& rhs) noexcept;
                         \tcode{rhs.stop_possible()} is \tcode{false}.
 \end{itemdescr}
 
-%*****
+%*******************
+%*** stop_source destructor
+%*******************
 \rSec3[stop_source.destr]{\tcode{stop_source} destructor}
 
 \indexlibrary{\idxcode{stop_source}!destructor}%
@@ -441,7 +465,9 @@ stop_source(stop_source&& rhs) noexcept;
                 releases the resources associated with the stop state.
 \end{itemdescr}
 
-%*****
+%*******************
+%*** stop_source assignment
+%*******************
 \rSec3[stop_source.assign]{\tcode{stop_source} assignment}
 
 \indexlibrarymember{operator=}{stop_source}%
@@ -464,7 +490,9 @@ stop_source& operator=(stop_source&& rhs) noexcept;
   \pnum\returns \tcode{*this}.
 \end{itemdescr}
 
-%*****
+%*******************
+%*** stop_source swap
+%*******************
 \rSec3[stop_source.swap]{\tcode{stop_source} swap}
 
 \indexlibrarymember{swap}{stop_source}%
@@ -477,7 +505,9 @@ void swap(stop_source& rhs) noexcept;
 \end{itemdescr}
 
 
-%***** get_token()
+%*******************
+%*** stop_source members
+%*******************
 \rSec3[stop_source.mem]{\tcode{stop_source} members}
 
 \indexlibrarymember{get_token}{stop_source}%
@@ -558,7 +588,9 @@ bool request_stop() noexcept;
 \end{itemdescr}
 
 
-%*****
+%*******************
+%*** stop_source comparisons
+%*******************
 \rSec3[stop_source.cmp]{\tcode{stop_source} comparisons}
 
 \indexlibrarymember{operator==}{stop_source}%
@@ -624,7 +656,9 @@ namespace std {
 }
 \end{codeblock}
 
-%*****
+%*******************
+%*** stop_callback constructors and destructor
+%*******************
 \rSec3[stop_callback.constr]{\tcode{stop_callback} constructors and destructor}
 
 \indexlibrary{\idxcode{stop_callback}!constructor}%
@@ -686,9 +720,12 @@ explicit stop_callback(stop_token&& st, C&& cb)
 
 %******************************************************************
 \rSec1[thread.threads]{Threads}
+%******************************************************************
 
 ...
 
+%**************************
+% <thread> synopsis
 %**************************
 \rSec2[thread.syn]{Header \tcode{<thread>} synopsis}
 \indexhdr{thread}%
@@ -714,13 +751,17 @@ namespace std {
 \end{codeblock}
 
 %**************************
+% Class thread
+%**************************
 \rSec2[thread.thread.class]{Class \tcode{thread}}
 
 ...
 
-{\color{insertcolor}
 
 %**************************
+% Class jthread
+%**************************
+{\color{insertcolor}
 \rSec2[thread.jthread.class]{Class \tcode{jthread}}
 
 \pnum
@@ -731,7 +772,9 @@ with the additional ability to request that the thread stop and to
 automatically \tcode{join()} the started thread.
 
 {\color{blue}
-[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences in behavior to class \tcode{std::thread}.} ]
+[{\itshape{}Editorial note:} 
+                \color{diffcolor}This color signals differences in behavior
+                compared to class \tcode{std::thread} ]
 }
 
 \indexlibrary{\idxcode{jthread}}%
@@ -784,7 +827,17 @@ namespace std {
 }
 \end{codeblock}
 
+%%{\color{blue}
+%[{\itshape{}Editorial note:} {After the synopsis, copy the whole description from 
+%                [thread.thread.constr] til [thread.thread.algorithm]
+%                using \tcode{jthread} instead of \tcode{thread}
+%                and apply the \color{diffcolor}differences signaled}. ]
+%}
 
+
+%*******************
+%*** jthread constructors
+%*******************
 \rSec3[thread.jthread.constr]{\tcode{jthread} constructors}
 
 \indexlibrary{\idxcode{jthread}!constructor}%
@@ -904,6 +957,9 @@ and \tcode{x.ssource.stop_possible()} is \tcode{false}.
 
 \end{itemdescr}
 
+%*******************
+%*** jthread destructor
+%*******************
 \rSec3[thread.jthread.destr]{\tcode{jthread} destructor}
 
 \indexlibrary{\idxcode{jthread}!destructor}%
@@ -919,6 +975,9 @@ If \tcode{joinable()} is \tcode{true}, calls \tcode{request_stop()} and then \tc
 \end{itemdescr}
 }%\color{diffcolor}
 
+%*******************
+%*** jthread assignment
+%*******************
 \rSec3[thread.jthread.assign]{\tcode{jthread} assignment}
 
 \indexlibrarymember{operator=}{jthread}%
@@ -945,9 +1004,108 @@ and \tcode{x.ssource.stop_possible()} is \tcode{false}.
 \end{itemdescr}
 
 
+%*******************
+%*** jthread stop members
+%*******************
+\rSec3[thread.jthread.member]{Members}
+
+\indexlibrarymember{swap}{jthread}%
+\begin{itemdecl}
+void swap(jthread& x) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Swaps the state of \tcode{*this} and \tcode{x}.
+\end{itemdescr}
+
+\indexlibrarymember{joinable}{jthread}%
+\begin{itemdecl}
+bool joinable() const noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\returns \tcode{get_id() != id()}.
+\end{itemdescr}
+
+\indexlibrarymember{join}{jthread}%
+\begin{itemdecl}
+void join();
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects\ Blocks until the thread represented by \tcode{*this} has completed.
+
+\pnum
+\sync The completion of the thread represented by \tcode{*this} synchronizes with\iref{intro.multithread}
+the corresponding successful
+\tcode{join()} return. \begin{note} Operations on
+\tcode{*this} are not synchronized. \end{note}
+
+\pnum
+\ensures The thread represented by \tcode{*this} has completed. \tcode{get_id() == id()}.
+
+\pnum
+\throws \tcode{system_error} when
+an exception is required\iref{thread.req.exception}.
+
+\pnum
+\errors
+\begin{itemize}
+\item \tcode{resource_deadlock_would_occur} --- if deadlock is detected or
+\tcode{get_id() == this_thread::\brk{}get_id()}.
+
+\item \tcode{no_such_process} --- if the thread is not valid.
+
+\item \tcode{invalid_argument} --- if the thread is not joinable.
+\end{itemize}
+\end{itemdescr}
+
+\indexlibrarymember{detach}{jthread}%
+\begin{itemdecl}
+void detach();
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects The thread represented by \tcode{*this} continues execution without the calling thread
+blocking. When \tcode{detach()} returns, \tcode{*this} no longer represents the possibly continuing
+thread of execution. When the thread previously represented by \tcode{*this} ends execution, the
+implementation shall release any owned resources.
+
+\pnum\ensures \tcode{get_id() == id()}.
+
+\pnum\throws \tcode{system_error} when
+an exception is required\iref{thread.req.exception}.
+
+\pnum \errors
+\begin{itemize}
+\item \tcode{no_such_process} --- if the thread is not valid.
+\item \tcode{invalid_argument} --- if the thread is not joinable.
+\end{itemize}
+\end{itemdescr}
+
+\indexlibrarymember{get_id}{jthread}%
+\begin{itemdecl}
+id get_id() const noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\returns A default constructed \tcode{id} object if \tcode{*this} does not represent a thread,
+otherwise \tcode{this_thread::get_id()} for the thread of execution represented by
+\tcode{*this}.
+\end{itemdescr}
+
+
+%*******************
+%*** jthread stop members
+%*******************
+{\color{diffcolor}
 \rSec3[thread.jthread.stop]{\tcode{jthread} stop members}
 
-{\color{diffcolor}
 \indexlibrarymember{get_stop_source}{jthread}%
 \begin{itemdecl}
 [[nodiscard]] stop_source get_stop_source() noexcept
@@ -973,25 +1131,35 @@ bool request_stop() noexcept;
 \end{itemdescr}
 }%\color{diffcolor}
 
-%\rSec3[thread.jthread.static]{\tcode{jthread} static members}
-%
-%\indexlibrarymember{hardware_concurrency}{thread}%
-%\begin{itemdecl}
-%unsigned hardware_concurrency() noexcept;
-%\end{itemdecl}
-%\begin{itemdescr}
-%  \pnum\effects Equivalent to: \tcode{return thread::hardware_concurrency()}.
-%\end{itemdescr}
-%
-%\rSec3[thread.jthread.algorithm]{\tcode{jthread} specialized algorithms}
-%
-%\indexlibrarymember{swap}{jthread}%
-%\begin{itemdecl}
-%void swap(jthread& x, jthread& y) noexcept;
-%\end{itemdecl}
-%\begin{itemdescr}
-%  \pnum\effects As if by \tcode{x.swap(y)}.
-%\end{itemdescr}
+
+
+% Static members
+\rSec3[thread.jthread.static]{Static members}
+
+\indexlibrarymember{hardware_concurrency}{jthread}%
+\begin{itemdecl}
+unsigned hardware_concurrency() noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\returns The number of hardware thread contexts. \begin{note} This value should
+only be considered to be a hint. \end{note} If this value is not computable or
+well-defined, an implementation should return 0.
+\end{itemdescr}
+
+% specialized algorithms
+\rSec3[thread.jthread.algorithm]{Specialized algorithms}
+
+\indexlibrarymember{swap}{jjthread}%
+\begin{itemdecl}
+void swap(jthread& x, jthread& y) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum\effects As if by \tcode{x.swap(y)}.
+\end{itemdescr}
+
 
 }%\color{insertcolor}
 
@@ -1000,11 +1168,13 @@ bool request_stop() noexcept;
 
 %******************************************************************
 \rSec1[thread.mutex]{Mutual exclusion}
+%******************************************************************
 
 ...
 
 %******************************************************************
 \rSec1[thread.condition]{Condition variables}
+%******************************************************************
 
 ...
 
@@ -1020,6 +1190,9 @@ bool request_stop() noexcept;
 
 ...
 
+%**************************
+% Class conition_variable_any
+%**************************
 \rSec2[thread.condition.condvarany]{Class \tcode{condition_variable_any}}
 
 ...
@@ -1149,9 +1322,9 @@ void notify_all() noexcept;
 \end{itemdescr}
 
 
-%**************************************
-%*** wait functions:
-
+%*******************
+%*** Noninteruptible Waits
+%*******************
 {\color{insertcolor}
 \rSec3[thread.condvarany.wait]{Noninterruptible waits}
 }
@@ -1325,30 +1498,11 @@ return wait_until(lock, chrono::steady_clock::now() + rel_time, std::move(pred))
 
 \clearpage
 
-%**********************************************************
-%\begin{codeblock}
-%******************
-%* NEW:
-%******************
-%\end{codeblock}
+
+%*******************
+%*** Interuptible Waits
+%*******************
 {\color{insertcolor}
-
-%    template<class Lock, class Predicate>
-%      bool wait_until(Lock& lock,
-%                      Predicate pred,
-%                      stop_token stoken);
-%    template<class Lock, class Clock, class Duration, class Predicate>
-%      bool wait_until(Lock& lock,
-%                      const chrono::time_point<Clock, Duration>& abs_time
-%                      Predicate pred,
-%                      stop_token stoken);
-%    template<class Lock, class Rep, class Period, class Predicate>
-%      bool wait_for(Lock& lock,
-%                    const chrono::duration<Rep, Period>& rel_time,
-%                    Predicate pred,
-%                    stop_token stoken);
-
-%**************************************
 \rSec3[thread.condvarany.interruptwait]{Interruptible waits}
 
 \pnum
@@ -1495,6 +1649,7 @@ return wait_until(lock, chrono::steady_clock::now() + rel_time, std::move(pred),
 %
 %%******************************************************************
 %\rSec1[futures]{Futures}
+%%******************************************************************
 %
 %...
 
