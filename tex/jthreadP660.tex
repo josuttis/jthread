@@ -6,7 +6,7 @@
 \begin{tabular}{@{}ll}
 Project:  	& ISO JTC1/SC22/WG21: Programming Language C++ \\
 Doc No: 	& WG21 P0660R10 \\
-Date: 		& 2019-07-11 \\
+Date: 		& 2019-07-18 \\
 Reply to: 	& Nicolai Josuttis (nico@josuttis.de), \\
                 &         Lewis Baker (lbaker@fb.com) \\
                 &         Billy O'Neal (bion@microsoft.com) \\
@@ -25,8 +25,7 @@ Prev. Version:	& \url{www.wg21.link/P0660R9}, \url{www.wg21.link/P1287R0} \\
  \item \tcode{request_stop()} returns whether the stop state was changed.
  \item \tcode{stop_callback} has type member \tcode{callback_type}.
  \item \tcode{stop_callback} constructor supports copying/conversion of callback.
- \item \tcode{stop_callback} deduction guide now deduces to decayed type
-       and to lvalue reference for passed \tcode{std::reference_wapper<>}.
+ \item \tcode{stop_callback} deduction guide now deduces to decayed type.
  \item Class \tcode{jthread} is now part of header \tcode{<thread>}.
  \item Copy missing definitions from class \tcode{std::thread} to class \tcode{std::jthread}.
  \item Extend cross references to \tcode{std::thread}.
@@ -378,10 +377,7 @@ to a specified callback type is requested.
 
 The deduction guide for \tcode{stop_callback}s deduces the callback argument type
 (\tcode{callback_type})
-such that the constructor performs a decayed copy of the callback argument
-unless a \tcode{std::reference_wrapper<>} is passed.
-If a \tcode{std::reference_wrapper<>} is passed,
-the callback argument type becomes an lvalue reference.
+such that the constructor performs a decayed copy of the callback argument.
 Because the constructors are function templates,
 type conversions are possible.
 
@@ -425,7 +421,7 @@ we have the following behavior:
  \tcode{stop_callback cb\{token, std::ref(stop)\}; }
   &
         Captures lvalue reference to stop in \tcode{cb}.
-        Deduces \tcode{callback_type} as \tcode{decltype(stop)\&}.
+        Deduces \tcode{callback_type} as \tcode{std::reference_wrapper<decltype(stop)>}.
 	
         %???: With JonathanÂs deduction guide suggestion this would deduce
         %Callback arg to lambda\tcode{\&}.

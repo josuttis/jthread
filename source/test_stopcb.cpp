@@ -41,8 +41,8 @@ void testStopCallbackInits()
   auto stop12 = [] { std::cout << "stop12\n"; };
   std::stop_callback cb12{token, std::ref(stop12)};
   static_assert(std::is_same_v<decltype(cb12)::callback_type,
-                               decltype(stop12)&>);
-  static_assert(std::is_reference_v<decltype(cb12)::callback_type>);
+                               std::reference_wrapper<decltype(stop12)>>);
+  static_assert(!std::is_reference_v<decltype(cb12)::callback_type>);
 
   std::cout << "-----\n";
   std::stop_callback cb13{token,
