@@ -1,5 +1,5 @@
 %!TEX root = std.tex
-\setcounter{chapter}{29}
+\setcounter{chapter}{31}
 \rSec0[thread]{Thread support library}
 
 %******************************************************************
@@ -1645,11 +1645,81 @@ return wait_until(lock, chrono::steady_clock::now() + rel_time, std::move(pred),
 }%\color{insertcolor}
 
 
-%\vspace{1ex}
+\clearpage
+
+%******************************************************************
+\rSec1[]{Other Fixes}
+%******************************************************************
+
+{\color{blue}
+In [intro.progress]/8:
+}
+
+It is implementation-defined whether the implementation-created thread of execution that executes main
+(6.8.3.1) and the threads of execution created by \tcode{std::thread} (32.3.2) 
+{\color{insertcolor}
+or \tcode{std::jthread} \iref{thread.jthread.class}
+}%\color{insertcolor}
+provide concurrent forward progress
+guarantees.
+
+
+%[except.terminate]:1.13:
+%when execution of the initial function of a thread exits via an exception (32.3.2.2), or
+
+
+{\color{blue}
+In [coroutine.handle.resumption]/1:
+}
+
+Resuming a coroutine via resume, operator(), or destroy on an execution agent other than the one on
+which it was suspended has implementation-defined behavior unless each execution agent is either an instance
+of \tcode{std::thread}
+{\color{insertcolor}
+, or \tcode{std::jthread}, 
+}%\color{insertcolor}
+or the thread that executes main.
+
+
+{\color{blue}
+In [algorithms.parallel.exec]/6:
+}
+
+The invocations of element access functions in parallel algorithms invoked with an execution policy object
+of type execution::parallel_policy are permitted to execute either in the invoking thread of execution
+or in a thread of execution implicitly created by the library to support parallel algorithm execution. If the
+threads of execution created by \tcode{thread} (32.3.2) 
+{\color{insertcolor}
+or \tcode{std::jthread} \iref{thread.jthread.class}
+}%\color{insertcolor}
+provide concurrent forward progress guarantees (6.8.2.2),
+then a thread of execution implicitly created by the library will provide parallel forward progress guarantees;
+otherwise, the provided forward progress guarantee is implementation-defined.
+
+
+{\color{blue}
+In [cfenv.syn]/2:
+}
+
+The floating-point environment has thread storage duration (6.6.5.2). The initial state for a thread’s
+floating-point environment is the state of the floating-point environment of the thread that constructs the
+corresponding \tcode{}thread object (32.3.2) 
+{\color{insertcolor}
+or \tcode{jthread} object \iref{thread.jthread.class}
+}%\color{insertcolor}
+at the time it constructed the object.
+
+
+%32.6.9[futures.async]/3.1
+%If launch::async is set in policy, calls INVOKE(decay-copy(std::forward<F>(f)), decaycopy(
+%std::forward<Args>(args))...) (20.14.3, 32.3.2.2) as if in a new thread of execution
+%represented by a thread object with the calls to decay-copy being evaluated in the thread that
+%called async.
+
+
+%Additionally, in 32.3.2[thread.thread.class]/1, there is wording that a std::thread object uniquely represents a thread of execution.  I don't know that the added [thread.jthread.class]/1 is enough when it says same functionality as thread.
 %
-%%******************************************************************
-%\rSec1[futures]{Futures}
-%%******************************************************************
+%    Do we need to say that a std::jthread object uniquely represents a thread of execution?
 %
-%...
+%    Do we need to say anything about thread and jthread objects not simultaneously representing the same thread of execution? In other words, given a thread object and a jthread object, they should not represent the same thread of execution. Since there is no interface in either thread or jthread that would allow this, I am ok if the answer is no we don't need to say anything.
 
