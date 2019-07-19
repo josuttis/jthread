@@ -253,6 +253,8 @@ void swap(stop_token& rhs) noexcept;
 \end{itemdescr}
 
 
+\clearpage
+
 %*******************
 %*** stop_token members
 %*******************
@@ -266,7 +268,9 @@ void swap(stop_token& rhs) noexcept;
   \pnum\returns \tcode{true} if \tcode{*this} has ownership of a stop state that has received a stop request;
                 otherwise, \tcode{false}.
                 
-                ??? The determination of the return value is performed atomically. ???
+                {\color{blue} ???:}
+                The determination of the return value is performed atomically.
+                {\color{blue} ???}
 
   % generally covered above:
   %\pnum\sync If \tcode{true} is returned, then synchronizes with the
@@ -303,6 +307,7 @@ void swap(stop_token& rhs) noexcept;
                      objects exists that share the ownership of the associated shared stop state.
                 \end{note}
 
+  {\color{blue} ??? END }
 \end{itemdescr}
 
 
@@ -569,7 +574,9 @@ void swap(stop_source& rhs) noexcept;
   \pnum\returns \tcode{true} if \tcode{*this} has ownership of a stop state that has received a stop request;
                 otherwise, \tcode{false}.
                 
-                ??? The determination of the return value is performed atomically. ???
+                {\color{blue} ???:}
+                The determination of the return value is performed atomically.
+                {\color{blue} ???}
 \end{itemdescr}
 
 \indexlibrarymember{request_stop}{stop_source}%
