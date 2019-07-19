@@ -90,7 +90,6 @@ do not introduce data races.
 A call to \tcode{request_stop} that returns \tcode{true}
 synchronizes with a call to \tcode{stop_requested} on an associated \tcode{stop_token}
 or \tcode{stop_source} object that returns \tcode{true}.
-%NEW:
 Registration of a callback synchronizes with the invocation of that callback.
 
 
@@ -173,7 +172,7 @@ stop_token() noexcept;
 \begin{itemdescr}
   \pnum\postconditions \tcode{stop_possible()} is \tcode{false} and 
                        \tcode{stop_requested()} is \tcode{false}.
-        \begin{note} As the created \tcode{stop_token} object that can never receive a stop request,
+        \begin{note} Because the created \tcode{stop_token} object that can never receive a stop request,
                      no resources are allocated for a stop state.  \end{note}
 
 \end{itemdescr}
@@ -280,12 +279,30 @@ void swap(stop_token& rhs) noexcept;
 [[nodiscard]] bool stop_possible() const noexcept;
 \end{itemdecl}
 \begin{itemdescr}
+
+  {\color{blue} ??? EITHER: }
+
   \pnum\returns \tcode{false} if:
   \begin{itemize}
    \item \tcode{*this} does not have ownership of a stop state, or
    \item \tcode{stop_requested()} is \tcode{false} and there are no associated \tcode{stop_source} objects;
   \end{itemize}
         otherwise, \tcode{true}.
+
+  {\color{blue} ??? OR: }
+  
+  \pnum\returns \tcode{false} if:
+  \begin{itemize}
+   \item \tcode{*this} does not own a stop state, or
+   \item a stop request was not made and 
+         an implementation detects that the associated shared stop state can never receive a stop request;
+  \end{itemize}
+        otherwise, \tcode{true}.
+                \begin{note} Implementations are permitted to return \tcode{false} when no request to stop
+                     has been made and no more \tcode{stop_source}
+                     objects exists that share the ownership of the associated shared stop state.
+                \end{note}
+
 \end{itemdescr}
 
 
@@ -1737,7 +1754,7 @@ otherwise, the provided forward progress guarantee is implementation-defined.
 In [cfenv.syn]/2:
 }
 
-The floating-point environment has thread storage duration (6.6.5.2). The initial state for a thread�s
+The floating-point environment has thread storage duration (6.6.5.2). The initial state for a threads
 floating-point environment is the state of the floating-point environment of the thread that constructs the
 corresponding \tcode{}thread object (32.3.2) 
 {\color{insertcolor}
