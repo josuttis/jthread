@@ -303,7 +303,7 @@ void swap(stop_token& rhs) noexcept;
 [[nodiscard]] bool operator==(const stop_token& lhs, const stop_token& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\returns \tcode{true} if \tcode{lhs} and \tcode{rhs} share ownership
+  \pnum\returns \tcode{true} if \tcode{lhs} and \tcode{rhs} have ownership
                 of the same stop state
                 or if both \tcode{lhs} and \tcode{rhs} do not have ownership of a stop state;
                 otherwise \tcode{false}.
@@ -582,7 +582,7 @@ bool request_stop() noexcept;
                 then \tcode{terminate()} is called.
                 \begin{note} A stop request includes notifying all condition variables
                              of type \tcode{condition_variable_any}
-                             temporarily registered during an interruptible wait (\iref{thread.condvarany.interruptwait}).
+                             temporarily registered during an interruptible wait\iref{thread.condvarany.interruptwait}.
                              \end{note}
 
   \pnum\postconditions \tcode{stop_possible()} is \tcode{false} or \tcode{stop_requested()} is \tcode{true}.
@@ -601,7 +601,7 @@ bool request_stop() noexcept;
 [[nodiscard]] bool operator==(const stop_source& lhs, const stop_source& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  \pnum\returns \tcode{true} if \tcode{lhs} and \tcode{rhs} share ownership
+  \pnum\returns \tcode{true} if \tcode{lhs} and \tcode{rhs} have ownership
                 of the same stop state
                 or if both \tcode{lhs} and \tcode{rhs} do not have ownership of a stop state;
                 otherwise \tcode{false}.
@@ -799,7 +799,7 @@ namespace std {
 \pnum
 The class \tcode{jthread} provides a mechanism
 to create a new thread of execution.
-The functionality is the same as for class \tcode{thread} (\iref{thread.thread.class})
+The functionality is the same as for class \tcode{thread}\iref{thread.thread.class}
 with the additional ability to request that the thread stops and
 then joins the started thread.
 
