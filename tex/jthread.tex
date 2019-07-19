@@ -385,29 +385,6 @@ namespace std {
 }
 \end{codeblock}
 
-%%*******************
-%%*** No-shared-stop-state indicator nostopstate_t
-%%*******************
-%\rSec3[stopsource.nostopstate]{No-shared-stop-state indicator}
-%
-%% double check nullopt_t
-%
-%\indexlibrary{\idxcode{nostopstate_t}}%
-%\indexlibrary{\idxcode{nostopstate}}%
-%\begin{itemdecl}
-%struct nostopstate_t{@\seebelow@};
-%inline constexpr nostopstate_t nostopstate(@\unspec@);
-%\end{itemdecl}
-%
-%\pnum
-%The struct \tcode{nostopstate_t} is an empty class type used as a unique type to indicate the state of
-%not containing a shared stop state for \tcode{stop_source} objects.
-%In particular, \tcode{stop_source} has a constructor with \tcode{nostopstate_t} as a single argument type;
-%this indicates that a \tcode{stop_source} object is constructed that has no shared stop state.
-%
-%\pnum
-%Type \tcode{nostopstate_t} does not have a default constructor or an initializer-list constructor,
-%and is not an aggregate.
 
 %*******************
 %*** stop_source constructors
@@ -444,13 +421,7 @@ explicit stop_source(nostopstate_t) noexcept;
 stop_source(const stop_source& rhs) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  %\pnum\effects If \tcode{rhs.stop_possible()} is \tcode{true},
-  %              constructs a \tcode{stop_source}
-  %              that shares the ownership of the stop state with \tcode{rhs}.
 
-  % TODO: It's possible that evaluating stop_requested() == rhs.stop_requested()
-  %       could return 'false' if another thread concurrently called request_stop().
-  %       Is this a problem putting it in in a post-condition?
   \pnum\postconditions \tcode{*this == rhs} is \tcode{true}.
     \begin{note} \tcode{*this} and \tcode{rhs} share the ownership of the
                  same stop state, if any.  \end{note}
@@ -541,12 +512,6 @@ void swap(stop_source& rhs) noexcept;
 \begin{itemdescr}
   \pnum\returns \tcode{true} if \tcode{*this} has ownership of a stop state;
                 otherwise, \tcode{false}.
-                % NOT NECESSARY:
-                %The determination of the return values is performed atomically.
-                %the stop source can be used to perform stop requests, executed atomically.
-                %\begin{note} Returns \tcode{false} if the object was created with \tcode{nostopstate}
-                %             or the values were moved away.
-                %             \end{note}
 \end{itemdescr}
 
 \indexlibrarymember{stop_requested}{stop_source}%
@@ -564,12 +529,6 @@ void swap(stop_source& rhs) noexcept;
 bool request_stop() noexcept;
 \end{itemdecl}
 \begin{itemdescr}
-  %\pnum\requires \tcode{stop_possible() == true}
-  %Hans:
-  %Did we discuss whether interrupt() on an invalid (e.g. default constructed) stop/interrupt token should be a no-op,
-  %rather than undefined? I would expect that to be convenient if we start passing stop_tokens around explicitly.
-  %Presumably a lot of short-lived tasks don't care about stopping/interruption, but might be used in a context in which an
-  %stop/interrupt token is expected. With the change, you could just pass a default-constructed one.
 
   \pnum\effects If \tcode{*this} does not have ownership of a stop state, returns \tcode{false}. 
                 Otherwise, atomically determines whether the owned stop state has received a stop request,
@@ -736,14 +695,6 @@ explicit stop_callback(stop_token&& st, C&& cb)
                 the destructor does not block\iref{defns.block} waiting for the return from
                 the invocation of \tcode{callback}.
                 Releases ownership of the stop state, if any.
-
-                %\tcode{callback} is destroyed.
-                %% TODO: FIX WORDING HERE:
-                %If \tcode{\~stop_callback()} is invoked 
-                %%during invocation of the callback and both run on the same thread.
-                %while the invocation of \tcode{callback}
-                %is active on the current thread then the destructor does not block waiting
-                %for the return from \tcode{callback}.
 \end{itemdescr}
 
 }%\color{insertcolor}
@@ -775,7 +726,6 @@ namespace std {
   class jthread;
 
 \end{codeblock}
-  %void swap(jthread& x, jthread& y) noexcept;
 }%\color{insertcolor}
 \begin{codeblock}
   ...
@@ -866,13 +816,6 @@ namespace std {
 \begin{codeblock}
 }
 \end{codeblock}
-
-%%{\color{blue}
-%[{\itshape{}Editorial note:} {After the synopsis, copy the whole description from 
-%                [thread.thread.constr] til [thread.thread.algorithm]
-%                using \tcode{jthread} instead of \tcode{thread}
-%                and apply the \color{diffcolor}differences signaled}. ]
-%}
 
 
 %*******************
@@ -1557,17 +1500,8 @@ when there is a stop request on the passed \tcode{stop_token}.
 In that case the functions return immediately,
 returning \tcode{false} if the predicate evaluates to \tcode{false}. 
 
-% Hans Boehm:
-%We then also need some statement for the waiting functions that if they return with an stopped/interrupted status,
-% their synchronization behavior is as though they called stop_requested().
-%{\color{blue}
-%[{\itshape{}Editorial note:} Because all signatures here in the effects clause call
-%        \tcode{stop_requested()}, we don't need wording
-%        that the calls synchronize with \tcode{interrupt()/request_stop()}. ]
-%}
 
-
-%**** untimed wait_until (with pred)
+%**** wait_until (with pred)
 % return false if stoken.stop_requested():
 
 \begin{itemdecl}
@@ -1576,13 +1510,8 @@ template<class Lock, class Predicate>
                   Predicate pred,
                   stop_token stoken);
 \end{itemdecl}
-%{\color{blue}
-%[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait()} function without the stop token parameter.} ]
-%}
 
 \begin{itemdescr}
-
-%{\color{diffcolor}
  \pnum\effects Registers for the duration of this call \tcode{*this} to get notified on a stop request on \tcode{stoken}
                during this call and then equivalent to:
 \begin{codeblock}
@@ -1606,9 +1535,6 @@ return pred();
 
  \pnum \throws 
         Any exception thrown by \tcode{pred}.
-
-%}%diffcolor
-
 \end{itemdescr}
 
 
@@ -1623,9 +1549,6 @@ template<class Lock, class Clock, class Duration, class Predicate>
                   Predicate pred,
                   stop_token stoken);
 \end{itemdecl}
-%{\color{blue}
-%[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait_until()} function without the stop token parameter.} ]
-%}
 
 \begin{itemdescr}
  \pnum\effects Registers for the duration of this call \tcode{*this} to get notified on a stop request on \tcode{stoken}
@@ -1661,10 +1584,6 @@ regardless of whether the timeout was triggered or a stop request was made. \end
         Timeout-related exceptions \iref{thread.req.timing},
         or any exception thrown by \tcode{pred}.
 
-%{\color{diffcolor}
-% \pnum\sync If the function returns with an stopped/interrupted status, 
-%                their synchronization behavior is as though it called \tcode{stop_requested()}.
-%}%diffcolor
 \end{itemdescr}
 
 
@@ -1678,9 +1597,6 @@ template<class Lock, class Rep, class Period, class Predicate>
                 Predicate pred,
                 stop_token stoken);
 \end{itemdecl}
-%{\color{blue}
-%[{\itshape{}Editorial note:} {\color{diffcolor}This color signals differences to the corresponding \tcode{wait_for()} function without the stop token parameter.} ]
-%}
 \begin{itemdescr}
  \pnum \effects Equivalent to:
 \begin{codeblock}
@@ -1715,10 +1631,6 @@ In 16.5.1.2 Headers [headers] in tab:headers.cpp add:
 }
 
 \tcode{<stop_token>}
-
-
-%[except.terminate]:1.13:
-%when execution of the initial function of a thread exits via an exception (32.3.2.2), or
 
 
 {\color{blue}
@@ -1762,17 +1674,4 @@ or \tcode{jthread} object \iref{thread.jthread.class}
 }%\color{insertcolor}
 at the time it constructed the object.
 
-
-%32.6.9[futures.async]/3.1
-%If launch::async is set in policy, calls INVOKE(decay-copy(std::forward<F>(f)), decaycopy(
-%std::forward<Args>(args))...) (20.14.3, 32.3.2.2) as if in a new thread of execution
-%represented by a thread object with the calls to decay-copy being evaluated in the thread that
-%called async.
-
-
-%Additionally, in 32.3.2[thread.thread.class]/1, there is wording that a std::thread object uniquely represents a thread of execution.  I don't know that the added [thread.jthread.class]/1 is enough when it says same functionality as thread.
-%
-%    Do we need to say that a std::jthread object uniquely represents a thread of execution?
-%
-%    Do we need to say anything about thread and jthread objects not simultaneously representing the same thread of execution? In other words, given a thread object and a jthread object, they should not represent the same thread of execution. Since there is no interface in either thread or jthread that would allow this, I am ok if the answer is no we don't need to say anything.
 
