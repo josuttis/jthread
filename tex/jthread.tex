@@ -694,12 +694,33 @@ namespace std {
 }
 \end{codeblock}
 
-The program is ill-formed, if the definition of \tcode{stop_callback} is
-instantiated with a type as the argument for the template parameter
-\tcode{Callback} that does not satisfy \tcode{Invocable} or does not satisfy
+{\color{blue} ??? EITHER: }
+
+\pnum
+If \tcode{stop_callback} is instantiated with an argument for the template parameter
+\tcode{Callback} that does not satisfy \tcode{Invocable} or does not model
+\tcode{Destructible}, the program is ill-formed.
+
+\pnum
+If \tcode{stop_callback} is instantiated with an argument for the template parameter
+\tcode{Callback} that does not model \tcode{Invocable} or does not model \tcode{Destructible},
+the behaviour is undefined.
+
+{\color{blue} ??? OR (see LWG3193): }
+
+\pnum\mandates
+\tcode{stop_callback} is instantiated with an argument for the
+template parameter \tcode{Callback} that satisfies both \tcode{Invocable} and
 \tcode{Destructible}.
-%If Callback does not satisfy Invocable or does not satisfy
-%Destructible, the program is ill-formed.
+
+\pnum\expects
+\tcode{stop_callback} is instantiated with an argument for the
+template parameter \tcode{Callback} that models both \tcode{Invocable} and
+\tcode{Destructible}.
+
+{\color{blue} ??? END}
+
+
 
 %*******************
 %*** stop_callback constructors and destructor
