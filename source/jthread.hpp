@@ -38,7 +38,7 @@ class jthread
     template <typename Callable, typename... Args,
               typename = ::std::enable_if_t<!::std::is_same_v<::std::decay_t<Callable>, jthread>>>
     explicit jthread(Callable&& cb, Args&&... args);
-    ~jthread();
+    inline ~jthread();
 
     jthread(const jthread&) = delete;
     jthread(jthread&&) noexcept = default;
@@ -46,7 +46,7 @@ class jthread
     jthread& operator=(jthread&&) noexcept = default;
 
     // members:
-    void swap(jthread&) noexcept;
+    inline void swap(jthread&) noexcept;
     bool joinable() const noexcept;
     void join();
     void detach();
@@ -119,7 +119,7 @@ inline jthread::jthread(Callable&& cb, Args&&... args)
 }
 
 // destructor:
-jthread::~jthread() {
+inline jthread::~jthread() {
   if (joinable()) {   // if not joined/detached, signal stop and wait for end:
     request_stop();
     join();
@@ -151,7 +151,7 @@ inline stop_token jthread::get_stop_token() const noexcept {
   return _stopSource.get_token();
 }
 
-void jthread::swap(jthread& t) noexcept {
+inline void jthread::swap(jthread& t) noexcept {
     std::swap(_stopSource, t._stopSource);
     std::swap(_thread, t._thread);
 }
