@@ -38,7 +38,7 @@ class jthread
     template <typename Callable, typename... Args,
               typename = ::std::enable_if_t<!::std::is_same_v<::std::decay_t<Callable>, jthread>>>
     explicit jthread(Callable&& cb, Args&&... args);
-    inline ~jthread();
+    ~jthread();
 
     jthread(const jthread&) = delete;
     jthread(jthread&&) noexcept = default;
@@ -46,7 +46,7 @@ class jthread
     jthread& operator=(jthread&&) noexcept = default;
 
     // members:
-    inline void swap(jthread&) noexcept;
+    void swap(jthread&) noexcept;
     bool joinable() const noexcept;
     void join();
     void detach();
