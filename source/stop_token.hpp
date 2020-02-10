@@ -14,22 +14,6 @@
 #endif
 
 namespace std {
-
-#if __cplusplus <= 201703L
-// workaround for non-existing unwrap_reference:
-template<typename T>
-struct unwrap_reference {
-  using type = T;
-};
-
-template<typename T>
-struct unwrap_reference<std::reference_wrapper<T>> {
-  using type = T&;
-};
-
-template<class T> using unwrap_reference_t = typename unwrap_reference<T>::type;
-#endif
-
 inline void __spin_yield() noexcept {
   // TODO: Platform-specific code here
 #if defined(__x86_64__) || defined(_M_X64)
