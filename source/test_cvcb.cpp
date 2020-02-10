@@ -35,9 +35,9 @@ void testCVCallback()
                                              });
                        std::cout << "\nt1 cb registered" << std::endl;
                        std::unique_lock<std::mutex> lg{readyMutex};
-                       readyCV.wait_until(lg,
-                                          [&ready] { return ready; },
-                                          stoken);
+                       readyCV.wait(lg,
+                                    stoken,
+                                    [&ready] { return ready; });
                        std::cout << "\nend t1" << std::endl;
                 }};
 

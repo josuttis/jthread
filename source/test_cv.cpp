@@ -24,10 +24,9 @@ void cvIWait (std::stop_token sToken, int id,
     {
       std::unique_lock lg{readyMutex};
       //std::cout.put(static_cast<char>('0'+id)).flush();
-      //readyCV.iwait(lg, [&ready] { return ready; });
-      readyCV.wait_until(lg,
-                         [&ready] { return ready; },
-                         sToken);
+      readyCV.wait(lg,
+                   sToken,
+                   [&ready] { return ready; });
       if (sToken.stop_requested()) {
         throw "interrupted";
       }
@@ -118,14 +117,13 @@ void testCVPred(bool callNotify)
   std::condition_variable_any2 readyCV;
   
   {
-    std::jthread t1([&ready, &readyMutex, &readyCV, callNotify] (std::stop_token it) {
+    std::jthread t1([&ready, &readyMutex, &readyCV, callNotify] (std::stop_token st) {
                       try {
                         std::unique_lock lg{readyMutex};
-                        //readyCV.iwait(lg, [&ready] { return ready; });
-                        readyCV.wait_until(lg,
-                                           [&ready] { return ready; },
-                                           it);
-                        if (it.stop_requested()) {
+                        readyCV.wait(lg,
+                                     st,
+                                     [&ready] { return ready; });
+                        if (st.stop_requested()) {
                           throw "interrupted";
                         }
                         assert(callNotify);
@@ -139,13 +137,13 @@ void testCVPred(bool callNotify)
                       catch (...) {
                         assert(false);
                       }
-                      if (it.stop_requested()) {
+                      if (st.stop_requested()) {
                         std::cout << "t1: interrupted" << std::endl;
                       }
                       else {
                         std::cout << "t1: ready" << std::endl;
                       }
-                      assert(callNotify != it.stop_requested());
+                      assert(callNotify != st.stop_requested());
                     });
     
     std::this_thread::sleep_for(1s);
@@ -175,18 +173,18 @@ void testCVStdThreadNoPred(bool callNotify)
   
   std::stop_source is;
   {
-    std::thread t1([&ready, &readyMutex, &readyCV, it=is.get_token(), callNotify] {
+    std::thread t1([&ready, &readyMutex, &readyCV, st=is.get_token(), callNotify] {
                       {
                         std::unique_lock lg{readyMutex};
-                        bool ret = readyCV.wait_until(lg,
-                                                      [&ready] { return ready; },
-                                                      it);
+                        bool ret = readyCV.wait(lg,
+                                                st,
+                                                [&ready] { return ready; });
                         if (ret) {
                             std::cout << "t1: ready" << std::endl;
-                            assert(!it.stop_requested());
+                            assert(!st.stop_requested());
                             assert(callNotify);
                         }
-                        else if (it.stop_requested()) {
+                        else if (st.stop_requested()) {
                             std::cout << "t1: interrupted" << std::endl;
                             assert(!callNotify);
                         }
@@ -226,23 +224,23 @@ void testCVStdThreadPred(bool callNotify)
   
   std::stop_source is;
   {
-    std::thread t1([&ready, &readyMutex, &readyCV, it=is.get_token(), callNotify] {
+    std::thread t1([&ready, &readyMutex, &readyCV, st=is.get_token(), callNotify] {
                       bool ret;
                       {
                         std::unique_lock lg{readyMutex};
-                        ret = readyCV.wait_until(lg,
-                                                 [&ready] { return ready; },
-                                                 it);
+                        ret = readyCV.wait(lg,
+                                           st,
+                                           [&ready] { return ready; });
                         if (ret) {
                           std::cout << "t1: ready" << std::endl;
-                          assert(!it.stop_requested());
+                          assert(!st.stop_requested());
                         }
                         else {
                           std::cout << "t1: interrupted" << std::endl;
-                          assert(it.stop_requested());
+                          assert(st.stop_requested());
                         }
                       }
-                      assert(callNotify != it.stop_requested());
+                      assert(callNotify != st.stop_requested());
                     });
     
     std::this_thread::sleep_for(0.5s);
@@ -278,17 +276,15 @@ void testMinimalWait(int sec)
     std::mutex readyMutex;
     std::condition_variable_any2 readyCV;
     {
-      std::jthread t1([&ready, &readyMutex, &readyCV, dur] (std::stop_token it) {
+      std::jthread t1([&ready, &readyMutex, &readyCV, dur] (std::stop_token st) {
                         try {
                           std::cout << "\n- start t1" << std::endl;
                           auto t0 = std::chrono::steady_clock::now();
                           {
                             std::unique_lock lg{readyMutex};
-                            readyCV.wait_until(lg,
-                                               [&ready] {
-                                                  return ready;
-                                               },
-                                               it);
+                            readyCV.wait(lg,
+                                         st,
+                                         [&ready] { return ready; });
                           }
                           assert(std::chrono::steady_clock::now() <  t0 + dur + 1s);
                           std::cout << "\n- t1 done" << std::endl;
@@ -329,18 +325,18 @@ void testMinimalWaitFor(int sec1, int sec2)
   std::mutex readyMutex;
   std::condition_variable_any2 readyCV;
   {
-    std::jthread t1([&ready, &readyMutex, &readyCV, durInt, durWait] (std::stop_token it) {
+    std::jthread t1([&ready, &readyMutex, &readyCV, durInt, durWait] (std::stop_token st) {
                       try {
                       std::cout << "\n- start t1" << std::endl;
                       auto t0 = std::chrono::steady_clock::now();
                       {
                         std::unique_lock lg{readyMutex};
                         readyCV.wait_for(lg,
+                                         st,
                                          durWait,
                                          [&ready] {
                                             return ready;
-                                         },
-                                         it);
+                                         });
                       }
                       assert(std::chrono::steady_clock::now() <  t0 + durInt + 1s);
                       assert(std::chrono::steady_clock::now() <  t0 + durWait + 1s);
@@ -383,18 +379,17 @@ void testTimedCV(bool callNotify, bool callInterrupt, Dur dur)
   std::condition_variable_any2 readyCV;
   
   {
-    std::jthread t1([&ready, &readyMutex, &readyCV, callNotify, dur] (std::stop_token it) {
+    std::jthread t1([&ready, &readyMutex, &readyCV, callNotify, dur] (std::stop_token st) {
                       std::cout << "\n- start t1" << std::endl;
                       auto t0 = std::chrono::steady_clock::now();
                       int timesDone{0};
                       while (timesDone < 3) {
                         {
                           std::unique_lock lg{readyMutex};
-                          //auto end = std::chrono::system_clock::now() + dur;
-                          //auto ret = readyCV.wait_until(lg, end,
-                          auto ret = readyCV.wait_for(lg, dur,
-                                                      [&ready] { return ready; },
-                                                      it);
+                          auto ret = readyCV.wait_for(lg,
+                                                      st,
+                                                      dur,
+                                                      [&ready] { return ready; });
                           if (dur > 5s) {
                             assert(std::chrono::steady_clock::now() < t0 + dur);
                           }
@@ -402,11 +397,11 @@ void testTimedCV(bool callNotify, bool callInterrupt, Dur dur)
                             //std::cout << "t1: ready" << std::endl;
                             std::cout.put('r').flush();
                             assert(ready);
-                            assert(!it.stop_requested());
+                            assert(!st.stop_requested());
                             assert(callNotify);
                             ++timesDone;
                           }
-                          else if (it.stop_requested()) {
+                          else if (st.stop_requested()) {
                             //std::cout << "t1: interrupted" << std::endl;
                             std::cout.put('i').flush();
                             assert(!ready);
@@ -468,19 +463,18 @@ void testTimedIWait(bool callNotify, bool callInterrupt, Dur dur)
   enum class State { loop, ready, interrupted };
   State t1Feedback{State::loop};
   {
-    std::jthread t1([&ready, &readyMutex, &readyCV, callNotify, dur, &t1Feedback] (std::stop_token it) {
+    std::jthread t1([&ready, &readyMutex, &readyCV, callNotify, dur, &t1Feedback] (std::stop_token st) {
                       std::cout << "\n- start t1" << std::endl;
                       auto t0 = std::chrono::steady_clock::now();
                       int timesDone{0};
                       while (timesDone < 3) {
                         try {
                           std::unique_lock lg{readyMutex};
-                          //auto end = std::chrono::system_clock::now() + dur;
-                          //auto ret = readyCV.wait_until(lg, end,
-                          auto ret = readyCV.wait_for(lg, dur,
-                                                      [&ready] { return ready; },
-                                                      it);
-                          if (it.stop_requested()) {
+                          auto ret = readyCV.wait_for(lg,
+                                                      st,
+                                                      dur,
+                                                      [&ready] { return ready; });
+                          if (st.stop_requested()) {
                             throw "interrupted";
                           }
                           if (dur > 5s) {
@@ -491,14 +485,14 @@ void testTimedIWait(bool callNotify, bool callInterrupt, Dur dur)
                             std::cout.put('r').flush();
                             t1Feedback = State::ready;
                             assert(ready);
-                            assert(!it.stop_requested());
+                            assert(!st.stop_requested());
                             assert(callNotify);
                             ++timesDone;
                           }
                           else {
                             // note: might also be interrupted already!
                             //std::cout << "t1: timeout" << std::endl;
-                            std::cout.put(it.stop_requested() ? 'T' : 't').flush();
+                            std::cout.put(st.stop_requested() ? 'T' : 't').flush();
                           }
                         }
                         catch (const char*) {
