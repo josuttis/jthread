@@ -40,7 +40,7 @@ void exampleProducerConsumer(double prodSec, double consSec, bool interrupt)
       std::unique_lock lock{itemsMx};
       while (!stoken.stop_requested()) {
         ////std::cout << "\nP: wait " << std::endl;
-        if (!itemsCV.wait_until(lock, [&] { return items.size() < maxQueueSize; }, stoken)) {
+        if (!itemsCV.wait(lock, stoken, [&] { return items.size() < maxQueueSize; })) {
          //std::cout << "\nP: wait returned false " << std::endl;
          return;
         }
@@ -85,7 +85,7 @@ void exampleProducerConsumer(double prodSec, double consSec, bool interrupt)
         lock.lock();
 
         //std::cout << "\nC: wait " << std::endl;
-        if (!itemsCV.wait_until(lock, [&] { return !items.empty(); }, stoken)) {
+        if (!itemsCV.wait(lock, stoken, [&] { return !items.empty(); })) {
           // returned false, so it was interrupted
           //std::cout << "\nC: wait returned false " << std::endl;
           return;
@@ -127,8 +127,7 @@ void exampleProducerConsumer(double prodSec, double consSec, bool interrupt)
     std::unique_lock lock{ m2 };
 
     // A hacky way of implementing an interruptible sleep.
-    //cv.wait_for(lock, stoken, 5s, [] { return false; });
-    cv2.wait_for(lock, 5s, [] { std::cout << "S" << std::endl; return false; }, stoken);
+    cv2.wait_for(lock, stoken, 5s, [] { std::cout << "S" << std::endl; return false; }, stoken);
 
     // Ideally this would be:
     // std::this_thread::sleep(5s, stoken);

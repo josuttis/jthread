@@ -155,26 +155,26 @@ class condition_variable_any2
     // - true if pred() yields true
     // - false otherwise (i.e. on interrupt)
     template <class Lockable,class Predicate>
-      bool wait_until(Lockable& lock,
-                      Predicate pred,
-                      stop_token stoken);
+      bool wait(Lockable& lock,
+                stop_token stoken,
+                Predicate pred);
 
     // return:
     // - true if pred() yields true
     // - false otherwise (i.e. on timeout or interrupt)
     template <class Lockable, class Clock, class Duration, class Predicate>
       bool wait_until(Lockable& lock,
+                      stop_token stoken,
                       const chrono::time_point<Clock, Duration>& abs_time,
-                      Predicate pred,
-                      stop_token stoken);
+                      Predicate pred);
     // return:
     // - true if pred() yields true
     // - false otherwise (i.e. on timeout or interrupt)
     template <class Lockable, class Rep, class Period, class Predicate>
       bool wait_for(Lockable& lock,
+                    stop_token stoken,
                     const chrono::duration<Rep, Period>& rel_time,
-                    Predicate pred,
-                    stop_token stoken);
+                    Predicate pred);
 
   //***************************************** 
   //* implementation:
@@ -214,9 +214,9 @@ class condition_variable_any2
 // - true if pred() yields true
 // - false otherwise (i.e. on interrupt)
 template <class Lockable, class Predicate>
-inline bool condition_variable_any2::wait_until(Lockable& lock,
-                                            Predicate pred,
-                                            stop_token stoken)
+inline bool condition_variable_any2::wait(Lockable& lock,
+                                          stop_token stoken,
+                                          Predicate pred)
 {
     if (stoken.stop_requested()) {
       return pred();
@@ -244,9 +244,9 @@ inline bool condition_variable_any2::wait_until(Lockable& lock,
 // - false otherwise (i.e. on timeout or interrupt)
 template <class Lockable, class Clock, class Duration, class Predicate>
 inline bool condition_variable_any2::wait_until(Lockable& lock,
-                                            const chrono::time_point<Clock, Duration>& abs_time,
-                                            Predicate pred,
-                                            stop_token stoken)
+                                                stop_token stoken,
+                                                const chrono::time_point<Clock, Duration>& abs_time,
+                                                Predicate pred)
 {
     if (stoken.stop_requested()) {
       return pred();
@@ -282,15 +282,15 @@ inline bool condition_variable_any2::wait_until(Lockable& lock,
 // - false otherwise (i.e. on timeout or interrupt)
 template <class Lockable,class Rep, class Period, class Predicate>
 inline bool condition_variable_any2::wait_for(Lockable& lock,
-                                          const chrono::duration<Rep, Period>& rel_time,
-                                          Predicate pred,
-                                          stop_token stoken)
+                                              stop_token stoken,
+                                              const chrono::duration<Rep, Period>& rel_time,
+                                              Predicate pred)
 {
   auto abs_time = std::chrono::steady_clock::now() + rel_time;
   return wait_until(lock,
+                    std::move(stoken),
                     abs_time,
-                    std::move(pred),
-                    std::move(stoken));
+                    std::move(pred));
 }
 
 

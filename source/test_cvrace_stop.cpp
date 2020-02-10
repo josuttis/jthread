@@ -50,7 +50,7 @@ void testCVAnyMutex()
     m.lock();
     waiting=true;
     deleter_cv.notify_all();
-    cv->wait_until(m,[]{return done;},st);
+    cv->wait(m, st, []{return done;});
     m.unlock();
     th.join();
     free(raw);

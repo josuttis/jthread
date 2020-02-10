@@ -119,7 +119,7 @@ inline jthread::jthread(Callable&& cb, Args&&... args)
 }
 
 // destructor:
-jthread::~jthread() {
+inline jthread::~jthread() {
   if (joinable()) {   // if not joined/detached, signal stop and wait for end:
     request_stop();
     join();
@@ -151,7 +151,7 @@ inline stop_token jthread::get_stop_token() const noexcept {
   return _stopSource.get_token();
 }
 
-void jthread::swap(jthread& t) noexcept {
+inline void jthread::swap(jthread& t) noexcept {
     std::swap(_stopSource, t._stopSource);
     std::swap(_thread, t._thread);
 }

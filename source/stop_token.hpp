@@ -14,7 +14,6 @@
 #endif
 
 namespace std {
-
 inline void __spin_yield() noexcept {
   // TODO: Platform-specific code here
 #if defined(__x86_64__) || defined(_M_X64)

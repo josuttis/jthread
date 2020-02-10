@@ -32,14 +32,14 @@ void testCVDeadlock()
 //  - block and try to notify cv1
   
   {
-    std::jthread t1([&ready, &readyMutex, &readyCV] (std::stop_token it) {
-                        std::cout << "\n" <<std::this_thread::get_id()<<": t1: lock "<<&readyMutex << std::endl;
+    std::jthread t1([&ready, &readyMutex, &readyCV] (std::stop_token st) {
+                      std::cout << "\n" <<std::this_thread::get_id()<<": t1: lock "<<&readyMutex << std::endl;
                       std::unique_lock<std::mutex> lg{readyMutex};
                       std::cout << "\n" <<std::this_thread::get_id()<<": t1: wait" << std::endl;
-                      readyCV.wait_until(lg,
-                                         [&ready] { return ready; },
-                                         it);
-                      if (it.stop_requested()) {
+                      readyCV.wait(lg,
+                                   st,
+                                   [&ready] { return ready; });
+                      if (st.stop_requested()) {
                         std::cout << "\n" <<std::this_thread::get_id()<<": t1: signal stop" << std::endl;
                       }
                       else {
