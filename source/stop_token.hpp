@@ -142,14 +142,14 @@ struct __stop_state {
       __stop_callback_base* __cb,
       bool __incrementRefCountIfSuccessful) noexcept {
     std::uint64_t __oldState;
-    goto load_state;
+    goto __load_state;
     do {
-      goto check_state;
+      goto __check_state;
       do {
         __spin_yield();
-      load_state:
+      __load_state:
         __oldState = __state_.load(std::memory_order_acquire);
-      check_state:
+      __check_state:
         if (__is_stop_requested(__oldState)) {
           __cb->__execute();
           return false;
