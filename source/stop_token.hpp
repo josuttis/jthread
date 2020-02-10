@@ -16,6 +16,7 @@
 namespace std {
 
 #if __cplusplus <= 201703L
+// workaround for non-existing unwrap_reference:
 template<typename T>
 struct unwrap_reference {
   using type = T;
@@ -28,8 +29,6 @@ struct unwrap_reference<std::reference_wrapper<T>> {
 
 template<class T> using unwrap_reference_t = typename unwrap_reference<T>::type;
 #endif
-
-// workaround for non exitsing unwrap_reference:
 
 inline void __spin_yield() noexcept {
   // TODO: Platform-specific code here
