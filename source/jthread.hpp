@@ -43,7 +43,7 @@ class jthread
     jthread(const jthread&) = delete;
     jthread(jthread&&) noexcept = default;
     jthread& operator=(const jthread&) = delete;
-    jthread& operator=(jthread&&) noexcept = default;
+    jthread& operator=(jthread&&) noexcept;
 
     // members:
     void swap(jthread&) noexcept;
@@ -116,6 +116,18 @@ inline jthread::jthread(Callable&& cb, Args&&... args)
                ::std::forward<Args>(args)...  // pass arguments for callable
            }
 {
+}
+
+// move assignment operator:
+inline jthread& jthread::operator=(jthread&& t) noexcept {
+  if (joinable()) {   // if not joined/detached, signal stop and wait for end:
+    request_stop();
+    join();
+  }
+
+  _thread = std::move(t._thread);
+  _stopSource = std::move(t._stopSource);
+  return *this;
 }
 
 // destructor:

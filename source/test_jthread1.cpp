@@ -209,6 +209,34 @@ void testDetach()
 
 //------------------------------------------------------
 
+void testAssign()
+{
+  // test jthread operator=()
+  std::cout << "\n*** start testAssign()" << std::endl;
+
+  std::stop_token stoken;
+  {
+    std::jthread t1([](std::stop_token stoken) {
+                      // wait until interrupt is signaled (due to calling request_stop() for the token):
+                      for (int i=0; !stoken.stop_requested(); ++i) {
+                         std::this_thread::sleep_for(100ms);
+                         std::cout.put('.').flush();
+                      }
+                      std::cout << "END t1" << std::endl;
+                 });
+    stoken = t1.get_stop_token();
+    assert(!stoken.stop_requested());
+    assert(t1.joinable());
+    // t1 is stopped and joined before being assigned:
+    t1 = std::jthread();
+    assert(stoken.stop_requested());
+    assert(!t1.joinable());
+  }
+  std::cout << "\n*** OK" << std::endl;
+}
+
+//------------------------------------------------------
+
 void testStdThread()
 {
   // test the extended std::thread API
@@ -436,6 +464,8 @@ int main()
   testJoin();
   std::cout << "\n\n**************************\n";
   testDetach();
+  std::cout << "\n\n**************************\n";
+  testAssign();
   std::cout << "\n\n**************************\n";
   testStdThread();
   std::cout << "\n\n**************************\n";
