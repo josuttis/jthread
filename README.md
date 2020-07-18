@@ -7,7 +7,7 @@ C++ class for a joining and cooperative interruptible thread (std::jthread) with
      - http://wg21.link/p1287  (initial proposal for stop callbacks, merged with p0660r7)
   -  http://wg21.link/p1869  (additional minor updates for C++20)
 
-Mian authors:  Nicolai Josuttis (http://www.josuttis.com/contact.html) and Lewis Baker
+Main authors:  Nicolai Josuttis (http://www.josuttis.com/contact.html) and Lewis Baker
 
 The code is licensed under a Creative Commons Attribution 4.0 International License 
 (http://creativecommons.org/licenses/by/4.0/).
