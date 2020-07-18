@@ -1,7 +1,7 @@
 # jthread
-C++ class for a joining and cooperative interruptible thread (should become std::jthread) with stop_token helper
+C++ class for a joining and cooperative interruptible thread (std::jthread) with stop_token helper
 
-Draft implementation of the C++ paper P0660
+C++ standard committee paper P0660 that proposed this for C++20:
   https://wg21.link/p0660
 
 Authors:  Nicolai Josuttis (http://www.josuttis.com/contact.html) and Lewis Baker
