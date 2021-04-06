@@ -449,7 +449,7 @@ class stop_source {
     return __state_ != nullptr;
   }
 
-  bool request_stop() const noexcept {
+  bool request_stop() noexcept {
     if (__state_ != nullptr) {
       return __state_->__request_stop();
     }
