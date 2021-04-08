@@ -409,7 +409,7 @@ class stop_source {
  public:
   stop_source() : __state_(new __stop_state()) {}
 
-  explicit stop_source(std::nostopstate_t) noexcept : __state_(nullptr) {}
+  explicit stop_source(nostopstate_t) noexcept : __state_(nullptr) {}
 
   ~stop_source() {
     if (__state_ != nullptr) {
