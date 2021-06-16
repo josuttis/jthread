@@ -53,7 +53,7 @@ struct __stop_state {
   void __remove_token_reference() noexcept {
     auto __oldState =
         __state_.fetch_sub(__token_ref_increment, std::memory_order_acq_rel);
-    if (__oldState < (__token_ref_increment + __source_ref_increment)) {
+    if (__oldState < (__token_ref_increment + __token_ref_increment)) {
       delete this;
     }
   }
